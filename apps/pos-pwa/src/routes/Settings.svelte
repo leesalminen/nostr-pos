@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { ArrowLeft, LockKeyhole } from 'lucide-svelte';
+  import BullFooter from '../lib/ui/BullFooter.svelte';
   import Button from '../lib/ui/Button.svelte';
   import { loadTerminal, terminal } from '../lib/stores/terminal';
 
@@ -38,5 +39,6 @@
         Advanced
       </Button>
     </div>
+    <BullFooter />
   </div>
 </main>

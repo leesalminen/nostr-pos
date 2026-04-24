@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { ArrowLeft, CreditCard, History, Settings } from 'lucide-svelte';
   import Button from '../lib/ui/Button.svelte';
+  import BullFooter from '../lib/ui/BullFooter.svelte';
   import BullSpinner from '../lib/ui/BullSpinner.svelte';
   import QrCard from '../lib/ui/QrCard.svelte';
   import { terminal, loadTerminal } from '../lib/stores/terminal';
@@ -197,6 +198,7 @@
           <BullSpinner size={72} label="Preparing" />
         </div>
       {/if}
+      <BullFooter />
     </section>
   </div>
 </main>

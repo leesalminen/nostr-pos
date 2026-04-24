@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { ArrowLeft, Settings } from 'lucide-svelte';
+  import BullFooter from '../lib/ui/BullFooter.svelte';
   import TransactionSheet from '../lib/ui/TransactionSheet.svelte';
   import { loadTerminal, terminal } from '../lib/stores/terminal';
   import { transactions, refreshTransactions } from '../lib/stores/ledger';
@@ -37,5 +38,6 @@
     </div>
 
     <TransactionSheet rows={$transactions} />
+    <BullFooter />
   </div>
 </main>

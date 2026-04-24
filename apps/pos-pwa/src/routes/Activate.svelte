@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { ShieldCheck } from 'lucide-svelte';
+  import BullFooter from '../lib/ui/BullFooter.svelte';
   import Button from '../lib/ui/Button.svelte';
   import { activateTerminal, loadTerminal, terminal } from '../lib/stores/terminal';
   import { announcePairingRequest } from '../lib/activation/pairing';
@@ -28,5 +29,6 @@
     <Button onclick={async () => { await activateTerminal(); location.hash = '#/'; }}>
       Mark Approved
     </Button>
+    <BullFooter />
   </section>
 </main>

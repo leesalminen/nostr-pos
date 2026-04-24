@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { ArrowLeft, Printer, Share2 } from 'lucide-svelte';
+  import BullFooter from '../lib/ui/BullFooter.svelte';
   import Button from '../lib/ui/Button.svelte';
   import ReceiptView from '../lib/ui/ReceiptView.svelte';
   import type { PaymentAttempt, Sale } from '../lib/pos/types';
@@ -53,4 +54,5 @@
   {:else}
     <p class="py-20 text-center">Receipt not found.</p>
   {/if}
+  <div class="no-print"><BullFooter /></div>
 </main>
