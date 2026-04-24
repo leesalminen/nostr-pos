@@ -8,11 +8,13 @@
   import { getAttempt, getSale } from '../lib/db/repositories/ledger';
   import { loadTerminal, terminal } from '../lib/stores/terminal';
   import { markReceiptPrinted } from '../lib/pos/receipt';
+  import { statusLabel } from '../lib/util/formatting';
 
   let { params = {} }: { params?: { saleId?: string } } = $props();
 
   let sale = $state<Sale | undefined>();
   let attempt = $state<PaymentAttempt | undefined>();
+  const isPaid = $derived(sale?.status === 'receipt_ready' || sale?.status === 'settled');
 
   onMount(async () => {
     await loadTerminal();
@@ -44,17 +46,21 @@
       Back
     </button>
     <div class="flex gap-2">
-      <Button variant="secondary" onclick={printReceipt}><Printer size={18} />Print</Button>
-      <Button variant="ghost" onclick={shareReceipt}><Share2 size={18} />Share</Button>
+      <Button variant="secondary" disabled={!isPaid} onclick={printReceipt}><Printer size={18} />Print</Button>
+      <Button variant="ghost" disabled={!isPaid} onclick={shareReceipt}><Share2 size={18} />Share</Button>
     </div>
   </div>
 
   {#if sale}
     <ReceiptView sale={sale} attempt={attempt} merchantName={$terminal?.merchantName ?? 'Seguras Butcher'} posName={$terminal?.posName ?? 'Counter 1'} />
     <div class="no-print mx-auto mt-5 max-w-sm text-center">
-      <div class="rounded-md bg-[#d9f3df] px-5 py-4 text-[#14522d]">
-        <p class="font-display text-5xl uppercase tracking-display leading-none">Paid</p>
-        <p class="mt-1 text-sm">Receipt ready.</p>
+      <div
+        class={`rounded-md px-5 py-4 ${
+          isPaid ? 'bg-[#d9f3df] text-[#14522d]' : 'bg-[#fff0c7] text-[#725315] dark:bg-[#3a321f] dark:text-[#f0d38a]'
+        }`}
+      >
+        <p class="font-display text-5xl uppercase tracking-display leading-none">{isPaid ? 'Paid' : statusLabel(sale.status)}</p>
+        <p class="mt-1 text-sm">{isPaid ? 'Receipt ready.' : 'Payment is not complete yet.'}</p>
       </div>
     </div>
   {:else}
