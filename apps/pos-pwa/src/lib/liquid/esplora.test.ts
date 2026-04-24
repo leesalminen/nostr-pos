@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fetchAddressTransactions, verifyAddressPayment } from './esplora';
+import { broadcastLiquidTransaction, fetchAddressTransactions, verifyAddressPayment } from './esplora';
 
 describe('Liquid Esplora adapter', () => {
   it('fetches address transactions', async () => {
@@ -10,6 +10,33 @@ describe('Liquid Esplora adapter', () => {
 
     await expect(fetchAddressTransactions('https://example.test/api/', 'tex1qabc', fetcher as unknown as typeof fetch)).resolves.toHaveLength(1);
     expect(fetcher).toHaveBeenCalledWith('https://example.test/api/address/tex1qabc/txs');
+  });
+
+  it('broadcasts a raw Liquid transaction', async () => {
+    const fetcher = vi.fn(async () => ({
+      ok: true,
+      text: async () => 'txid1\n'
+    }));
+
+    await expect(broadcastLiquidTransaction('https://example.test/api/', '02000000', fetcher as unknown as typeof fetch)).resolves.toBe(
+      'txid1'
+    );
+    expect(fetcher).toHaveBeenCalledWith('https://example.test/api/tx', {
+      method: 'POST',
+      headers: { 'content-type': 'text/plain' },
+      body: '02000000'
+    });
+  });
+
+  it('surfaces failed broadcasts as retryable errors', async () => {
+    const fetcher = vi.fn(async () => ({
+      ok: false,
+      text: async () => 'bad tx'
+    }));
+
+    await expect(broadcastLiquidTransaction('https://example.test/api', '02000000', fetcher as unknown as typeof fetch)).rejects.toThrow(
+      "Can't broadcast the Liquid claim right now."
+    );
   });
 
   it('verifies sufficient address payment', () => {

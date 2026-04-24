@@ -3211,6 +3211,13 @@ verification evidence stay close to the source of truth.
   commands, deterministic Liquid receive derivation with address-index
   persistence, and a swap-provider abstraction with a mock Boltz reverse-swap
   adapter that verifies claim address/amount before exposing invoice data.
+- Added the first claim-resume recovery path: the PWA can now broadcast a
+  previously prepared Liquid claim transaction through the configured Esplora
+  backend from Advanced → Recovery center, then marks the swap recovery record
+  claimed with the returned txid. This preserves the §14.3 invariant for
+  `claim_tx_hex` that already exists in recovery state, and keeps failed
+  broadcasts retryable. Remaining production gap: construct/RBF the actual
+  Boltz claim transaction from swap material with Liquid transaction tooling.
 - Added local protocol outbox events for sale-created, payment-status, and
   receipt records, plus startup reconciliation that expires stale open attempts
   and records the status update. This is the IndexedDB side of the PRD's

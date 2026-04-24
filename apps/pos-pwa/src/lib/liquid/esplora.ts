@@ -21,6 +21,18 @@ export async function fetchAddressTransactions(apiBase: string, address: string,
   return (await response.json()) as EsploraTx[];
 }
 
+export async function broadcastLiquidTransaction(apiBase: string, txHex: string, fetcher: typeof fetch = fetch): Promise<string> {
+  const response = await fetcher(`${apiBase.replace(/\/$/, '')}/tx`, {
+    method: 'POST',
+    headers: { 'content-type': 'text/plain' },
+    body: txHex
+  });
+  if (!response.ok) throw new Error("Can't broadcast the Liquid claim right now.");
+  const txid = (await response.text()).trim();
+  if (!txid) throw new Error("Liquid backend did not return a transaction id.");
+  return txid;
+}
+
 export function verifyAddressPayment(transactions: EsploraTx[], address: string, expectedSat: number): PaymentVerification {
   let receivedSat = 0;
   let confirmed = false;

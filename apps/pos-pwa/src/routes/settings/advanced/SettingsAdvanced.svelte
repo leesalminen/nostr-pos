@@ -1,12 +1,13 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { ArrowLeft, Download } from 'lucide-svelte';
+  import { ArrowLeft, Download, RotateCw } from 'lucide-svelte';
   import BullFooter from '../../../lib/ui/BullFooter.svelte';
   import Button from '../../../lib/ui/Button.svelte';
   import ServerList from '../../../lib/ui/advanced/ServerList.svelte';
   import { clearAdminPin, loadTerminal, setAdminPin, terminal } from '../../../lib/stores/terminal';
   import { outboxItems, recentTransactions, recoveryRecords } from '../../../lib/db/repositories/ledger';
   import { recoveryBackupsJson, transactionsCsv } from '../../../lib/pos/export';
+  import { broadcastPreparedClaims } from '../../../lib/pos/claim-engine';
   import { publishPendingOutbox } from '../../../lib/nostr/outbox';
   import { clearAdminUnlock, isAdminUnlocked, markAdminUnlocked, verifyAdminPin } from '../../../lib/security/admin-pin';
   import type { SwapRecoveryRecord } from '../../../lib/pos/types';
@@ -22,6 +23,7 @@
   let newPin = $state('');
   let pinMessage = $state('');
   let pinBusy = $state(false);
+  let claimBusy = $state(false);
   onMount(async () => {
     const config = await loadTerminal();
     locked = !isAdminUnlocked();
@@ -44,6 +46,10 @@
 
   function expiringSoonCount(now = Date.now()) {
     return recoveryRows.filter((record) => record.status !== 'claimed' && record.expiresAt - now <= 60 * 60_000).length;
+  }
+
+  function preparedClaimCount() {
+    return recoveryRows.filter((record) => record.status === 'claimable' && record.claimTxHex).length;
   }
 
   function downloadFile(filename: string, type: string, content: string) {
@@ -81,6 +87,25 @@
     outboxCount = (await outboxItems()).filter((item) => item.okFrom.length < 2).length;
     const ok = reports.reduce((sum, report) => sum + report.okCount, 0);
     syncMessage = reports.length === 0 ? 'Everything is already synced.' : `${ok} backup server confirmations recorded.`;
+  }
+
+  async function finishPreparedClaims() {
+    if (!$terminal || claimBusy) return;
+    claimBusy = true;
+    syncMessage = '';
+    try {
+      const results = await broadcastPreparedClaims($terminal);
+      await loadCounts();
+      const broadcast = results.filter((result) => result.status === 'broadcast').length;
+      const failed = results.filter((result) => result.status === 'failed').length;
+      if (results.length === 0) syncMessage = 'No prepared claim transactions are ready.';
+      else if (failed > 0) syncMessage = `${broadcast} claims broadcast. ${failed} still need retry.`;
+      else syncMessage = `${broadcast} claims broadcast.`;
+    } catch (err) {
+      syncMessage = err instanceof Error ? err.message : 'Could not finish claims.';
+    } finally {
+      claimBusy = false;
+    }
   }
 
   async function unlockWithPin() {
@@ -212,6 +237,10 @@
             <dd class="font-bold">{recoveryStatusCount('claimable')}</dd>
           </div>
           <div class="flex justify-between gap-4">
+            <dt class="text-[#776b5a] dark:text-[#b9aa91]">Prepared claims</dt>
+            <dd class="font-bold">{preparedClaimCount()}</dd>
+          </div>
+          <div class="flex justify-between gap-4">
             <dt class="text-[#776b5a] dark:text-[#b9aa91]">Pending swaps</dt>
             <dd class="font-bold">{recoveryStatusCount('pending')}</dd>
           </div>
@@ -246,6 +275,9 @@
         {/if}
         <div class="mt-4 flex flex-wrap items-center gap-3">
           <Button variant="secondary" onclick={syncNow}>Sync now</Button>
+          <Button variant="secondary" disabled={claimBusy || preparedClaimCount() === 0} onclick={finishPreparedClaims}>
+            <RotateCw size={18} />Finish claims
+          </Button>
           <Button variant="secondary" onclick={exportRecoveryBackups}><Download size={18} />Export backups</Button>
           {#if syncMessage}
             <p class="text-sm text-[#776b5a] dark:text-[#b9aa91]">{syncMessage}</p>
