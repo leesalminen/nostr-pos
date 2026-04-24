@@ -174,6 +174,17 @@ class ControllerRecoveryExecutor {
           providerStatus: status.status,
         );
       }
+      if (recovery.claimTxHex != null && recovery.claimTxHex!.isNotEmpty) {
+        final claimTxid = await _liquidClient.broadcastTransaction(
+          recovery.claimTxHex!,
+        );
+        return ControllerRecoveryResult(
+          swapId: recovery.swapId,
+          status: 'broadcast',
+          providerStatus: status.status,
+          claimTxid: claimTxid,
+        );
+      }
       if (!_claimableStatus(status.status)) {
         return ControllerRecoveryResult(
           swapId: recovery.swapId,

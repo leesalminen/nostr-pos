@@ -17,15 +17,22 @@ void main() {
         'swap_id': 'swap1',
         'expires_at': DateTime.now().millisecondsSinceEpoch ~/ 1000 + 3600,
         'encrypted_local_blob': 'ciphertext',
+        'claim': {
+          'claim_tx_hex': 'claimhex',
+          'claim_txid': null,
+          'replaced_claim_txids': ['oldclaimtxid'],
+        },
       },
     );
 
     final recoveries = swapRecoveriesFromEvents([event]);
     expect(recoveries.single.swapId, 'swap1');
     expect(recoveries.single.terminalId, 'term1');
+    expect(recoveries.single.claimTxHex, 'claimhex');
+    expect(recoveries.single.replacedClaimTxids, ['oldclaimtxid']);
     expect(
       recoveryClaimPlan(recoveries).single['action'],
-      'poll_provider_then_claim',
+      'broadcast_prepared_claim',
     );
   });
 

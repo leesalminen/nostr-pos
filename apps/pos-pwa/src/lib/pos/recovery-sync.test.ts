@@ -36,7 +36,17 @@ describe('terminal recovery backup sync', () => {
       payment_attempt_id: 'attempt1',
       swap_id: 'swap1',
       encrypted_local_blob: 'ciphertext',
-      expires_at: 2
+      expires_at: 2,
+      lockup_txid: 'lockuptxid',
+      claim: {
+        claim_tx_hex: 'claimhex',
+        claim_txid: 'claimtxid',
+        replaced_claim_txids: ['oldclaimtxid'],
+        claim_prepared_at: 3,
+        claim_broadcast_at: 4,
+        claim_fee_sat_per_vbyte: 0.3,
+        claim_rbf_count: 1
+      }
     };
     const item: OutboxItem = {
       id: 'recovery1',
@@ -53,6 +63,14 @@ describe('terminal recovery backup sync', () => {
       paymentAttemptId: 'attempt1',
       encryptedLocalBlob: 'ciphertext',
       expiresAt: 2000,
+      lockupTxid: 'lockuptxid',
+      claimTxHex: 'claimhex',
+      claimTxid: 'claimtxid',
+      replacedClaimTxids: ['oldclaimtxid'],
+      claimPreparedAt: 3000,
+      claimBroadcastAt: 4000,
+      claimFeeSatPerVbyte: 0.3,
+      claimRbfCount: 1,
       status: 'pending'
     });
   });

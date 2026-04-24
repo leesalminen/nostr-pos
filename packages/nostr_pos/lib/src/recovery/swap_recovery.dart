@@ -14,6 +14,11 @@ class SwapRecoverySummary {
     required this.expiresAt,
     required this.encryptedLocalBlob,
     this.terminalId,
+    this.lockupTxid,
+    this.lockupTxHex,
+    this.claimTxHex,
+    this.claimTxid,
+    this.replacedClaimTxids = const [],
   });
 
   final String saleId;
@@ -22,6 +27,11 @@ class SwapRecoverySummary {
   final int expiresAt;
   final String encryptedLocalBlob;
   final String? terminalId;
+  final String? lockupTxid;
+  final String? lockupTxHex;
+  final String? claimTxHex;
+  final String? claimTxid;
+  final List<String> replacedClaimTxids;
 
   bool get expired =>
       expiresAt <= DateTime.now().millisecondsSinceEpoch ~/ 1000;
@@ -34,6 +44,11 @@ class SwapRecoverySummary {
     'expired': expired,
     'encrypted_local_blob': encryptedLocalBlob,
     'terminal_id': terminalId,
+    'lockup_txid': lockupTxid,
+    'lockup_tx_hex': lockupTxHex,
+    'claim_tx_hex': claimTxHex,
+    'claim_txid': claimTxid,
+    'replaced_claim_txids': replacedClaimTxids,
   };
 }
 
@@ -77,6 +92,9 @@ List<SwapRecoverySummary> swapRecoveriesFromEvents(List<NostrPosEvent> events) {
         .map((tag) => tag[1])
         .cast<String?>()
         .firstOrNull;
+    final claim = content['claim'] is Map
+        ? (content['claim'] as Map).cast<String, Object?>()
+        : const <String, Object?>{};
     recoveries[swapId] = SwapRecoverySummary(
       saleId: content['sale_id']! as String,
       paymentAttemptId: content['payment_attempt_id']! as String,
@@ -84,6 +102,13 @@ List<SwapRecoverySummary> swapRecoveriesFromEvents(List<NostrPosEvent> events) {
       expiresAt: content['expires_at']! as int,
       encryptedLocalBlob: content['encrypted_local_blob']! as String,
       terminalId: terminalId,
+      lockupTxid: content['lockup_txid'] as String?,
+      lockupTxHex: content['lockup_tx_hex'] as String?,
+      claimTxHex: claim['claim_tx_hex'] as String?,
+      claimTxid: claim['claim_txid'] as String?,
+      replacedClaimTxids: (claim['replaced_claim_txids'] is List)
+          ? (claim['replaced_claim_txids'] as List).whereType<String>().toList()
+          : const [],
     );
   }
   return recoveries.values.toList()
@@ -98,10 +123,15 @@ List<Map<String, Object?>> recoveryClaimPlan(
         (recovery) => {
           'swap_id': recovery.swapId,
           'sale_id': recovery.saleId,
-          'action': recovery.expired
+          'action':
+              recovery.claimTxHex != null && recovery.claimTxHex!.isNotEmpty
+              ? 'broadcast_prepared_claim'
+              : recovery.expired
               ? 'audit_expired'
               : 'poll_provider_then_claim',
           'has_encrypted_material': recovery.encryptedLocalBlob.isNotEmpty,
+          'has_claim_tx_hex':
+              recovery.claimTxHex != null && recovery.claimTxHex!.isNotEmpty,
         },
       )
       .toList();

@@ -1,6 +1,8 @@
 import { decryptJson } from '../db/crypto';
-import { getAttempt, getRecoveryBySwap, getSale, recoveryRecords } from '../db/repositories/ledger';
+import { getAttempt, getRecoveryBySwap, getSale, putOutbox, recoveryRecords } from '../db/repositories/ledger';
 import { broadcastLiquidTransaction, fetchTransactionHex, fetchTransactionStatus } from '../liquid/esplora';
+import { swapRecoveryEvent } from '../nostr/events';
+import { merchantRecoveryPubkey } from '../nostr/outbox';
 import { buildBoltzLiquidReverseClaim } from '../swaps/boltz-claim';
 import {
   markSwapClaimable,
@@ -58,6 +60,34 @@ async function settleRecoveredClaim(record: SwapRecoveryRecord, txid: string, se
   await settleAttempt({ sale, attempt, txid, settledAt });
 }
 
+async function queueRecoveryRecordUpdate(config: TerminalConfig, record: SwapRecoveryRecord, now = Date.now()): Promise<void> {
+  await putOutbox({
+    id: `recovery_${record.swapId}_${now}`,
+    type: 'payment_backup',
+    payload: swapRecoveryEvent({
+      saleId: record.saleId,
+      paymentAttemptId: record.paymentAttemptId,
+      swapId: record.swapId,
+      terminalId: config.terminalId,
+      encryptedLocalBlob: record.encryptedLocalBlob,
+      expiresAt: record.expiresAt,
+      recoveryPubkey: merchantRecoveryPubkey(config),
+      lockupTxid: record.lockupTxid,
+      lockupTxHex: record.lockupTxHex,
+      claimTxHex: record.claimTxHex,
+      claimTxid: record.claimTxid,
+      replacedClaimTxids: record.replacedClaimTxids,
+      claimPreparedAt: record.claimPreparedAt,
+      claimBroadcastAt: record.claimBroadcastAt,
+      claimConfirmedAt: record.claimConfirmedAt,
+      claimFeeSatPerVbyte: record.claimFeeSatPerVbyte,
+      claimRbfCount: record.claimRbfCount
+    }),
+    createdAt: now,
+    okFrom: []
+  });
+}
+
 export async function broadcastPreparedClaims(
   config: TerminalConfig,
   options: { fetcher?: typeof fetch; records?: SwapRecoveryRecord[]; now?: number } = {}
@@ -77,9 +107,11 @@ export async function broadcastPreparedClaims(
   const results: PreparedClaimResult[] = [];
   for (const record of records) {
     try {
+      await queueRecoveryRecordUpdate(config, record, now);
       await markSwapClaimBroadcastAttempt({ swapId: record.swapId, now, feeSatPerVbyte: record.claimFeeSatPerVbyte });
       const txid = await broadcastLiquidTransaction(backend.url, record.claimTxHex as string, options.fetcher);
-      await markSwapRecoveryFinished({ swapId: record.swapId, claimTxHex: record.claimTxHex, claimTxid: txid, now });
+      const finished = await markSwapRecoveryFinished({ swapId: record.swapId, claimTxHex: record.claimTxHex, claimTxid: txid, now });
+      if (finished) await queueRecoveryRecordUpdate(config, finished, now);
       await settleRecoveredClaim(record, txid, now);
       results.push({ swapId: record.swapId, status: 'broadcast', txid });
     } catch (err) {
@@ -137,10 +169,12 @@ export async function claimLiquidReverseSwap(
     });
 
     const now = input.now ?? Date.now();
-    await markSwapClaimable({ swapId: input.swapId, claimTxHex, now });
+    const claimable = await markSwapClaimable({ swapId: input.swapId, claimTxHex, now });
+    if (claimable) await queueRecoveryRecordUpdate(config, claimable, now);
     await markSwapClaimBroadcastAttempt({ swapId: input.swapId, now, feeSatPerVbyte: input.feeSatPerVbyte });
     const txid = await broadcastLiquidTransaction(backend.url, claimTxHex, input.fetcher);
-    await markSwapRecoveryFinished({ swapId: input.swapId, claimTxHex, claimTxid: txid, now });
+    const finished = await markSwapRecoveryFinished({ swapId: input.swapId, claimTxHex, claimTxid: txid, now });
+    if (finished) await queueRecoveryRecordUpdate(config, finished, now);
     await settleRecoveredClaim(existing, txid, now);
     return { swapId: input.swapId, status: 'broadcast', txid };
   } catch (err) {
@@ -251,6 +285,7 @@ export async function bumpFeeDueClaims(
         results.push({ swapId: record.swapId, status: 'skipped', reason: 'No recovery record found.' });
         continue;
       }
+      await queueRecoveryRecordUpdate(config, prepared, now);
       const [broadcast] = await broadcastPreparedClaims(config, { fetcher: options.fetcher, records: [prepared], now });
       results.push({ ...(broadcast ?? { swapId: record.swapId, status: 'skipped' as const }), feeSatPerVbyte: nextFee });
     } catch (err) {

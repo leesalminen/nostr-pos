@@ -119,6 +119,16 @@ export function swapRecoveryEvent(input: {
   encryptedLocalBlob: string;
   expiresAt: number;
   recoveryPubkey?: string;
+  lockupTxid?: string;
+  lockupTxHex?: string;
+  claimTxHex?: string;
+  claimTxid?: string;
+  replacedClaimTxids?: string[];
+  claimPreparedAt?: number;
+  claimBroadcastAt?: number;
+  claimConfirmedAt?: number;
+  claimFeeSatPerVbyte?: number;
+  claimRbfCount?: number;
 }): LocalProtocolEvent {
   const tags = [
     ['proto', 'nostr-pos', '0.2'],
@@ -135,7 +145,20 @@ export function swapRecoveryEvent(input: {
       payment_attempt_id: input.paymentAttemptId,
       swap_id: input.swapId,
       encrypted_local_blob: input.encryptedLocalBlob,
-      expires_at: Math.floor(input.expiresAt / 1000)
+      expires_at: Math.floor(input.expiresAt / 1000),
+      lockup_txid: input.lockupTxid ?? null,
+      lockup_tx_hex: input.lockupTxHex ?? null,
+      claim: {
+        mode: 'standard',
+        claim_tx_hex: input.claimTxHex ?? null,
+        claim_txid: input.claimTxid ?? null,
+        replaced_claim_txids: input.replacedClaimTxids ?? [],
+        claim_prepared_at: input.claimPreparedAt ? Math.floor(input.claimPreparedAt / 1000) : null,
+        claim_broadcast_at: input.claimBroadcastAt ? Math.floor(input.claimBroadcastAt / 1000) : null,
+        claim_confirmed_at: input.claimConfirmedAt ? Math.floor(input.claimConfirmedAt / 1000) : null,
+        claim_fee_sat_per_vbyte: input.claimFeeSatPerVbyte ?? null,
+        claim_rbf_count: input.claimRbfCount ?? 0
+      }
     }
   };
 }

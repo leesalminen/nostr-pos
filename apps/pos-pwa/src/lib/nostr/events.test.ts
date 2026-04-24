@@ -56,12 +56,14 @@ describe('local protocol events', () => {
       terminalId: 'term1',
       encryptedLocalBlob: 'ciphertext',
       expiresAt: 60_000,
-      recoveryPubkey: 'b'.repeat(64)
+      recoveryPubkey: 'b'.repeat(64),
+      claimTxHex: 'claimhex'
     });
 
     expect(event.kind).toBe(9381);
     expect(event.tags).toContainEqual(['swap', 'swap1']);
     expect(event.tags).toContainEqual(['p', 'b'.repeat(64)]);
     expect(event.content.encrypted_local_blob).toBe('ciphertext');
+    expect(event.content.claim).toMatchObject({ claim_tx_hex: 'claimhex' });
   });
 });

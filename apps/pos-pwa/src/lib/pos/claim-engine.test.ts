@@ -128,7 +128,7 @@ describe('prepared claim broadcaster', () => {
     expect(sales.get('sale1')?.status).toBe('receipt_ready');
     expect(attempts.get('attempt1')).toMatchObject({ status: 'settled', settlementTxid: 'txid1' });
     expect(receipts.size).toBe(1);
-    expect(outbox).toHaveLength(2);
+    expect(outbox).toHaveLength(4);
   });
 
   it('marks a failed prepared claim retryable when broadcast fails', async () => {
@@ -228,6 +228,18 @@ describe('prepared claim broadcaster', () => {
       claimBroadcastAttempts: 1,
       claimLastError: undefined
     });
+    expect(outbox).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'payment_backup',
+          payload: expect.objectContaining({
+            content: expect.objectContaining({
+              claim: expect.objectContaining({ claim_tx_hex: 'claimhex', claim_txid: 'claimtxid' })
+            })
+          })
+        })
+      ])
+    );
   });
 
   it('fetches the lockup transaction before building a claim when only a txid is available', async () => {

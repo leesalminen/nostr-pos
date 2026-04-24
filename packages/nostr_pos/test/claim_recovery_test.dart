@@ -49,6 +49,26 @@ void main() {
     expect(buildRequest.material.swap?['id'], 'swap1');
   });
 
+  test('broadcasts prepared claim hex from recovery records', () async {
+    final liquid = _FakeLiquidClient();
+    final executor = ControllerRecoveryExecutor(
+      swapStatusClient: _FakeSwapStatusClient(
+        SwapStatusDetails(status: 'transaction.confirmed'),
+      ),
+      liquidClient: liquid,
+      claimBuilder: (_) async => throw StateError('not used'),
+    );
+
+    final result = await executor.recoverClaim(
+      _recovery(claimTxHex: 'preparedclaimhex'),
+    );
+
+    expect(result.status, 'broadcast');
+    expect(result.claimTxid, 'claimtxid');
+    expect(liquid.broadcastHexes, ['preparedclaimhex']);
+    expect(liquid.fetchedTxids, isEmpty);
+  });
+
   test('reports expired recoveries without polling providers', () async {
     final statusClient = _FakeSwapStatusClient(
       SwapStatusDetails(status: 'transaction.confirmed'),
@@ -69,14 +89,17 @@ void main() {
   });
 }
 
-SwapRecoverySummary _recovery({int? expiresAt}) => SwapRecoverySummary(
-  saleId: 'sale1',
-  paymentAttemptId: 'attempt1',
-  swapId: 'swap1',
-  expiresAt: expiresAt ?? DateTime.now().millisecondsSinceEpoch ~/ 1000 + 3600,
-  encryptedLocalBlob: _encryptedLocalBlob,
-  terminalId: 'term1',
-);
+SwapRecoverySummary _recovery({int? expiresAt, String? claimTxHex}) =>
+    SwapRecoverySummary(
+      saleId: 'sale1',
+      paymentAttemptId: 'attempt1',
+      swapId: 'swap1',
+      expiresAt:
+          expiresAt ?? DateTime.now().millisecondsSinceEpoch ~/ 1000 + 3600,
+      encryptedLocalBlob: _encryptedLocalBlob,
+      terminalId: 'term1',
+      claimTxHex: claimTxHex,
+    );
 
 class _FakeSwapStatusClient implements SwapStatusClient {
   _FakeSwapStatusClient(this.status);
