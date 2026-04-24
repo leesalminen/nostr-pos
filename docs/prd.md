@@ -3190,3 +3190,9 @@ verification evidence stay close to the source of truth.
 - Refined navigation after UX review: recent transactions now live on their own
   screen behind a history icon next to Settings. The payment screen rail selector
   is Lightning/Liquid only; Bolt Card is a Lightning-only action beside Copy.
+- Added Phase 3/4/5 foundations: browser-generated terminal key material with
+  shared pairing-code derivation, activation gate before cashier use, Dart event
+  envelopes + local event store, CLI create/announce/authorize/revoke/list
+  commands, deterministic Liquid receive derivation with address-index
+  persistence, and a swap-provider abstraction with a mock Boltz reverse-swap
+  adapter that verifies claim address/amount before exposing invoice data.

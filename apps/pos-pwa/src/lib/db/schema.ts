@@ -4,7 +4,7 @@ import type { PaymentAttempt, Receipt, Sale, SwapRecoveryRecord, TerminalConfig 
 interface PosDb extends DBSchema {
   terminal_config: {
     key: string;
-    value: TerminalConfig;
+    value: TerminalConfig | number;
   };
   sales: {
     key: string;

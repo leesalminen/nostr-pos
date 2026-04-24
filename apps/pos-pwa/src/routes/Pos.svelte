@@ -27,7 +27,7 @@
   const rawAmount = $derived(parts[1]);
   const rawNote = $derived(parts[2]);
   const amount = $derived(String(Number(rawAmount || '0')));
-  const activePaymentData = $derived(sale ? paymentPayload(selectedMethod, sale.amountSat, sale.id) : '');
+  const activePaymentData = $derived(sale ? paymentPayload(selectedMethod, sale.amountSat, sale.id, attempt?.liquidAddress) : '');
 
   const statusTone = $derived(
     !sale
@@ -74,7 +74,7 @@
     selectedMethod = method;
     boltCardPending = false;
     if (!attempt || !sale) return;
-    attempt = { ...attempt, method, paymentData: paymentPayload(method, sale.amountSat, sale.id), updatedAt: Date.now() };
+    attempt = { ...attempt, method, paymentData: paymentPayload(method, sale.amountSat, sale.id, attempt.liquidAddress), updatedAt: Date.now() };
     await putAttempt(attempt);
     await refreshTransactions();
   }

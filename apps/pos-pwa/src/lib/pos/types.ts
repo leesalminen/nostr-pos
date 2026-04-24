@@ -44,6 +44,9 @@ export type PaymentAttempt = {
   method: PaymentMethod;
   status: PaymentStatus;
   paymentData?: string;
+  liquidAddress?: string;
+  addressIndex?: number;
+  terminalBranch?: number;
   settlementTxid?: string;
   createdAt: number;
   updatedAt: number;

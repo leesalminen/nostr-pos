@@ -5,11 +5,20 @@ import { getDb } from '../schema';
 const terminalKey = 'active';
 
 export async function getTerminalConfig(): Promise<TerminalConfig | undefined> {
-  return (await getDb()).get('terminal_config', terminalKey);
+  const value = await (await getDb()).get('terminal_config', terminalKey);
+  return typeof value === 'number' ? undefined : value;
 }
 
 export async function saveTerminalConfig(config: TerminalConfig): Promise<void> {
   await (await getDb()).put('terminal_config', config, terminalKey);
+}
+
+export async function reserveAddressIndex(): Promise<number> {
+  const db = await getDb();
+  const key = 'next_address_index';
+  const current = Number((await db.get('terminal_config', key)) ?? 0);
+  await db.put('terminal_config', current + 1, key);
+  return current;
 }
 
 export function defaultTerminalConfig(): TerminalConfig {

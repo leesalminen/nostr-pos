@@ -2,15 +2,18 @@ import confetti from 'canvas-confetti';
 import type { PaymentAttempt, PaymentMethod, Receipt, Sale, SaleStatus, TerminalConfig } from './types';
 import { encryptJson } from '../db/crypto';
 import { putAttempt, putOutbox, putReceipt, putRecovery, putSale } from '../db/repositories/ledger';
+import { reserveAddressIndex } from '../db/repositories/terminal';
 import { getBullBitcoinRate, fiatToSats } from '../fx/bull-bitcoin';
+import { deriveLiquidAddress, liquidBip21 } from '../liquid/address';
+import { MockBoltzReverseSwapProvider } from '../swaps/mock-boltz';
 import { ulid } from '../util/ulid';
 
 export function statusAfterDetection(method: PaymentMethod): SaleStatus {
   return method === 'liquid' ? 'settled' : 'settling';
 }
 
-export function paymentPayload(method: PaymentMethod, amountSat: number, saleId: string): string {
-  if (method === 'liquid') return `liquid:tex1q${saleId.toLowerCase()}?amount=${amountSat}`;
+export function paymentPayload(method: PaymentMethod, amountSat: number, saleId: string, liquidAddress?: string): string {
+  if (method === 'liquid') return liquidBip21(liquidAddress ?? `tex1q${saleId.toLowerCase()}`, amountSat);
   if (method === 'bolt_card') return `lnbc${amountSat}n1p${saleId.toLowerCase()}boltcard`;
   return `lnbc${amountSat}n1p${saleId.toLowerCase()}lightning`;
 }
@@ -23,6 +26,22 @@ export async function createSale(config: TerminalConfig, fiatAmount: string, met
   }
 
   const now = Date.now();
+  const addressIndex = await reserveAddressIndex();
+  const liquid = deriveLiquidAddress(config, addressIndex);
+  const swapProvider = new MockBoltzReverseSwapProvider();
+  const swap = await swapProvider.createReverseSwap({
+    saleId: ulid(now + 2),
+    invoiceSat: amountSat,
+    claimAddress: liquid.address
+  });
+  const verification = swapProvider.verifySwap(swap, {
+    saleId: swap.id.replace(/^swap_/, ''),
+    invoiceSat: amountSat,
+    claimAddress: liquid.address
+  });
+  if (!verification.ok) {
+    throw new Error('Could not safely prepare Lightning payment. Try again.');
+  }
   const sale: Sale = {
     id: ulid(now),
     receiptNumber: `R-${String(now).slice(-8)}`,
@@ -42,7 +61,10 @@ export async function createSale(config: TerminalConfig, fiatAmount: string, met
     saleId: sale.id,
     method,
     status: 'created',
-    paymentData: paymentPayload(method, amountSat, sale.id),
+    paymentData: method === 'liquid' ? liquidBip21(liquid.address, amountSat) : swap.invoice,
+    liquidAddress: liquid.address,
+    addressIndex: liquid.addressIndex,
+    terminalBranch: liquid.terminalBranch,
     createdAt: now,
     updatedAt: now,
     expiresAt: now + 15 * 60_000
@@ -57,7 +79,7 @@ export async function createSale(config: TerminalConfig, fiatAmount: string, met
     if (okFrom.length < 2) {
       throw new Error('Could not safely prepare Lightning payment. Try again.');
     }
-    const swapId = `swap_${sale.id.toLowerCase()}`;
+    const swapId = swap.id;
     const recoveryPayload = {
       protocol: 'nostr-pos',
       version: 2,
@@ -67,9 +89,16 @@ export async function createSale(config: TerminalConfig, fiatAmount: string, met
       swap_id: swapId,
       amount: {
         invoice_sat: amountSat,
+        settlement_amount_sat: swap.expectedAmountSat,
         fiat_currency: config.currency,
         fiat_amount: fiatAmount
       },
+      settlement: {
+        terminal_branch: liquid.terminalBranch,
+        address_index: liquid.addressIndex,
+        address: liquid.address
+      },
+      swap,
       claim: {
         mode: 'standard',
         preimage_revealed: false,
