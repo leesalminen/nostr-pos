@@ -3270,6 +3270,8 @@ verification evidence stay close to the source of truth.
 - Generalized controller relay reads: `nostr_pos_cli list-events` can now query
   configured relays by kind, author, `d` tag, or `p` tag, which covers POS
   profile fetches and other protocol event inspection.
+- CI now runs `dart analyze` for the Dart SDK as well as the CLI so relay,
+  signing, and recovery SDK code gets static checks on every push.
 
 ### Known follow-ups
 
