@@ -10,6 +10,7 @@
   let approvalText = $state('');
   let approvalError = $state('');
   let applying = $state(false);
+  const isDev = import.meta.env.DEV;
 
   onMount(async () => {
     const config = await loadTerminal();
@@ -58,9 +59,11 @@
       <Button disabled={!approvalText.trim() || applying} onclick={applyApproval}>
         {applying ? 'Applying...' : 'Apply approval'}
       </Button>
-      <Button variant="secondary" onclick={async () => { await activateTerminal(); location.hash = '#/'; }}>
-        Dev: Mark Approved
-      </Button>
+      {#if isDev}
+        <Button variant="secondary" onclick={async () => { await activateTerminal(); location.hash = '#/'; }}>
+          Dev: Mark Approved
+        </Button>
+      {/if}
     </div>
     <BullFooter />
   </section>
