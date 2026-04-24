@@ -1,12 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { SwapRecoveryRecord, TerminalConfig } from './types';
+import type { PaymentAttempt, Receipt, Sale, SwapRecoveryRecord, TerminalConfig } from './types';
 
 const recoveries = new Map<string, SwapRecoveryRecord>();
+const sales = new Map<string, Sale>();
+const attempts = new Map<string, PaymentAttempt>();
+const receipts = new Map<string, Receipt>();
+const outbox: unknown[] = [];
 
 vi.mock('../db/repositories/ledger', () => ({
   recoveryRecords: vi.fn(() => Array.from(recoveries.values())),
+  getSale: vi.fn((id: string) => sales.get(id)),
+  getAttempt: vi.fn((id: string) => attempts.get(id)),
+  getReceiptBySale: vi.fn((saleId: string) => Array.from(receipts.values()).find((receipt) => receipt.saleId === saleId)),
   getRecoveryBySwap: vi.fn((swapId: string) => recoveries.get(swapId)),
-  putRecovery: vi.fn((record: SwapRecoveryRecord) => recoveries.set(record.swapId, record))
+  putAttempt: vi.fn((attempt: PaymentAttempt) => attempts.set(attempt.id, attempt)),
+  putReceipt: vi.fn((receipt: Receipt) => receipts.set(receipt.id, receipt)),
+  putRecovery: vi.fn((record: SwapRecoveryRecord) => recoveries.set(record.swapId, record)),
+  putSale: vi.fn((sale: Sale) => sales.set(sale.id, sale)),
+  putOutbox: vi.fn((item: unknown) => outbox.push(item))
 }));
 vi.mock('../db/crypto', () => ({
   decryptJson: vi.fn()
@@ -39,6 +50,10 @@ describe('prepared claim broadcaster', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     recoveries.clear();
+    sales.clear();
+    attempts.clear();
+    receipts.clear();
+    outbox.length = 0;
     recoveries.set('swap1', {
       saleId: 'sale1',
       paymentAttemptId: 'attempt1',
@@ -74,6 +89,40 @@ describe('prepared claim broadcaster', () => {
     expect(broadcastLiquidTransaction).toHaveBeenCalledWith('https://liquid.example/api/', '02000000', undefined);
     expect(recoveries.get('swap1')).toMatchObject({ status: 'claimed', claimTxHex: '02000000', claimTxid: 'txid1' });
     expect(recoveries.get('swap2')?.status).toBe('claimable');
+  });
+
+  it('settles the local sale when broadcasting a prepared claim', async () => {
+    const { broadcastLiquidTransaction } = await import('../liquid/esplora');
+    const { broadcastPreparedClaims } = await import('./claim-engine');
+    sales.set('sale1', {
+      id: 'sale1',
+      receiptNumber: 'R-1',
+      posRef: 'pos',
+      terminalId: 'term1',
+      amountFiat: '8500',
+      fiatCurrency: 'CRC',
+      amountSat: 25000,
+      status: 'payment_detected',
+      activePaymentAttemptId: 'attempt1',
+      createdAt: 0,
+      updatedAt: 0
+    });
+    attempts.set('attempt1', {
+      id: 'attempt1',
+      saleId: 'sale1',
+      method: 'lightning_swap',
+      status: 'detected',
+      swapId: 'swap1',
+      createdAt: 0,
+      updatedAt: 0
+    });
+    vi.mocked(broadcastLiquidTransaction).mockResolvedValue('txid1');
+
+    await expect(broadcastPreparedClaims(config)).resolves.toMatchObject([{ status: 'broadcast' }]);
+    expect(sales.get('sale1')?.status).toBe('receipt_ready');
+    expect(attempts.get('attempt1')).toMatchObject({ status: 'settled', settlementTxid: 'txid1' });
+    expect(receipts.size).toBe(1);
+    expect(outbox).toHaveLength(2);
   });
 
   it('leaves a prepared claim retryable when broadcast fails', async () => {

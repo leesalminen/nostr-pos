@@ -3229,6 +3229,9 @@ verification evidence stay close to the source of truth.
   the same claim path even when no WebSocket update is active.
 - Moved Vite/PWA/polyfill plugins to devDependencies after audit review; runtime
   dependency audit now passes with zero production vulnerabilities.
+- Advanced recovery claim broadcasts now settle the matching local sale and
+  payment attempt, creating the same receipt/outbox records as automatic claim
+  settlement when the local ledger rows are still present.
 - Added local protocol outbox events for sale-created, payment-status, and
   receipt records, plus startup reconciliation that expires stale open attempts
   and records the status update. This is the IndexedDB side of the PRD's

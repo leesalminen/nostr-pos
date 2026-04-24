@@ -1,8 +1,9 @@
 import { decryptJson } from '../db/crypto';
-import { getRecoveryBySwap, recoveryRecords } from '../db/repositories/ledger';
+import { getAttempt, getRecoveryBySwap, getSale, recoveryRecords } from '../db/repositories/ledger';
 import { broadcastLiquidTransaction, fetchTransactionHex } from '../liquid/esplora';
 import { buildBoltzLiquidReverseClaim } from '../swaps/boltz-claim';
 import { markSwapClaimable, markSwapRecoveryFinished } from './recovery-state';
+import { settleAttempt } from './settlement';
 import type { LiquidBackend, SwapRecoveryRecord, TerminalConfig } from './types';
 import type { ReverseSwapResponse } from '../swaps/provider';
 
@@ -25,6 +26,13 @@ function preparedClaimRows(records: SwapRecoveryRecord[]): SwapRecoveryRecord[] 
   return records.filter((record) => record.status === 'claimable' && Boolean(record.claimTxHex));
 }
 
+async function settleRecoveredClaim(record: SwapRecoveryRecord, txid: string, settledAt = Date.now()): Promise<void> {
+  const sale = await getSale(record.saleId);
+  const attempt = await getAttempt(record.paymentAttemptId);
+  if (!sale || !attempt || attempt.status === 'settled') return;
+  await settleAttempt({ sale, attempt, txid, settledAt });
+}
+
 export async function broadcastPreparedClaims(
   config: TerminalConfig,
   options: { fetcher?: typeof fetch; records?: SwapRecoveryRecord[] } = {}
@@ -45,6 +53,7 @@ export async function broadcastPreparedClaims(
     try {
       const txid = await broadcastLiquidTransaction(backend.url, record.claimTxHex as string, options.fetcher);
       await markSwapRecoveryFinished({ swapId: record.swapId, claimTxHex: record.claimTxHex, claimTxid: txid });
+      await settleRecoveredClaim(record, txid);
       results.push({ swapId: record.swapId, status: 'broadcast', txid });
     } catch (err) {
       results.push({
@@ -96,6 +105,7 @@ export async function claimLiquidReverseSwap(
     await markSwapClaimable({ swapId: input.swapId, claimTxHex });
     const txid = await broadcastLiquidTransaction(backend.url, claimTxHex, input.fetcher);
     await markSwapRecoveryFinished({ swapId: input.swapId, claimTxHex, claimTxid: txid });
+    await settleRecoveredClaim(existing, txid);
     return { swapId: input.swapId, status: 'broadcast', txid };
   } catch (err) {
     return {
