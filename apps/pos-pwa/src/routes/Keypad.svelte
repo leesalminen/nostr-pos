@@ -11,7 +11,11 @@
   let note = $state('');
 
   onMount(async () => {
-    await loadTerminal();
+    const config = await loadTerminal();
+    if (!config.activatedAt) {
+      location.hash = '#/activate';
+      return;
+    }
     await refreshTransactions();
   });
 

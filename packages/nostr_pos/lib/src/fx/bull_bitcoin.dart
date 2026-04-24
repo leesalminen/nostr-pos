@@ -55,10 +55,7 @@ class BullBitcoinFxClient {
         'id': DateTime.now().millisecondsSinceEpoch.toString(),
         'method': 'getUserRate',
         'params': {
-          'element': {
-            'fromCurrency': fromCurrency,
-            'toCurrency': toCurrency,
-          }
+          'element': {'fromCurrency': fromCurrency, 'toCurrency': toCurrency},
         },
       }),
     );

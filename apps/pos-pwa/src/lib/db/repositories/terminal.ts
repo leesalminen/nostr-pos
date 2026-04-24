@@ -1,4 +1,5 @@
 import type { TerminalConfig } from '../../pos/types';
+import { createTerminalKeypair, pairingCodeFromPubkey } from '../../security/keys';
 import { getDb } from '../schema';
 
 const terminalKey = 'active';
@@ -12,12 +13,15 @@ export async function saveTerminalConfig(config: TerminalConfig): Promise<void> 
 }
 
 export function defaultTerminalConfig(): TerminalConfig {
+  const keys = createTerminalKeypair();
   return {
     merchantName: 'Seguras Butcher',
     posName: 'Counter 1',
     currency: 'CRC',
-    terminalId: crypto.randomUUID().replaceAll('-', '').slice(0, 16).toUpperCase(),
-    pairingCode: '4F7G-YJDP',
+    terminalId: keys.publicKey.slice(-8).toUpperCase(),
+    terminalPubkey: keys.publicKey,
+    terminalPrivkeyEnc: keys.privateKey,
+    pairingCode: pairingCodeFromPubkey(keys.publicKey),
     maxInvoiceSat: 100000,
     syncServers: ['wss://no.str.cr', 'wss://relay.primal.net', 'wss://nos.lol']
   };

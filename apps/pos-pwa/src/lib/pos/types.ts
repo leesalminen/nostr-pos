@@ -76,8 +76,11 @@ export type TerminalConfig = {
   posName: string;
   currency: string;
   terminalId: string;
+  terminalPubkey: string;
+  terminalPrivkeyEnc?: string;
   pairingCode: string;
   activatedAt?: number;
+  authorization?: unknown;
   maxInvoiceSat: number;
   syncServers: string[];
 };

@@ -12,7 +12,7 @@ class NostrPosKinds {
 const nostrPosProtocolTag = ['proto', 'nostr-pos', '0.2'];
 
 List<List<String>> defaultRelayTags() => [
-      ['relay', 'wss://no.str.cr'],
-      ['relay', 'wss://relay.primal.net'],
-      ['relay', 'wss://nos.lol'],
-    ];
+  ['relay', 'wss://no.str.cr'],
+  ['relay', 'wss://relay.primal.net'],
+  ['relay', 'wss://nos.lol'],
+];
