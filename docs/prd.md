@@ -3524,6 +3524,14 @@ verification evidence stay close to the source of truth.
   now renders Lightning QR data only when a checksummed Bolt11 invoice exists,
   and live dev pilots use the configured Boltz provider instead of the mock
   adapter whenever the authorization supplies one.
+- Lightning charge preparation no longer silently downgrades to a Liquid-only
+  sale. If Boltz swap creation, invoice verification, or encrypted recovery
+  backup publishing fails, the keypad surfaces the concrete error so mainnet
+  pilots can fix the provider/relay issue before an invoice is shown.
+- Boltz reverse swap verification now decodes the returned Bolt11 invoice and
+  checks both the invoice amount and payment hash against the terminal-generated
+  preimage hash. The adapter also reads the current v2 reverse-swap limits shape
+  (`limits.minimal` / `limits.maximal`).
 
 ### Known follow-ups
 

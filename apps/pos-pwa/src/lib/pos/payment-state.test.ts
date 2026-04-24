@@ -67,7 +67,7 @@ describe('payment preparation safety', () => {
   it('does not fall back to mock Lightning providers in production', () => {
     vi.stubEnv('PROD', true);
 
-    expect(() => swapProviderForConfig(activeConfig)).toThrow('Lightning is temporarily unavailable');
+    expect(() => swapProviderForConfig(activeConfig)).toThrow('No authorized Boltz provider');
   });
 
   it('uses configured Boltz providers during live dev pilots', () => {

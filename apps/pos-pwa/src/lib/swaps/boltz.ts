@@ -9,6 +9,7 @@ import type {
   SwapStatusDetails,
   VerificationResult
 } from './provider';
+import { decodeBolt11Invoice } from '../lightning/bolt11';
 
 type Fetcher = typeof fetch;
 
@@ -77,9 +78,10 @@ export class BoltzReverseSwapProvider implements SwapProvider {
     if (!response.ok) return { minSat: 1000, maxSat: 100000 };
     const json = asObject(await response.json());
     const pair = asObject(asObject(json['BTC'])['L-BTC']);
+    const limits = pair['limits'] && typeof pair['limits'] === 'object' ? (pair['limits'] as Record<string, unknown>) : undefined;
     return {
-      minSat: asNumber(pair['min'], 'min'),
-      maxSat: asNumber(pair['max'], 'max')
+      minSat: asNumber(limits?.['minimal'] ?? pair['min'], 'min'),
+      maxSat: asNumber(limits?.['maximal'] ?? pair['max'], 'max')
     };
   }
 
@@ -134,7 +136,10 @@ export class BoltzReverseSwapProvider implements SwapProvider {
 
   verifySwap(response: ReverseSwapResponse, expected: ReverseSwapRequest): VerificationResult {
     if (response.claimAddress !== expected.claimAddress) return { ok: false, reason: 'claim address mismatch' };
-    if (!response.invoice.startsWith('ln')) return { ok: false, reason: 'invalid invoice' };
+    const invoice = decodeBolt11Invoice(response.invoice);
+    if (!invoice) return { ok: false, reason: 'invalid invoice' };
+    if (invoice.amountSat !== expected.invoiceSat) return { ok: false, reason: 'invoice amount mismatch' };
+    if (invoice.paymentHash !== response.preimageHash) return { ok: false, reason: 'invoice payment hash mismatch' };
     if (response.timeoutBlockHeight < 10) return { ok: false, reason: 'timeout too short' };
     if (response.expectedAmountSat <= 0 || response.expectedAmountSat > expected.invoiceSat) return { ok: false, reason: 'invalid settlement amount' };
     if (!/^[0-9a-f]{64}$/.test(response.preimageHash)) return { ok: false, reason: 'invalid preimage hash' };

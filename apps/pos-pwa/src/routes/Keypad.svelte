@@ -70,14 +70,7 @@
     try {
       const config = await loadTerminal();
       const [{ createSale, markReady }, { syncQueuedRecords }] = await Promise.all([import('../lib/pos/payment-state'), import('../lib/pos/sync')]);
-      let created;
-      try {
-        created = await createSale(config, displayAmount, 'lightning_swap', note || undefined);
-      } catch (lightningError) {
-        created = await createSale(config, displayAmount, 'liquid', note || undefined).catch(() => {
-          throw lightningError;
-        });
-      }
+      const created = await createSale(config, displayAmount, 'lightning_swap', note || undefined);
       await markReady(created.sale, created.attempt);
       await refreshTransactions();
       void syncQueuedRecords(config);

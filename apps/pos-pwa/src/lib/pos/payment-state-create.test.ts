@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PaymentAttempt, Sale, TerminalConfig } from './types';
+import type { SwapProvider } from '../swaps/provider';
 
 const sales = new Map<string, Sale>();
 const attempts = new Map<string, PaymentAttempt>();
@@ -52,18 +53,8 @@ describe('sale creation payment rails', () => {
 
   it('creates Liquid-only charges without requiring a swap provider', async () => {
     const { createSale } = await import('./payment-state');
-    const swapProvider = {
-      id: 'unavailable',
-      getLimits: vi.fn(),
-      createReverseSwap: vi.fn(async () => {
-        throw new Error('not used');
-      }),
-      getSwapStatus: vi.fn(),
-      verifySwap: vi.fn(),
-      supportsClaimCovenants: vi.fn(() => false)
-    };
 
-    const { sale, attempt } = await createSale(config, '8500', 'liquid', undefined, { swapProvider });
+    const { sale, attempt } = await createSale(config, '8500', 'liquid');
 
     expect(sales.get(sale.id)).toBeTruthy();
     expect(attempts.get(attempt.id)).toMatchObject({
@@ -73,7 +64,52 @@ describe('sale creation payment rails', () => {
       lightningInvoice: undefined,
       swapId: undefined
     });
-    expect(swapProvider.createReverseSwap).not.toHaveBeenCalled();
     expect(outbox).toHaveLength(1);
+  });
+
+  it('surfaces recovery durability failures before showing Lightning invoices', async () => {
+    const { createSale } = await import('./payment-state');
+    const swapProvider: SwapProvider = {
+      id: 'boltz',
+      getLimits: vi.fn(),
+      createReverseSwap: vi.fn(async () => ({
+        id: 'swap1',
+        invoice: 'lnbc10u1p57hfy0pp5demo',
+        preimage: '11'.repeat(32),
+        preimageHash: '22'.repeat(32),
+        claimPrivateKey: '33'.repeat(32),
+        claimPublicKey: `02${'44'.repeat(32)}`,
+        timeoutBlockHeight: 100,
+        claimAddress: 'tex1qliquid',
+        expectedAmountSat: 24_500
+      })),
+      getSwapStatus: vi.fn(),
+      verifySwap: vi.fn(() => ({ ok: true })),
+      supportsClaimCovenants: vi.fn(() => false)
+    };
+
+    await expect(
+      createSale(
+        { ...config, syncServers: ['wss://one', 'wss://two'] },
+        '8500',
+        'lightning_swap',
+        undefined,
+        {
+          swapProvider,
+          publishRecovery: vi.fn(async () => ({
+            id: 'recovery_swap1',
+            attempted: true,
+            okCount: 1,
+            results: [
+              { relay: 'wss://one', ok: true },
+              { relay: 'wss://two', ok: false, message: 'timeout' }
+            ]
+          }))
+        }
+      )
+    ).rejects.toThrow('recovery backup reached 1/2 relays');
+
+    expect(Array.from(sales.values()).at(-1)).toMatchObject({ status: 'failed' });
+    expect(Array.from(attempts.values()).at(-1)).toMatchObject({ status: 'failed' });
   });
 });

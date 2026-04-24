@@ -47,7 +47,7 @@ export function assertTerminalCanCharge(config: TerminalConfig, now = Date.now()
 export function swapProviderForConfig(config: TerminalConfig): SwapProvider {
   const provider = config.authorization?.swap_providers?.find((candidate) => candidate.type === 'boltz' && candidate.api_base);
   if (provider) return new BoltzReverseSwapProvider({ apiBase: provider.api_base });
-  if (import.meta.env.PROD) throw new Error('Lightning is temporarily unavailable. Use Liquid instead.');
+  if (import.meta.env.PROD) throw new Error('No authorized Boltz provider is configured for Lightning.');
   return new MockBoltzReverseSwapProvider();
 }
 
@@ -68,9 +68,13 @@ export async function createSale(
   const now = Date.now();
   const addressIndex = await reserveAddressIndex();
   const liquid = await deriveLiquidAddress(config, addressIndex);
-  const swapProvider = options.swapProvider ?? swapProviderForConfig(config);
   let swap: ReverseSwapResponse | undefined;
   if (method !== 'liquid') {
+    const limits = config.authorization?.limits as { allow_lightning?: unknown; allow_bolt_card?: unknown } | undefined;
+    if (limits?.allow_lightning === false || (method === 'bolt_card' && limits?.allow_bolt_card === false)) {
+      throw new Error('Lightning is disabled by the owner approval for this terminal.');
+    }
+    const swapProvider = options.swapProvider ?? swapProviderForConfig(config);
     swap = await swapProvider.createReverseSwap({
       saleId: ulid(now + 2),
       invoiceSat: amountSat,
@@ -82,7 +86,7 @@ export async function createSale(
       claimAddress: liquid.address
     });
     if (!verification.ok) {
-      throw new Error('Could not safely prepare Lightning payment. Try again.');
+      throw new Error(`Could not safely prepare Lightning payment: ${verification.reason}.`);
     }
   }
   const sale: Sale = {
@@ -136,7 +140,7 @@ export async function createSale(
     if (!swap) throw new Error('Could not safely prepare Lightning payment. Try again.');
     const minRecoveryOk = options.minRecoveryOk ?? 2;
     if (config.syncServers.length < minRecoveryOk) {
-      throw new Error('Could not safely prepare Lightning payment. Try again.');
+      throw new Error(`Could not safely prepare Lightning payment: add at least ${minRecoveryOk} sync servers.`);
     }
     const swapId = swap.id;
     const recoveryPayload = {
@@ -203,7 +207,8 @@ export async function createSale(
     if (!recoveryDurabilityMet(report, minRecoveryOk)) {
       await putSale({ ...sale, status: 'failed', updatedAt: Date.now() });
       await putAttempt({ ...attempt, status: 'failed', updatedAt: Date.now() });
-      throw new Error('Could not safely prepare Lightning payment. Try again.');
+      const relaySummary = report.results.map((result) => `${result.relay}: ${result.ok ? 'ok' : result.message || 'failed'}`).join('; ');
+      throw new Error(`Could not safely prepare Lightning payment: recovery backup reached ${report.okCount}/${minRecoveryOk} relays. ${relaySummary}`);
     }
   }
 

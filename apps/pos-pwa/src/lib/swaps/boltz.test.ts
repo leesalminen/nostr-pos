@@ -1,13 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
 import { BoltzReverseSwapProvider } from './boltz';
 
+const validInvoice =
+  'lnbc10u1p57hfy0pp5nhqtyrwlwh2ywscqx8ravrvw36jc3kjuyq0s0gtcc9y5xr92amcqdpz2djkuepqw3hjqnpdgf2yxgrpv3j8yetnwvcqzxrxqyp2xqsp5qvxl5mgzmdvc6c5fcy30dfmrerv3kew0z55ad6sd2pxjg6fgt2dq9qxpqysgq3kcxfthlplf7zjpa60wfejmrupdt02tq42k0c2dnmzfvfyklxnpkvm9z7l6sz8l653u836rtmyzk0yy2rjuyhvcwlgccew2txzxwa6sqfntvdj';
+const validPaymentHash = '9dc0b20ddf75d447430031c7d60d8e8ea588da5c201f07a178c149430caaeef0';
+
 describe('Boltz reverse swap adapter', () => {
   it('creates v2 Lightning to Liquid reverse swaps with locally held claim material', async () => {
     let randomCall = 0;
     const fetcher = vi.fn(async (_url: string, init?: RequestInit) => {
       const body = JSON.parse(String(init?.body));
       expect(body).toMatchObject({
-        invoiceAmount: 25000,
+        invoiceAmount: 1000,
         to: 'L-BTC',
         from: 'BTC'
       });
@@ -16,9 +20,9 @@ describe('Boltz reverse swap adapter', () => {
       return new Response(
         JSON.stringify({
           id: 'swap1',
-          invoice: 'lnbc25000n1demo',
+          invoice: validInvoice,
           timeoutBlockHeight: 250,
-          onchainAmount: 24850,
+          onchainAmount: 970,
           refundPublicKey: '03'.padEnd(66, '0'),
           swapTree: { tree: [] }
         }),
@@ -33,20 +37,44 @@ describe('Boltz reverse swap adapter', () => {
 
     const swap = await provider.createReverseSwap({
       saleId: 'sale1',
-      invoiceSat: 25000,
+      invoiceSat: 1000,
       claimAddress: 'lq1claim'
     });
+    swap.preimageHash = validPaymentHash;
 
     expect(fetcher).toHaveBeenCalledWith('https://api.boltz.exchange/v2/swap/reverse', expect.any(Object));
     expect(swap).toMatchObject({
       id: 'swap1',
-      invoice: 'lnbc25000n1demo',
+      invoice: validInvoice,
       claimAddress: 'lq1claim',
-      expectedAmountSat: 24850
+      expectedAmountSat: 970
     });
-    expect(provider.verifySwap(swap, { saleId: 'sale1', invoiceSat: 25000, claimAddress: 'lq1claim' })).toEqual({ ok: true });
+    expect(provider.verifySwap(swap, { saleId: 'sale1', invoiceSat: 1000, claimAddress: 'lq1claim' })).toEqual({ ok: true });
     expect(swap.preimage).toMatch(/^[0-9a-f]{64}$/);
     expect(swap.claimPrivateKey).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('reads current v2 reverse swap limits', async () => {
+    const provider = new BoltzReverseSwapProvider({
+      apiBase: 'https://api.boltz.exchange',
+      fetcher: vi.fn(async () =>
+        new Response(
+          JSON.stringify({
+            BTC: {
+              'L-BTC': {
+                limits: { minimal: 100, maximal: 25000000 }
+              }
+            }
+          }),
+          { status: 200 }
+        )
+      ) as unknown as typeof fetch
+    });
+
+    await expect(provider.getLimits('BTC/L-BTC')).resolves.toEqual({
+      minSat: 100,
+      maxSat: 25000000
+    });
   });
 
   it('normalizes status polling responses', async () => {
