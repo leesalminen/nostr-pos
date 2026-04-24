@@ -3204,3 +3204,7 @@ verification evidence stay close to the source of truth.
 - Added controller-side accounting foundations: event-history merge for
   sale/status/receipt records, CSV/JSON export helpers, and CLI commands for
   `record-sale`, `list-sales`, and `export-sales`.
+- Added Bolt Card utility foundations: NFC record URL extraction, LNURL-withdraw
+  validation, invoice amount bounds checking, and callback payment request
+  helper. The browser permission/read loop remains the final Android-tablet
+  integration point.
