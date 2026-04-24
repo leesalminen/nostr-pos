@@ -36,7 +36,16 @@ async function verifyLiquidAttempt(
   attempt: PaymentAttempt,
   options: ReconcileOptions
 ): Promise<{ changed: boolean; terminal: true } | { changed: false; terminal: false }> {
-  if (!attempt.liquidAddress || !['created', 'waiting'].includes(attempt.status)) return { changed: false, terminal: false };
+  if (!attempt.liquidAddress || !['created', 'waiting'].includes(attempt.status)) {
+    debugLiquidVerification('skipped attempt before liquid verification', {
+      attemptId: attempt.id,
+      saleId: sale.id,
+      method: attempt.method,
+      status: attempt.status,
+      hasLiquidAddress: Boolean(attempt.liquidAddress)
+    });
+    return { changed: false, terminal: false };
+  }
   const config = await getTerminalConfig();
   const backend = config?.authorization?.liquid_backends?.find((candidate) => candidate.type === 'esplora' && candidate.url);
   if (!backend) {
@@ -172,6 +181,10 @@ export async function applySwapStatusUpdate(
 export async function reconcileOpenPayments(input?: number | ReconcileOptions): Promise<number> {
   const options = normalizeOptions(input);
   const attempts = await openPaymentAttempts();
+  debugLiquidVerification('reconcile open payments start', {
+    count: attempts.length,
+    now: options.now
+  });
   let changed = 0;
   for (const attempt of attempts) {
     const sale = await getSale(attempt.saleId);

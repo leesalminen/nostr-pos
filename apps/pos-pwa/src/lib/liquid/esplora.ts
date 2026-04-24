@@ -110,7 +110,7 @@ export function liquidVerificationDebugEnabled(): boolean {
 
 export function debugLiquidVerification(message: string, details: Record<string, unknown> = {}): void {
   if (liquidVerificationDebugEnabled()) {
-    console.debug('[nostr-pos] confidential liquid verification', message, details);
+    console.info('[nostr-pos] confidential liquid verification', message, details);
   }
 }
 
@@ -159,11 +159,23 @@ export async function verifyConfidentialAddressPayment(
   const network = target.isMainnet() ? Network.mainnet() : Network.testnet();
   const wallet = new Wollet(network, descriptor);
   const policyAsset = network.policyAsset().toString();
+  debugLiquidVerification('started confidential verification', {
+    address,
+    targetUnconfidential,
+    expectedSat,
+    addressIndex: options.addressIndex,
+    candidateCount: transactions.length
+  });
 
   if (options.addressIndex !== undefined) {
     const derived = wallet.address(options.addressIndex).address();
     if (derived.toString() !== address && derived.toUnconfidential().toString() !== targetUnconfidential) {
-      return { detected: false, confirmed: false, receivedSat: 0 };
+      debugLiquidVerification('stored address index does not derive target address', {
+        addressIndex: options.addressIndex,
+        derived: derived.toString(),
+        derivedUnconfidential: derived.toUnconfidential().toString(),
+        targetUnconfidential
+      });
     }
   }
 
@@ -179,6 +191,7 @@ export async function verifyConfidentialAddressPayment(
       const txHex = await fetchTransactionHex(options.apiBase, txidToApply, options.fetcher ?? fetch);
       wallet.applyTransaction(Transaction.fromString(txHex));
       appliedTxids.add(txidToApply);
+      debugLiquidVerification('applied tx', { txid: txidToApply });
       return true;
     } catch (err) {
       debugLiquidVerification('could not apply tx', {
@@ -190,14 +203,45 @@ export async function verifyConfidentialAddressPayment(
   }
 
   function countWalletTx(walletTx: ReturnType<typeof wallet.transactions>[number], fallbackConfirmed: boolean): void {
+    const walletTxid = walletTx.txid().toString();
+    let inspected = 0;
     for (const output of [...walletTx.outputs(), ...walletTx.inputs()]) {
+      inspected += 1;
       const walletOutput = output.get();
-      if (!walletOutput) continue;
-      if (options.addressIndex !== undefined && walletOutput.wildcardIndex() !== options.addressIndex) continue;
+      if (!walletOutput) {
+        debugLiquidVerification('skipped empty wallet output', { walletTxid });
+        continue;
+      }
+      const wildcardIndex = walletOutput.wildcardIndex();
+      if (options.addressIndex !== undefined && wildcardIndex !== options.addressIndex) {
+        debugLiquidVerification('wallet output index differs from stored attempt index', {
+          walletTxid,
+          wildcardIndex,
+          expectedIndex: options.addressIndex
+        });
+      }
       const outputAddress = walletOutput.address();
-      if (!outputAddressMatches(outputAddress, address, targetUnconfidential)) continue;
+      const outputAddressString = outputAddress.toString();
+      const outputUnconfidential = outputAddress.toUnconfidential().toString();
+      if (!outputAddressMatches(outputAddress, address, targetUnconfidential)) {
+        debugLiquidVerification('skipped wallet output with different address', {
+          walletTxid,
+          outputAddress: outputAddressString,
+          outputUnconfidential,
+          targetUnconfidential
+        });
+        continue;
+      }
       const unblinded = walletOutput.unblinded();
-      if (unblinded.asset().toString() !== policyAsset) continue;
+      const asset = unblinded.asset().toString();
+      if (asset !== policyAsset) {
+        debugLiquidVerification('skipped wallet output with different asset', {
+          walletTxid,
+          asset,
+          policyAsset
+        });
+        continue;
+      }
       const outpoint = walletOutput.outpoint();
       const outpointKey = `${outpoint.txid().toString()}:${outpoint.vout()}`;
       if (countedOutpoints.has(outpointKey)) continue;
@@ -211,6 +255,7 @@ export async function verifyConfidentialAddressPayment(
         confirmed
       });
     }
+    debugLiquidVerification('inspected wallet tx', { walletTxid, inspected, receivedSat });
   }
 
   for (const tx of transactions) {
@@ -218,21 +263,46 @@ export async function verifyConfidentialAddressPayment(
       debugLiquidVerification('skipped old tx', { txid: tx.txid });
       continue;
     }
+    debugLiquidVerification('checking candidate tx', {
+      txid: tx.txid,
+      confirmed: Boolean(tx.status?.confirmed),
+      blockTime: tx.status?.block_time,
+      vinCount: tx.vin?.length ?? 0,
+      voutCount: tx.vout.length
+    });
     const prevoutTxids = new Set(
       (tx.vin ?? [])
         .filter((input) => input.txid && input.prevout?.scriptpubkey_address === targetUnconfidential)
         .map((input) => input.txid as string)
     );
+    debugLiquidVerification('matching prevout txids', {
+      txid: tx.txid,
+      targetUnconfidential,
+      prevouts: (tx.vin ?? []).map((input) => ({
+        txid: input.txid,
+        vout: input.vout,
+        address: input.prevout?.scriptpubkey_address,
+        matches: input.prevout?.scriptpubkey_address === targetUnconfidential
+      })),
+      matching: Array.from(prevoutTxids)
+    });
 
     for (const prevoutTxid of prevoutTxids) {
       if (!(await applyTx(prevoutTxid))) continue;
       const prevoutWalletTx = wallet.transactions().find((candidate) => candidate.txid().toString() === prevoutTxid);
-      if (prevoutWalletTx) countWalletTx(prevoutWalletTx, Boolean(tx.status?.confirmed));
+      if (prevoutWalletTx) {
+        countWalletTx(prevoutWalletTx, Boolean(tx.status?.confirmed));
+      } else {
+        debugLiquidVerification('prevout tx applied but not in wallet transactions', { txid: prevoutTxid });
+      }
     }
 
     if (!(await applyTx(tx.txid))) continue;
     const walletTx = wallet.transactions().find((candidate) => candidate.txid().toString() === tx.txid);
-    if (!walletTx) continue;
+    if (!walletTx) {
+      debugLiquidVerification('candidate tx applied but not in wallet transactions', { txid: tx.txid });
+      continue;
+    }
     countWalletTx(walletTx, Boolean(tx.status?.confirmed));
   }
 

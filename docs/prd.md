@@ -3502,6 +3502,10 @@ verification evidence stay close to the source of truth.
   scoped console diagnostics for skipped/applied confidential candidates; any
   build can enable the same diagnostics with
   `localStorage.setItem("nostr-pos:debug:liquid", "1")`.
+- Confidential payment verification treats the unblinded target address match
+  as authoritative. The stored local address index is logged when it disagrees
+  with LWK's wildcard index, but it is not allowed to reject an otherwise valid
+  target-address, policy-asset, sufficient-amount payment.
 - Removed the early UI placeholder Lightning payload path. The payment screen
   now renders Lightning QR data only when a checksummed Bolt11 invoice exists,
   and live dev pilots use the configured Boltz provider instead of the mock
