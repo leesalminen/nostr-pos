@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { ArrowLeft, Download } from 'lucide-svelte';
+  import BullFooter from '../../../lib/ui/BullFooter.svelte';
   import Button from '../../../lib/ui/Button.svelte';
   import ServerList from '../../../lib/ui/advanced/ServerList.svelte';
   import { loadTerminal, terminal } from '../../../lib/stores/terminal';
@@ -92,5 +93,6 @@
         </div>
       </div>
     </div>
+    <BullFooter />
   </div>
 </main>
