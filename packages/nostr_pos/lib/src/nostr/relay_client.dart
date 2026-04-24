@@ -141,26 +141,43 @@ Future<List<RelayPublishResult>> publishEventToRelays({
   return results;
 }
 
-Future<NostrPosEvent?> findPairingAnnouncement({
+Future<List<NostrPosEvent>> queryEventsFromRelays({
   required List<String> relays,
-  required String pairingCode,
+  required Map<String, Object?> filter,
   NostrRelayClient? client,
 }) async {
   final relayClient = client ?? NostrRelayClient();
   final events = <NostrPosEvent>[];
   for (final relay in relays) {
     try {
-      events.addAll(
-        await relayClient.query(relay, {
-          'kinds': [NostrPosKinds.pairingAnnouncement],
-          '#pairing': [pairingCode],
-          'limit': 5,
-        }),
-      );
+      events.addAll(await relayClient.query(relay, filter));
     } catch (_) {
-      // Pairing can continue as long as one configured relay responds.
+      // Query results are best-effort across configured relays.
     }
   }
+  final byId = <String, NostrPosEvent>{};
+  for (final event in events) {
+    if (event.idMatches) byId[event.id] = event;
+  }
+  return byId.values.toList()
+    ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+}
+
+Future<NostrPosEvent?> findPairingAnnouncement({
+  required List<String> relays,
+  required String pairingCode,
+  NostrRelayClient? client,
+}) async {
+  final relayClient = client ?? NostrRelayClient();
+  final events = await queryEventsFromRelays(
+    relays: relays,
+    client: relayClient,
+    filter: {
+      'kinds': [NostrPosKinds.pairingAnnouncement],
+      '#pairing': [pairingCode],
+      'limit': 5,
+    },
+  );
   final valid =
       events.where((event) => event.hasProtocolTag && event.idMatches).toList()
         ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -172,7 +189,6 @@ Future<List<NostrPosEvent>> fetchSwapRecoveryBackups({
   String? recoveryPubkey,
   NostrRelayClient? client,
 }) async {
-  final relayClient = client ?? NostrRelayClient();
   final filter = <String, Object?>{
     'kinds': [NostrPosKinds.swapRecoveryBackup],
     'limit': 100,
@@ -181,22 +197,15 @@ Future<List<NostrPosEvent>> fetchSwapRecoveryBackups({
     filter['#p'] = [recoveryPubkey];
   }
 
-  final events = <NostrPosEvent>[];
-  for (final relay in relays) {
-    try {
-      events.addAll(await relayClient.query(relay, filter));
-    } catch (_) {
-      // Recovery can continue as long as one configured relay responds.
-    }
-  }
-  final byId = <String, NostrPosEvent>{};
-  for (final event in events) {
-    if (event.kind == NostrPosKinds.swapRecoveryBackup &&
-        event.hasProtocolTag &&
-        event.idMatches) {
-      byId[event.id] = event;
-    }
-  }
-  return byId.values.toList()
-    ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+  return (await queryEventsFromRelays(
+        relays: relays,
+        filter: filter,
+        client: client,
+      ))
+      .where(
+        (event) =>
+            event.kind == NostrPosKinds.swapRecoveryBackup &&
+            event.hasProtocolTag,
+      )
+      .toList();
 }

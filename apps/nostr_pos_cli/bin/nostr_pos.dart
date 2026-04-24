@@ -417,12 +417,31 @@ Future<void> _recordSale(List<String> args) async {
 Future<void> _listEvents(List<String> args) async {
   final parser = ArgParser()
     ..addOption('store', defaultsTo: '.nostr-pos/events.jsonl')
-    ..addOption('kind');
+    ..addOption('kind')
+    ..addOption('relays')
+    ..addOption('author')
+    ..addOption('d')
+    ..addOption('p')
+    ..addOption('limit', defaultsTo: '50');
   final parsed = parser.parse(args);
-  final store = LocalEventStore(parsed['store'] as String);
-  final events = parsed['kind'] == null
-      ? await store.readAll()
-      : await store.byKind(int.parse(parsed['kind'] as String));
+  final events = parsed['relays'] == null
+      ? parsed['kind'] == null
+            ? await LocalEventStore(parsed['store'] as String).readAll()
+            : await LocalEventStore(
+                parsed['store'] as String,
+              ).byKind(int.parse(parsed['kind'] as String))
+      : await queryEventsFromRelays(
+          relays: _parseRelays(parsed['relays'] as String),
+          filter: {
+            if (parsed['kind'] != null)
+              'kinds': [int.parse(parsed['kind'] as String)],
+            if (parsed['author'] != null)
+              'authors': [parsed['author'] as String],
+            if (parsed['d'] != null) '#d': [parsed['d'] as String],
+            if (parsed['p'] != null) '#p': [parsed['p'] as String],
+            'limit': int.parse(parsed['limit'] as String),
+          },
+        );
   stdout.writeln(
     const JsonEncoder.withIndent(
       '  ',

@@ -3267,6 +3267,9 @@ verification evidence stay close to the source of truth.
   relays with per-relay OK reporting.
 - Verified the Dart CLI relay write path live by publishing a signed kind-30380
   POS profile smoke event to all three default relays; each returned OK.
+- Generalized controller relay reads: `nostr_pos_cli list-events` can now query
+  configured relays by kind, author, `d` tag, or `p` tag, which covers POS
+  profile fetches and other protocol event inspection.
 
 ### Known follow-ups
 
