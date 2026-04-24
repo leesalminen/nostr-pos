@@ -37,6 +37,10 @@ export function recoveryGiftWrapEvents(template: EventTemplate, privateKeyHex: s
   return uniqueRecipients.map((recipient) => nip59.wrapEvent(template, privateKey, recipient.toLowerCase()));
 }
 
+function requiresMerchantRecoveryKey(item: OutboxItem): boolean {
+  return import.meta.env.PROD && ['sale_created', 'payment_status', 'receipt', 'payment_backup'].includes(item.type);
+}
+
 function combinePublishResults(reports: PublishResult[][], relays: string[]): PublishResult[] {
   return relays.map((relay, index) => {
     const relayResults = reports.map((report) => report[index]).filter(Boolean);
@@ -56,6 +60,9 @@ async function publishItemEvents(
 ): Promise<PublishResult[]> {
   if (!config.terminalPrivkeyEnc) throw new Error('Terminal signing key is unavailable.');
   const recoveryRecipient = merchantRecoveryPubkey(config);
+  if (!recoveryRecipient && requiresMerchantRecoveryKey(item)) {
+    throw new Error('Merchant recovery key is required before publishing private payment records.');
+  }
   if (item.type === 'payment_backup' && recoveryRecipient) {
     const template = outboxItemToTemplate(item);
     const events = recoveryGiftWrapEvents(template, config.terminalPrivkeyEnc, [recoveryRecipient, config.terminalPubkey]);

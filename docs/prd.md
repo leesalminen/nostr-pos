@@ -1465,7 +1465,9 @@ Content (encrypted form):
 ```
 
 Privacy TODO before production pilot:
-- Confirm kind-9382 payment status events and kind-9383 receipt events are NIP-44 v2 encrypted in every production path. Any plaintext receipt/status compatibility must be dev-only.
+- Reconfirm with a production build smoke test that kind-9380/9382/9383
+  payment records refuse plaintext publication when the merchant recovery key is
+  missing.
 - Re-review public tags on encrypted events. Even with encrypted content, tags like `sale`, `terminal`, `status`, `method`, `swap`, timestamps, and POS `a` refs can leak sales cadence, terminal activity, payment outcomes, or business volume patterns.
 - Decide whether `status` and `method` belong in public tags for v1 or should move into encrypted content only, with less-specific routing tags left public.
 - Audit other relay-visible records for public leakage before pilot: kind-30380 POS profiles, kind-30382 revocations, kind-30383 pairing announcements, kind-9380 sale-created tags, and kind-9381 recovery-backup tags/wrappers.
@@ -3328,6 +3330,10 @@ verification evidence stay close to the source of truth.
   and `nostr_pos_cli list-sales` / `export-sales` can merge local records with
   relay-fetched kind-9380/9382/9383 records via `--relays`,
   `--pos-ref`, and `--merchant-recovery-privkey`.
+- Hardened terminal publishing privacy: production PWA builds now refuse to
+  publish sale-created, payment-status, receipt, or recovery-backup records
+  unless the merchant recovery key is available, keeping plaintext accounting
+  compatibility limited to dev/test flows.
 - CI now runs `dart analyze` for the Dart SDK as well as the CLI so relay,
   signing, and recovery SDK code gets static checks on every push.
 - README now documents the current smoke commands and the live relay-backed
