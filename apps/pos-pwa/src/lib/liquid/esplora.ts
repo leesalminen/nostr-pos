@@ -45,6 +45,8 @@ export type ConfidentialPaymentVerificationOptions = PaymentVerificationOptions 
   fetcher?: typeof fetch;
 };
 
+const LIQUID_DEBUG_STORAGE_KEY = 'nostr-pos:debug:liquid';
+
 export async function fetchAddressTransactions(apiBase: string, address: string, fetcher: typeof fetch = fetch): Promise<EsploraTx[]> {
   const response = await fetcher(`${apiBase.replace(/\/$/, '')}/address/${address}/txs`);
   if (!response.ok) throw new Error("Can't verify Liquid payments right now.");
@@ -96,8 +98,18 @@ function outputAddressMatches(outputAddress: { toString(): string; toUnconfident
   return outputAddress.toString() === address || outputAddress.toUnconfidential().toString() === unconfidential;
 }
 
-function debugConfidentialVerification(message: string, details: Record<string, unknown> = {}): void {
-  if (import.meta.env.DEV && import.meta.env.MODE !== 'test') {
+export function liquidVerificationDebugEnabled(): boolean {
+  if (import.meta.env.MODE === 'test') return false;
+  if (import.meta.env.DEV) return true;
+  try {
+    return globalThis.localStorage?.getItem(LIQUID_DEBUG_STORAGE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function debugLiquidVerification(message: string, details: Record<string, unknown> = {}): void {
+  if (liquidVerificationDebugEnabled()) {
     console.debug('[nostr-pos] confidential liquid verification', message, details);
   }
 }
@@ -169,7 +181,7 @@ export async function verifyConfidentialAddressPayment(
       appliedTxids.add(txidToApply);
       return true;
     } catch (err) {
-      debugConfidentialVerification('could not apply tx', {
+      debugLiquidVerification('could not apply tx', {
         txid: txidToApply,
         reason: err instanceof Error ? err.message : String(err)
       });
@@ -193,7 +205,7 @@ export async function verifyConfidentialAddressPayment(
       receivedSat += Number(unblinded.value());
       txid ??= outpoint.txid().toString();
       confirmed ||= fallbackConfirmed || walletOutput.height() !== undefined;
-      debugConfidentialVerification('counted wallet output', {
+      debugLiquidVerification('counted wallet output', {
         outpoint: outpointKey,
         receivedSat,
         confirmed
@@ -203,7 +215,7 @@ export async function verifyConfidentialAddressPayment(
 
   for (const tx of transactions) {
     if (!txIsRecentEnough(tx, options.minCreatedAt)) {
-      debugConfidentialVerification('skipped old tx', { txid: tx.txid });
+      debugLiquidVerification('skipped old tx', { txid: tx.txid });
       continue;
     }
     const prevoutTxids = new Set(
@@ -224,7 +236,7 @@ export async function verifyConfidentialAddressPayment(
     countWalletTx(walletTx, Boolean(tx.status?.confirmed));
   }
 
-  debugConfidentialVerification('finished', {
+  debugLiquidVerification('finished', {
     detected: receivedSat >= expectedSat,
     expectedSat,
     receivedSat,

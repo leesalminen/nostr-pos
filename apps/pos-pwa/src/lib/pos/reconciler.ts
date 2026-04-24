@@ -1,7 +1,7 @@
 import { getAttempt, getSale, openPaymentAttempts, putAttempt, putOutbox, putSale } from '../db/repositories/ledger';
 import { getTerminalConfig } from '../db/repositories/terminal';
 import { authorizationDescriptor } from '../liquid/address';
-import { fetchAddressTransactions, verifyAddressPayment, verifyConfidentialAddressPayment } from '../liquid/esplora';
+import { debugLiquidVerification, fetchAddressTransactions, verifyAddressPayment, verifyConfidentialAddressPayment } from '../liquid/esplora';
 import { paymentStatusEvent } from '../nostr/events';
 import type { PaymentAttempt, Sale } from './types';
 import { claimLiquidReverseSwap } from './claim-engine';
@@ -39,10 +39,20 @@ async function verifyLiquidAttempt(
   if (!attempt.liquidAddress || !['created', 'waiting'].includes(attempt.status)) return { changed: false, terminal: false };
   const config = await getTerminalConfig();
   const backend = config?.authorization?.liquid_backends?.find((candidate) => candidate.type === 'esplora' && candidate.url);
-  if (!backend) return { changed: false, terminal: false };
+  if (!backend) {
+    debugLiquidVerification('no liquid backend configured', { attemptId: attempt.id, saleId: sale.id });
+    return { changed: false, terminal: false };
+  }
 
   try {
     const transactions = await fetchAddressTransactions(backend.url, attempt.liquidAddress, options.fetcher ?? fetch);
+    debugLiquidVerification('fetched address transactions', {
+      attemptId: attempt.id,
+      saleId: sale.id,
+      address: attempt.liquidAddress,
+      count: transactions.length,
+      expectedSat: sale.amountSat
+    });
     let verification = verifyAddressPayment(transactions, attempt.liquidAddress, sale.amountSat, { minCreatedAt: sale.createdAt });
     const descriptor = config ? authorizationDescriptor(config) : undefined;
     if (!verification.detected && descriptor) {
@@ -53,7 +63,21 @@ async function verifyLiquidAttempt(
         fetcher: options.fetcher,
         minCreatedAt: sale.createdAt
       });
+    } else if (!verification.detected && !descriptor) {
+      debugLiquidVerification('missing descriptor for confidential verification', {
+        attemptId: attempt.id,
+        saleId: sale.id,
+        address: attempt.liquidAddress
+      });
     }
+    debugLiquidVerification('payment verification result', {
+      attemptId: attempt.id,
+      saleId: sale.id,
+      detected: verification.detected,
+      confirmed: verification.confirmed,
+      receivedSat: verification.receivedSat,
+      txid: verification.txid
+    });
     if (!verification.detected) return { changed: false, terminal: false };
     await settleAttempt({
       sale,
@@ -62,7 +86,12 @@ async function verifyLiquidAttempt(
       settledAt: options.now
     });
     return { changed: true, terminal: true };
-  } catch {
+  } catch (err) {
+    debugLiquidVerification('verification threw', {
+      attemptId: attempt.id,
+      saleId: sale.id,
+      reason: err instanceof Error ? err.message : String(err)
+    });
     return { changed: false, terminal: false };
   }
 }

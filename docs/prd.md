@@ -3499,7 +3499,9 @@ verification evidence stay close to the source of truth.
 - If Esplora returns only the spending transaction for a confidential address
   hit, the terminal fetches and applies matching `vin.prevout` transaction hexes
   first so LWK can recover the original receive output amount. Dev builds emit
-  scoped console diagnostics for skipped/applied confidential candidates.
+  scoped console diagnostics for skipped/applied confidential candidates; any
+  build can enable the same diagnostics with
+  `localStorage.setItem("nostr-pos:debug:liquid", "1")`.
 - Removed the early UI placeholder Lightning payload path. The payment screen
   now renders Lightning QR data only when a checksummed Bolt11 invoice exists,
   and live dev pilots use the configured Boltz provider instead of the mock
