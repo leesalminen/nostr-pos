@@ -17,6 +17,16 @@ export type LocalProtocolEvent = {
   content: Record<string, unknown>;
 };
 
+function saleTags(sale: Sale, extra: string[][] = []): string[][] {
+  return [
+    ['proto', 'nostr-pos', '0.2'],
+    ['sale', sale.id],
+    ['terminal', sale.terminalId],
+    ...(sale.posRef ? [['a', sale.posRef]] : []),
+    ...extra
+  ];
+}
+
 export function pairingAnnouncementEvent(input: {
   terminalPubkey: string;
   pairingCode: string;
@@ -42,11 +52,7 @@ export function pairingAnnouncementEvent(input: {
 export function saleCreatedEvent(sale: Sale): LocalProtocolEvent {
   return {
     kind: KINDS.saleCreated,
-    tags: [
-      ['proto', 'nostr-pos', '0.2'],
-      ['sale', sale.id],
-      ['terminal', sale.terminalId]
-    ],
+    tags: saleTags(sale),
     content: {
       sale_id: sale.id,
       created_at: Math.floor(sale.createdAt / 1000),
@@ -65,12 +71,7 @@ export function saleCreatedEvent(sale: Sale): LocalProtocolEvent {
 export function paymentStatusEvent(sale: Sale, attempt: PaymentAttempt): LocalProtocolEvent {
   return {
     kind: KINDS.paymentStatus,
-    tags: [
-      ['proto', 'nostr-pos', '0.2'],
-      ['sale', sale.id],
-      ['terminal', sale.terminalId],
-      ['status', attempt.status]
-    ],
+    tags: saleTags(sale, [['status', attempt.status]]),
     content: {
       sale_id: sale.id,
       status: attempt.status,
@@ -89,11 +90,7 @@ export function paymentStatusEvent(sale: Sale, attempt: PaymentAttempt): LocalPr
 export function receiptEvent(sale: Sale, attempt: PaymentAttempt): LocalProtocolEvent {
   return {
     kind: KINDS.receipt,
-    tags: [
-      ['proto', 'nostr-pos', '0.2'],
-      ['sale', sale.id],
-      ['terminal', sale.terminalId]
-    ],
+    tags: saleTags(sale),
     content: {
       receipt_id: sale.receiptNumber,
       sale_id: sale.id,

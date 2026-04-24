@@ -31,6 +31,10 @@ export function recoveryDurabilityMet(report: Pick<OutboxPublishReport, 'results
   return report.results.filter((result) => result.ok).length >= minOk;
 }
 
+export function posRefForConfig(config: TerminalConfig): string {
+  return config.posProfile ? `30380:${config.posProfile.merchantPubkey}:${config.posProfile.posId}` : 'pilot-seguras-butcher';
+}
+
 export async function createSale(
   config: TerminalConfig,
   fiatAmount: string,
@@ -64,7 +68,7 @@ export async function createSale(
   const sale: Sale = {
     id: ulid(now),
     receiptNumber: `R-${String(now).slice(-8)}`,
-    posRef: 'pilot-seguras-butcher',
+    posRef: posRefForConfig(config),
     terminalId: config.terminalId,
     amountFiat: fiatAmount,
     fiatCurrency: config.currency,

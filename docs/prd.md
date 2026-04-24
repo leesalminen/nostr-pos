@@ -3281,6 +3281,9 @@ verification evidence stay close to the source of truth.
   PBKDF2-SHA256 (600k iterations), Advanced requires a short-lived session
   unlock before recovery/export tools, and no-PIN deployments show the required
   reduced-security confirmation.
+- Linked terminal sale/status/receipt records to the loaded POS profile
+  coordinate, so relay/accounting history carries the required profile `a` tag
+  instead of the previous pilot placeholder reference.
 - CI now runs `dart analyze` for the Dart SDK as well as the CLI so relay,
   signing, and recovery SDK code gets static checks on every push.
 - README now documents the current smoke commands and the live relay-backed
