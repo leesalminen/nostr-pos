@@ -89,4 +89,60 @@ describe('Liquid Esplora adapter', () => {
 
     expect(result).toEqual({ detected: true, confirmed: true, receivedSat: 25_000, txid: 'tx1' });
   });
+
+  it('detects confidential address payments returned by the address endpoint', () => {
+    const result = verifyAddressPayment(
+      [
+        {
+          txid: 'oldtx',
+          status: { confirmed: true, block_time: 100 },
+          vout: [
+            {
+              scriptpubkey_address: 'ex1qold',
+              valuecommitment: '08old',
+              assetcommitment: '0aold'
+            }
+          ]
+        },
+        {
+          txid: 'confidentialtx',
+          status: { confirmed: true, block_time: 200 },
+          vout: [
+            {
+              scriptpubkey_address: 'ex1qunconfidential',
+              valuecommitment: '08commitment',
+              assetcommitment: '0acommitment'
+            }
+          ]
+        }
+      ],
+      'lq1qqconfidential',
+      25_000,
+      { minCreatedAt: 150_000 }
+    );
+
+    expect(result).toEqual({
+      detected: true,
+      confirmed: true,
+      receivedSat: 25_000,
+      txid: 'confidentialtx'
+    });
+  });
+
+  it('ignores old confidential address history before the sale', () => {
+    const result = verifyAddressPayment(
+      [
+        {
+          txid: 'oldtx',
+          status: { confirmed: true, block_time: 100 },
+          vout: [{ scriptpubkey_address: 'ex1qold', valuecommitment: '08old' }]
+        }
+      ],
+      'lq1qqconfidential',
+      25_000,
+      { minCreatedAt: 150_000 }
+    );
+
+    expect(result.detected).toBe(false);
+  });
 });

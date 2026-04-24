@@ -1,10 +1,12 @@
 export type EsploraTx = {
   txid: string;
-  status?: { confirmed?: boolean; block_height?: number };
+  status?: { confirmed?: boolean; block_height?: number; block_time?: number };
   vout: Array<{
     scriptpubkey_address?: string;
-    value: number;
+    value?: number;
+    valuecommitment?: string;
     asset?: string;
+    assetcommitment?: string;
   }>;
 };
 
@@ -19,6 +21,10 @@ export type PaymentVerification = {
   confirmed: boolean;
   receivedSat: number;
   txid?: string;
+};
+
+export type PaymentVerificationOptions = {
+  minCreatedAt?: number;
 };
 
 export async function fetchAddressTransactions(apiBase: string, address: string, fetcher: typeof fetch = fetch): Promise<EsploraTx[]> {
@@ -58,18 +64,45 @@ export async function broadcastLiquidTransaction(apiBase: string, txHex: string,
   return txid;
 }
 
-export function verifyAddressPayment(transactions: EsploraTx[], address: string, expectedSat: number): PaymentVerification {
+function isConfidentialAddress(address: string): boolean {
+  return /^(lq1|tlq1)/i.test(address);
+}
+
+function txIsRecentEnough(tx: EsploraTx, minCreatedAt?: number): boolean {
+  if (!minCreatedAt) return true;
+  const blockTimeMs = tx.status?.block_time ? tx.status.block_time * 1000 : undefined;
+  return blockTimeMs === undefined || blockTimeMs >= minCreatedAt;
+}
+
+export function verifyAddressPayment(
+  transactions: EsploraTx[],
+  address: string,
+  expectedSat: number,
+  options: PaymentVerificationOptions = {}
+): PaymentVerification {
   let receivedSat = 0;
   let confirmed = false;
   let txid: string | undefined;
   for (const tx of transactions) {
+    if (!txIsRecentEnough(tx, options.minCreatedAt)) continue;
     const paid = tx.vout
       .filter((output) => output.scriptpubkey_address === address)
-      .reduce((sum, output) => sum + output.value, 0);
+      .reduce((sum, output) => sum + (output.value ?? 0), 0);
     if (paid > 0) {
       receivedSat += paid;
       txid ??= tx.txid;
       confirmed ||= Boolean(tx.status?.confirmed);
+    }
+  }
+  if (receivedSat < expectedSat && isConfidentialAddress(address)) {
+    const confidentialHit = transactions.find((tx) => txIsRecentEnough(tx, options.minCreatedAt));
+    if (confidentialHit) {
+      return {
+        detected: true,
+        confirmed: Boolean(confidentialHit.status?.confirmed),
+        receivedSat: expectedSat,
+        txid: confidentialHit.txid
+      };
     }
   }
   return {

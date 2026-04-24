@@ -42,7 +42,7 @@ async function verifyLiquidAttempt(
 
   try {
     const transactions = await fetchAddressTransactions(backend.url, attempt.liquidAddress, options.fetcher ?? fetch);
-    const verification = verifyAddressPayment(transactions, attempt.liquidAddress, sale.amountSat);
+    const verification = verifyAddressPayment(transactions, attempt.liquidAddress, sale.amountSat, { minCreatedAt: sale.createdAt });
     if (!verification.detected) return { changed: false, terminal: false };
     await settleAttempt({
       sale,

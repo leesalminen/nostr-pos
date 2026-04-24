@@ -191,6 +191,70 @@ describe('startup reconciliation', () => {
     expect(outbox).toHaveLength(2);
   });
 
+  it('settles confidential Liquid address hits without visible output amounts', async () => {
+    const { reconcileOpenPayments } = await import('./reconciler');
+    config = {
+      merchantName: 'Merchant',
+      posName: 'Counter',
+      currency: 'CRC',
+      terminalId: 'term1',
+      terminalPubkey: 'pub',
+      pairingCode: 'ABCD-EFGH',
+      maxInvoiceSat: 100000,
+      syncServers: [],
+      authorization: {
+        liquid_backends: [{ type: 'esplora', url: 'https://liquid.example/api' }]
+      }
+    };
+    sales.set('sale-confidential', {
+      id: 'sale-confidential',
+      receiptNumber: 'R-C',
+      posRef: 'pos',
+      terminalId: 'term1',
+      amountFiat: '8500',
+      fiatCurrency: 'CRC',
+      amountSat: 25000,
+      status: 'payment_ready',
+      createdAt: 200_000,
+      updatedAt: 200_000
+    });
+    attempts.set('attempt-confidential', {
+      id: 'attempt-confidential',
+      saleId: 'sale-confidential',
+      method: 'liquid',
+      status: 'waiting',
+      liquidAddress: 'lq1qqconfidential',
+      createdAt: 200_000,
+      updatedAt: 200_000,
+      expiresAt: 300_000
+    });
+    const fetcher = vi.fn(async () =>
+      new Response(
+        JSON.stringify([
+          {
+            txid: 'oldtx',
+            status: { confirmed: true, block_time: 100 },
+            vout: [{ scriptpubkey_address: 'ex1qold', valuecommitment: '08old' }]
+          },
+          {
+            txid: 'confidentialtx',
+            status: { confirmed: true, block_time: 210 },
+            vout: [{ scriptpubkey_address: 'ex1qreceiver', valuecommitment: '08commitment' }]
+          }
+        ]),
+        { status: 200 }
+      )
+    );
+
+    await expect(reconcileOpenPayments({ now: 220_000, fetcher })).resolves.toBe(1);
+    expect(attempts.get('attempt-confidential')).toMatchObject({
+      method: 'liquid',
+      status: 'settled',
+      settlementTxid: 'confidentialtx'
+    });
+    expect(sales.get('sale-confidential')?.status).toBe('receipt_ready');
+  });
+
   it('marks Lightning swaps detected by the provider after refresh', async () => {
     const { reconcileOpenPayments } = await import('./reconciler');
     config = {
