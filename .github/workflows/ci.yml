@@ -28,4 +28,4 @@ jobs:
         with:
           sdk: stable
       - run: cd packages/nostr_pos && dart pub get && dart analyze && dart test
-      - run: cd apps/nostr_pos_cli && dart pub get && dart analyze
+      - run: cd apps/nostr_pos_cli && dart pub get && dart analyze && dart test
