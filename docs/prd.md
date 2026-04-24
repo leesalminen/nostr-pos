@@ -3216,8 +3216,14 @@ verification evidence stay close to the source of truth.
   backend from Advanced → Recovery center, then marks the swap recovery record
   claimed with the returned txid. This preserves the §14.3 invariant for
   `claim_tx_hex` that already exists in recovery state, and keeps failed
-  broadcasts retryable. Remaining production gap: construct/RBF the actual
-  Boltz claim transaction from swap material with Liquid transaction tooling.
+  broadcasts retryable.
+- Added the production Liquid reverse-swap claim path for live Boltz updates:
+  when a lockup transaction is observed, the PWA decrypts the saved recovery
+  material, uses `boltz-core` + `liquidjs-lib` + `secp256k1-zkp` to construct a
+  cooperative claim transaction, requests Boltz's partial signature, persists
+  `claim_tx_hex` before broadcast, then broadcasts through the configured
+  Esplora backend. Remaining hardening gap: fee bump/RBF policy and
+  non-cooperative script-path fallback.
 - Added local protocol outbox events for sale-created, payment-status, and
   receipt records, plus startup reconciliation that expires stale open attempts
   and records the status update. This is the IndexedDB side of the PRD's

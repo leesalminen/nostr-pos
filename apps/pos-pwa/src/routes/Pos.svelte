@@ -8,6 +8,7 @@
   import { terminal, loadTerminal, loadPosProfileReference } from '../lib/stores/terminal';
   import { refreshTransactions } from '../lib/stores/ledger';
   import { paymentPayload, simulateSettlement } from '../lib/pos/payment-state';
+  import { claimLiquidReverseSwap } from '../lib/pos/claim-engine';
   import { applySwapStatusUpdate, reconcileOpenPayments, resumeAttempt, resumeSale } from '../lib/pos/reconciler';
   import type { PaymentAttempt, PaymentMethod, Sale } from '../lib/pos/types';
   import { syncQueuedRecords } from '../lib/pos/sync';
@@ -97,7 +98,21 @@
             swapIds: [resumed.attempt.swapId],
             async onUpdate(update) {
               if (stopped || update.id !== resumed.attempt.swapId || !sale || !attempt) return;
-              const applied = await applySwapStatusUpdate(sale, attempt, update.status, { now: Date.now(), txid: update.txid });
+              const applied =
+                update.status === 'transaction.mempool' || update.status === 'transaction.confirmed'
+                  ? await claimLiquidReverseSwap(config, {
+                      swapId: resumed.attempt.swapId,
+                      lockupTxHex: update.transactionHex,
+                      lockupTxid: update.txid
+                    }).then((result) =>
+                      result.status === 'broadcast' && result.txid
+                        ? applySwapStatusUpdate(sale as Sale, attempt as PaymentAttempt, 'transaction.claimed', {
+                            now: Date.now(),
+                            txid: result.txid
+                          })
+                        : applySwapStatusUpdate(sale as Sale, attempt as PaymentAttempt, update.status, { now: Date.now(), txid: update.txid })
+                    )
+                  : await applySwapStatusUpdate(sale, attempt, update.status, { now: Date.now(), txid: update.txid });
               if (!applied.changed || stopped) return;
               const latest = await resumeAttempt(attempt.id);
               if (latest) {

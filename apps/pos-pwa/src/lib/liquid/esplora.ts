@@ -21,6 +21,14 @@ export async function fetchAddressTransactions(apiBase: string, address: string,
   return (await response.json()) as EsploraTx[];
 }
 
+export async function fetchTransactionHex(apiBase: string, txid: string, fetcher: typeof fetch = fetch): Promise<string> {
+  const response = await fetcher(`${apiBase.replace(/\/$/, '')}/tx/${encodeURIComponent(txid)}/hex`);
+  if (!response.ok) throw new Error("Can't fetch the Liquid transaction right now.");
+  const txHex = (await response.text()).trim();
+  if (!/^[0-9a-fA-F]+$/.test(txHex)) throw new Error('Liquid backend returned invalid transaction hex.');
+  return txHex;
+}
+
 export async function broadcastLiquidTransaction(apiBase: string, txHex: string, fetcher: typeof fetch = fetch): Promise<string> {
   const response = await fetcher(`${apiBase.replace(/\/$/, '')}/tx`, {
     method: 'POST',

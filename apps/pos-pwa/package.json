@@ -12,8 +12,13 @@
   },
   "dependencies": {
     "@noble/secp256k1": "^3.1.0",
+    "@vulpemventures/secp256k1-zkp": "^3.2.1",
+    "boltz-core": "^4.0.4",
+    "buffer": "^6.0.3",
     "canvas-confetti": "^1.9.3",
+    "ecpair": "^2.1.0",
     "idb": "^8.0.3",
+    "liquidjs-lib": "^6.0.2-liquid.37",
     "lucide-svelte": "^0.468.0",
     "lwk_wasm": "^0.16.0",
     "nostr-tools": "^2.23.3",
@@ -21,6 +26,8 @@
     "rx-nostr": "^3.7.4",
     "svelte": "^5.0.0",
     "svelte-spa-router": "^4.0.1",
+    "tiny-secp256k1": "^2.2.4",
+    "vite-plugin-node-polyfills": "^0.26.0",
     "vite-plugin-pwa": "^0.21.1"
   },
   "devDependencies": {

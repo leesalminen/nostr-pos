@@ -1,5 +1,6 @@
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { defineConfig } from 'vite';
+import { nodePolyfills } from 'vite-plugin-node-polyfills';
 import { VitePWA } from 'vite-plugin-pwa';
 import wasm from 'vite-plugin-wasm';
 
@@ -9,6 +10,15 @@ export default defineConfig({
   },
   plugins: [
     wasm(),
+    nodePolyfills({
+      include: ['buffer', 'events', 'fs', 'path', 'stream', 'string_decoder', 'util'],
+      globals: {
+        Buffer: true,
+        global: true,
+        process: true
+      },
+      protocolImports: true
+    }),
     svelte(),
     VitePWA({
       registerType: 'autoUpdate',
