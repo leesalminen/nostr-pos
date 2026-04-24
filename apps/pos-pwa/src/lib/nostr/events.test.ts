@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { paymentStatusEvent, receiptEvent, saleCreatedEvent, swapRecoveryEvent } from './events';
+import { pairingAnnouncementEvent, paymentStatusEvent, receiptEvent, saleCreatedEvent, swapRecoveryEvent } from './events';
 import type { PaymentAttempt, Sale } from '../pos/types';
 
 const sale: Sale = {
@@ -26,6 +26,18 @@ const attempt: PaymentAttempt = {
 };
 
 describe('local protocol events', () => {
+  it('builds pairing announcements for activation', () => {
+    const event = pairingAnnouncementEvent({
+      terminalPubkey: 'a'.repeat(64),
+      pairingCode: '4F7G-YJDP',
+      createdAt: 100_000
+    });
+
+    expect(event.kind).toBe(30383);
+    expect(event.tags).toContainEqual(['pairing', '4F7G-YJDP']);
+    expect(event.tags).toContainEqual(['expiration', '400']);
+  });
+
   it('builds sale/status/receipt payloads', () => {
     expect(saleCreatedEvent(sale).kind).toBe(9380);
     expect(paymentStatusEvent(sale, attempt).content.status).toBe('settled');

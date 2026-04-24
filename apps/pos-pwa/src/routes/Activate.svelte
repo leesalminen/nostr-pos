@@ -3,8 +3,15 @@
   import { ShieldCheck } from 'lucide-svelte';
   import Button from '../lib/ui/Button.svelte';
   import { activateTerminal, loadTerminal, terminal } from '../lib/stores/terminal';
+  import { announcePairingRequest } from '../lib/activation/pairing';
 
-  onMount(loadTerminal);
+  let announced = $state(false);
+
+  onMount(async () => {
+    const config = await loadTerminal();
+    await announcePairingRequest(config);
+    announced = true;
+  });
 </script>
 
 <main class="grid min-h-screen place-items-center bg-[#f5f0e8] px-5 text-[#211f1a] dark:bg-[#161512] dark:text-[#fff6e8]">
@@ -15,6 +22,9 @@
     <div class="my-8 rounded-md border border-[#d7c8b4] bg-[#fffaf0] px-5 py-7 text-5xl font-black tracking-[0.12em] shadow-sm dark:border-[#3a342a] dark:bg-[#211f1a]">
       {$terminal?.pairingCode ?? '4F7G-YJDP'}
     </div>
+    <p class="mb-5 text-sm text-[#776b5a] dark:text-[#b9aa91]">
+      {announced ? 'Waiting for owner approval.' : 'Preparing approval request...'}
+    </p>
     <Button onclick={async () => { await activateTerminal(); location.hash = '#/'; }}>
       Mark Approved
     </Button>

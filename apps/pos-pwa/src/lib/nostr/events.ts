@@ -1,6 +1,7 @@
 import type { PaymentAttempt, Sale } from '../pos/types';
 
 export const KINDS = {
+  pairingAnnouncement: 30383,
   saleCreated: 9380,
   swapRecovery: 9381,
   paymentStatus: 9382,
@@ -12,6 +13,28 @@ export type LocalProtocolEvent = {
   tags: string[][];
   content: Record<string, unknown>;
 };
+
+export function pairingAnnouncementEvent(input: {
+  terminalPubkey: string;
+  pairingCode: string;
+  createdAt: number;
+}): LocalProtocolEvent {
+  return {
+    kind: KINDS.pairingAnnouncement,
+    tags: [
+      ['proto', 'nostr-pos', '0.2'],
+      ['d', input.pairingCode],
+      ['pairing', input.pairingCode],
+      ['p', input.terminalPubkey],
+      ['expiration', String(Math.floor(input.createdAt / 1000) + 300)]
+    ],
+    content: {
+      pairing_code: input.pairingCode,
+      terminal_pubkey: input.terminalPubkey,
+      created_at: Math.floor(input.createdAt / 1000)
+    }
+  };
+}
 
 export function saleCreatedEvent(sale: Sale): LocalProtocolEvent {
   return {
