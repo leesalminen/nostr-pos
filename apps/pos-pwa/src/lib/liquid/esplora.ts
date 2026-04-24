@@ -81,6 +81,10 @@ function txIsRecentEnough(tx: EsploraTx, minCreatedAt?: number): boolean {
   return blockTimeMs === undefined || blockTimeMs >= minCreatedAt;
 }
 
+function outputAddressMatches(outputAddress: { toString(): string; toUnconfidential(): { toString(): string } }, address: string, unconfidential: string): boolean {
+  return outputAddress.toString() === address || outputAddress.toUnconfidential().toString() === unconfidential;
+}
+
 export function verifyAddressPayment(
   transactions: EsploraTx[],
   address: string,
@@ -137,6 +141,7 @@ export async function verifyConfidentialAddressPayment(
   let receivedSat = 0;
   let confirmed = false;
   let txid: string | undefined;
+  const countedOutpoints = new Set<string>();
   for (const tx of transactions) {
     if (!txIsRecentEnough(tx, options.minCreatedAt)) continue;
     let walletTx;
@@ -149,17 +154,21 @@ export async function verifyConfidentialAddressPayment(
       continue;
     }
     if (!walletTx) continue;
-    for (const output of walletTx.outputs()) {
+    for (const output of [...walletTx.outputs(), ...walletTx.inputs()]) {
       const walletOutput = output.get();
       if (!walletOutput) continue;
       if (options.addressIndex !== undefined && walletOutput.wildcardIndex() !== options.addressIndex) continue;
       const outputAddress = walletOutput.address();
-      if (outputAddress.toString() !== address && outputAddress.toUnconfidential().toString() !== targetUnconfidential) continue;
+      if (!outputAddressMatches(outputAddress, address, targetUnconfidential)) continue;
       const unblinded = walletOutput.unblinded();
       if (unblinded.asset().toString() !== policyAsset) continue;
+      const outpoint = walletOutput.outpoint();
+      const outpointKey = `${outpoint.txid().toString()}:${outpoint.vout()}`;
+      if (countedOutpoints.has(outpointKey)) continue;
+      countedOutpoints.add(outpointKey);
       receivedSat += Number(unblinded.value());
-      txid ??= tx.txid;
-      confirmed ||= Boolean(tx.status?.confirmed);
+      txid ??= outpoint.txid().toString();
+      confirmed ||= Boolean(tx.status?.confirmed) || walletOutput.height() !== undefined;
     }
   }
 

@@ -58,6 +58,33 @@ vi.mock('lwk_wasm', () => {
               get: () => ({
                 wildcardIndex: () => 7,
                 address: () => new Address('lq1qqconfidential'),
+                outpoint: () => ({
+                  txid: () => ({ toString: () => 'confidentialtx' }),
+                  vout: () => 0
+                }),
+                height: () => 123,
+                unblinded: () => ({
+                  asset: () => ({ toString: () => 'policy-asset' }),
+                  value: () => BigInt(25_000)
+                })
+              })
+            }
+          ],
+          inputs: () => []
+        },
+        {
+          txid: () => ({ toString: () => 'spendtx' }),
+          outputs: () => [],
+          inputs: () => [
+            {
+              get: () => ({
+                wildcardIndex: () => 7,
+                address: () => new Address('lq1qqconfidential'),
+                outpoint: () => ({
+                  txid: () => ({ toString: () => 'receivetx' }),
+                  vout: () => 1
+                }),
+                height: () => 456,
                 unblinded: () => ({
                   asset: () => ({ toString: () => 'policy-asset' }),
                   value: () => BigInt(25_000)
@@ -210,6 +237,40 @@ describe('Liquid Esplora adapter', () => {
       txid: 'confidentialtx'
     });
     expect(fetcher).toHaveBeenCalledWith('https://example.test/api/tx/confidentialtx/hex');
+  });
+
+  it('verifies spent confidential receive outputs from wallet inputs', async () => {
+    const fetcher = vi.fn(async () => ({
+      ok: true,
+      text: async () => '02000000'
+    }));
+
+    await expect(
+      verifyConfidentialAddressPayment(
+        [
+          {
+            txid: 'spendtx',
+            status: { confirmed: false },
+            vout: [{ scriptpubkey_address: 'ex1qchange', valuecommitment: '08change' }]
+          }
+        ],
+        'lq1qqconfidential',
+        25_000,
+        {
+          apiBase: 'https://example.test/api',
+          descriptor: 'ct(slip77(00),elwpkh(xpub-demo/0/*))',
+          addressIndex: 7,
+          fetcher: fetcher as unknown as typeof fetch,
+          minCreatedAt: 150_000
+        }
+      )
+    ).resolves.toEqual({
+      detected: true,
+      confirmed: true,
+      receivedSat: 25_000,
+      txid: 'receivetx'
+    });
+    expect(fetcher).toHaveBeenCalledWith('https://example.test/api/tx/spendtx/hex');
   });
 
   it('ignores old confidential address history before the sale', () => {
