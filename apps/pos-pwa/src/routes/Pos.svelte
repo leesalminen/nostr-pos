@@ -1,11 +1,10 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { ArrowLeft, CheckCircle2, Loader2, Smartphone, Zap } from 'lucide-svelte';
+  import { ArrowLeft, CheckCircle2, CreditCard, History, Loader2, Settings, Smartphone, Zap } from 'lucide-svelte';
   import Button from '../lib/ui/Button.svelte';
   import QrCard from '../lib/ui/QrCard.svelte';
-  import TransactionSheet from '../lib/ui/TransactionSheet.svelte';
   import { terminal, loadTerminal } from '../lib/stores/terminal';
-  import { transactions, refreshTransactions } from '../lib/stores/ledger';
+  import { refreshTransactions } from '../lib/stores/ledger';
   import { createSale, markReady, paymentPayload, simulateSettlement } from '../lib/pos/payment-state';
   import type { PaymentAttempt, PaymentMethod, Sale } from '../lib/pos/types';
   import type { FxRate } from '../lib/fx/bull-bitcoin';
@@ -19,6 +18,7 @@
   let attempt = $state<PaymentAttempt | undefined>();
   let rate = $state<FxRate | undefined>();
   let selectedMethod = $state<PaymentMethod>('lightning_swap');
+  let boltCardPending = $state(false);
   let error = $state('');
   let settling = $state(false);
 
@@ -49,7 +49,8 @@
   async function settle() {
     if (!sale || !attempt) return;
     settling = true;
-    const selectedAttempt = { ...attempt, method: selectedMethod, paymentData: activePaymentData };
+    const receiptMethod: PaymentMethod = boltCardPending ? 'bolt_card' : selectedMethod;
+    const selectedAttempt = { ...attempt, method: receiptMethod, paymentData: activePaymentData };
     await putAttempt(selectedAttempt);
     const receipt = await simulateSettlement(sale, selectedAttempt);
     sale = { ...sale, status: 'receipt_ready', updatedAt: Date.now() };
@@ -61,30 +62,42 @@
 
   async function selectMethod(method: PaymentMethod) {
     selectedMethod = method;
+    boltCardPending = false;
     if (!attempt || !sale) return;
     attempt = { ...attempt, method, paymentData: paymentPayload(method, sale.amountSat, sale.id), updatedAt: Date.now() };
     await putAttempt(attempt);
     await refreshTransactions();
   }
 
+  async function startBoltCard() {
+    if (!attempt || !sale) return;
+    boltCardPending = true;
+    attempt = { ...attempt, method: 'bolt_card', paymentData: paymentPayload('lightning_swap', sale.amountSat, sale.id), updatedAt: Date.now() };
+    await putAttempt(attempt);
+    await refreshTransactions();
+  }
+
   const tabs: Array<{ method: PaymentMethod; label: string }> = [
     { method: 'lightning_swap', label: 'Lightning' },
-    { method: 'liquid', label: 'Liquid' },
-    { method: 'bolt_card', label: 'Bolt Card' }
+    { method: 'liquid', label: 'Liquid' }
   ];
 </script>
 
 <main class="min-h-screen bg-[#f5f0e8] text-[#211f1a] dark:bg-[#161512] dark:text-[#fff6e8]">
-  <div class="mx-auto grid min-h-screen max-w-4xl grid-rows-1 pb-24">
+  <div class="mx-auto grid min-h-screen max-w-4xl grid-rows-1">
     <section class="px-5 py-5 sm:px-8">
       <header class="mb-8 flex items-center justify-between">
         <a class="inline-flex min-h-12 items-center gap-2 rounded-md px-2 font-bold" href="#/">
           <ArrowLeft size={21} />
           New sale
         </a>
-        <div class="text-right">
-          <p class="font-black">{$terminal?.merchantName ?? 'Seguras Butcher'}</p>
-          <p class="text-sm text-[#776b5a] dark:text-[#b9aa91]">Payment options</p>
+        <div class="flex items-center gap-2">
+          <a class="grid min-h-12 min-w-12 place-items-center rounded-md bg-[#eadfce] text-[#211f1a] dark:bg-[#2c2922] dark:text-[#fff6e8]" href="#/transactions" aria-label="Recent transactions">
+            <History size={22} />
+          </a>
+          <a class="grid min-h-12 min-w-12 place-items-center rounded-md bg-[#eadfce] text-[#211f1a] dark:bg-[#2c2922] dark:text-[#fff6e8]" href="#/settings" aria-label="Settings">
+            <Settings size={22} />
+          </a>
         </div>
       </header>
 
@@ -99,7 +112,7 @@
           <p class="text-6xl font-black tabular-nums">{formatFiat(sale.amountFiat, sale.fiatCurrency)}</p>
           <p class="rounded-full bg-[#e2edf5] px-4 py-2 text-sm font-bold text-[#1e4e73]">{statusLabel(sale.status)}</p>
 
-          <div class="grid w-full grid-cols-3 gap-2 rounded-md bg-[#eadfce] p-1 dark:bg-[#2c2922]">
+          <div class="grid w-full grid-cols-2 gap-2 rounded-md bg-[#eadfce] p-1 dark:bg-[#2c2922]">
             {#each tabs as tab}
               <button
                 type="button"
@@ -116,7 +129,12 @@
           </div>
 
           {#if activePaymentData}
-            <QrCard value={activePaymentData} label={`${methodLabel(selectedMethod)} payment code`} />
+            <QrCard
+              value={activePaymentData}
+              label={`${methodLabel(selectedMethod)} payment code`}
+              showBoltCard={selectedMethod === 'lightning_swap'}
+              onBoltCard={startBoltCard}
+            />
           {/if}
 
           <div class="grid w-full gap-2 rounded-md border border-[#d7c8b4] bg-[#fffaf0] p-4 text-left text-sm dark:border-[#3a342a] dark:bg-[#211f1a]">
@@ -140,10 +158,10 @@
             {/if}
           </div>
 
-          {#if selectedMethod === 'bolt_card'}
-            <p class="text-sm text-[#776b5a] dark:text-[#b9aa91]">Hold the card near the back of this device, or use the code above.</p>
+          {#if boltCardPending}
+            <p class="inline-flex items-center gap-2 text-sm text-[#776b5a] dark:text-[#b9aa91]"><CreditCard size={16} /> Hold the card near the back of this device.</p>
           {:else if selectedMethod === 'lightning_swap'}
-            <p class="inline-flex items-center gap-2 text-sm text-[#776b5a] dark:text-[#b9aa91]"><Zap size={16} /> Lightning is ready to scan.</p>
+            <p class="inline-flex items-center gap-2 text-sm text-[#776b5a] dark:text-[#b9aa91]"><Zap size={16} /> Lightning is ready to scan or tap.</p>
           {:else}
             <p class="inline-flex items-center gap-2 text-sm text-[#776b5a] dark:text-[#b9aa91]"><Smartphone size={16} /> Liquid is ready to scan.</p>
           {/if}
@@ -165,5 +183,4 @@
       {/if}
     </section>
   </div>
-  <TransactionSheet rows={$transactions} />
 </main>

@@ -1,9 +1,19 @@
 <script lang="ts">
   import QRCode from 'qrcode';
-  import { Copy } from 'lucide-svelte';
+  import { Copy, CreditCard } from 'lucide-svelte';
   import Button from './Button.svelte';
 
-  let { value, label = 'Payment code' }: { value: string; label?: string } = $props();
+  let {
+    value,
+    label = 'Payment code',
+    showBoltCard = false,
+    onBoltCard
+  }: {
+    value: string;
+    label?: string;
+    showBoltCard?: boolean;
+    onBoltCard?: () => void;
+  } = $props();
   let dataUrl = $state('');
 
   $effect(() => {
@@ -17,10 +27,16 @@
   {#if dataUrl}
     <img class="mx-auto aspect-square w-full max-w-[300px]" src={dataUrl} alt={label} />
   {/if}
-  <div class="mt-3 flex items-center justify-center">
+  <div class="mt-3 flex flex-wrap items-center justify-center gap-2">
     <Button variant="secondary" onclick={() => navigator.clipboard.writeText(value)}>
       <Copy size={18} />
       Copy
     </Button>
+    {#if showBoltCard}
+      <Button variant="secondary" onclick={onBoltCard}>
+        <CreditCard size={18} />
+        Bolt Card
+      </Button>
+    {/if}
   </div>
 </div>

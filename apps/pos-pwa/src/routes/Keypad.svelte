@@ -1,12 +1,11 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { Settings } from 'lucide-svelte';
+  import { History, Settings } from 'lucide-svelte';
   import AmountDisplay from '../lib/ui/AmountDisplay.svelte';
   import Button from '../lib/ui/Button.svelte';
   import Keypad from '../lib/ui/Keypad.svelte';
-  import TransactionSheet from '../lib/ui/TransactionSheet.svelte';
   import { terminal, loadTerminal } from '../lib/stores/terminal';
-  import { transactions, refreshTransactions } from '../lib/stores/ledger';
+  import { refreshTransactions } from '../lib/stores/ledger';
 
   let amount = $state('');
   let note = $state('');
@@ -26,16 +25,21 @@
 </script>
 
 <main class="min-h-screen bg-[#f5f0e8] text-[#211f1a] dark:bg-[#161512] dark:text-[#fff6e8]">
-  <div class="mx-auto grid min-h-screen max-w-4xl grid-rows-1 pb-24">
+  <div class="mx-auto grid min-h-screen max-w-4xl grid-rows-1">
     <section class="flex flex-col px-5 py-5 sm:px-8">
       <header class="mb-8 flex items-center justify-between gap-4">
         <div>
           <p class="text-sm font-bold uppercase tracking-[0.12em] text-[#776b5a] dark:text-[#b9aa91]">{$terminal?.posName ?? 'Counter 1'}</p>
           <h1 class="text-2xl font-black">{$terminal?.merchantName ?? 'Seguras Butcher'}</h1>
         </div>
-        <a class="grid min-h-12 min-w-12 place-items-center rounded-md bg-[#eadfce] text-[#211f1a] dark:bg-[#2c2922] dark:text-[#fff6e8]" href="#/settings" aria-label="Settings">
-          <Settings size={22} />
-        </a>
+        <div class="flex items-center gap-2">
+          <a class="grid min-h-12 min-w-12 place-items-center rounded-md bg-[#eadfce] text-[#211f1a] dark:bg-[#2c2922] dark:text-[#fff6e8]" href="#/transactions" aria-label="Recent transactions">
+            <History size={22} />
+          </a>
+          <a class="grid min-h-12 min-w-12 place-items-center rounded-md bg-[#eadfce] text-[#211f1a] dark:bg-[#2c2922] dark:text-[#fff6e8]" href="#/settings" aria-label="Settings">
+            <Settings size={22} />
+          </a>
+        </div>
       </header>
 
       <div class="mx-auto flex w-full max-w-xl flex-1 flex-col justify-center gap-6">
@@ -53,5 +57,4 @@
       </div>
     </section>
   </div>
-  <TransactionSheet rows={$transactions} />
 </main>

@@ -3187,3 +3187,6 @@ verification evidence stay close to the source of truth.
   default, Liquid and Bolt Card as alternate tabs, and visible fiat amount, BTC
   amount, sats, and exchange rate. Recent transactions now open from a bottom
   button into a slide-up sheet instead of occupying the screen.
+- Refined navigation after UX review: recent transactions now live on their own
+  screen behind a history icon next to Settings. The payment screen rail selector
+  is Lightning/Liquid only; Bolt Card is a Lightning-only action beside Copy.
