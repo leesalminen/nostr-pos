@@ -13,6 +13,7 @@ import { paymentStatusEvent, saleCreatedEvent, swapRecoveryEvent } from '../nost
 import { merchantRecoveryPubkey, publishOutboxItem, type OutboxPublishReport } from '../nostr/outbox';
 import { settleAttempt } from './settlement';
 import type { OutboxItem, SwapRecoveryRecord } from './types';
+export { paymentPayload } from './payment-payload';
 
 export type CreateSaleOptions = {
   minRecoveryOk?: number;
@@ -22,12 +23,6 @@ export type CreateSaleOptions = {
 
 export function statusAfterDetection(method: PaymentMethod): SaleStatus {
   return method === 'liquid' ? 'settled' : 'settling';
-}
-
-export function paymentPayload(method: PaymentMethod, amountSat: number, saleId: string, liquidAddress?: string): string {
-  if (method === 'liquid') return liquidBip21(liquidAddress ?? `tex1q${saleId.toLowerCase()}`, amountSat);
-  if (method === 'bolt_card') return `lnbc${amountSat}n1p${saleId.toLowerCase()}boltcard`;
-  return `lnbc${amountSat}n1p${saleId.toLowerCase()}lightning`;
 }
 
 export function recoveryDurabilityMet(report: Pick<OutboxPublishReport, 'results'>, minOk = 2): boolean {

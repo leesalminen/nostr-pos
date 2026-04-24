@@ -7,7 +7,7 @@
   import QrCard from '../lib/ui/QrCard.svelte';
   import { terminal, loadTerminal, loadPosProfileReference } from '../lib/stores/terminal';
   import { refreshTransactions } from '../lib/stores/ledger';
-  import { paymentPayload, simulateSettlement } from '../lib/pos/payment-state';
+  import { paymentPayload } from '../lib/pos/payment-payload';
   import { claimLiquidReverseSwap, reconcileClaimBroadcasts } from '../lib/pos/claim-engine';
   import { applySwapStatusUpdate, reconcileOpenPayments, resumeAttempt, resumeSale } from '../lib/pos/reconciler';
   import type { PaymentAttempt, PaymentMethod, Sale } from '../lib/pos/types';
@@ -151,6 +151,7 @@
     settling = true;
     const receiptMethod: PaymentMethod = boltCardPending ? 'bolt_card' : selectedMethod;
     const selectedAttempt = { ...attempt, method: receiptMethod, paymentData: activePaymentData };
+    const { simulateSettlement } = await import('../lib/pos/payment-state');
     await putAttempt(selectedAttempt);
     const receipt = await simulateSettlement(sale, selectedAttempt);
     sale = { ...sale, status: 'receipt_ready', updatedAt: Date.now() };
