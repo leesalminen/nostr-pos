@@ -3277,6 +3277,10 @@ verification evidence stay close to the source of truth.
 - Added Dart NIP-19 POS-link support: the SDK now encodes/decodes `naddr`
   profile pointers against `nostr-tools` vectors, and `nostr_pos_cli pos-url`
   prints a ready-to-open `#/pos/naddr...` link for controller setup.
+- Added Advanced admin gating: merchants can set a 4-8 digit PIN backed by
+  PBKDF2-SHA256 (600k iterations), Advanced requires a short-lived session
+  unlock before recovery/export tools, and no-PIN deployments show the required
+  reduced-security confirmation.
 - CI now runs `dart analyze` for the Dart SDK as well as the CLI so relay,
   signing, and recovery SDK code gets static checks on every push.
 - README now documents the current smoke commands and the live relay-backed

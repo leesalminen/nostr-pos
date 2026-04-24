@@ -103,6 +103,13 @@ export type PosProfileConfig = {
   relays: string[];
 };
 
+export type AdminPinConfig = {
+  salt: string;
+  verifier: string;
+  iterations: number;
+  setAt: number;
+};
+
 export type TerminalConfig = {
   merchantName: string;
   posName: string;
@@ -116,6 +123,7 @@ export type TerminalConfig = {
   revocationReason?: string;
   authorization?: TerminalAuthorization;
   posProfile?: PosProfileConfig;
+  adminPin?: AdminPinConfig;
   maxInvoiceSat: number;
   syncServers: string[];
 };

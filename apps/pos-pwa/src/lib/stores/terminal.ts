@@ -3,6 +3,7 @@ import type { TerminalConfig } from '../pos/types';
 import { configWithTerminalAuthorization } from '../activation/authorization';
 import { defaultTerminalConfig, getTerminalConfig, saveTerminalConfig } from '../db/repositories/terminal';
 import { configWithPosProfile, resolvePosProfile } from '../pos/profile-loader';
+import { createAdminPin } from '../security/admin-pin';
 
 export const terminal = writable<TerminalConfig | undefined>(undefined);
 
@@ -36,6 +37,22 @@ export async function loadPosProfileReference(reference: string): Promise<Termin
   const config = await loadTerminal();
   const profile = await resolvePosProfile(reference);
   const updated = configWithPosProfile(config, profile);
+  await saveTerminalConfig(updated);
+  terminal.set(updated);
+  return updated;
+}
+
+export async function setAdminPin(pin: string): Promise<TerminalConfig> {
+  const config = await loadTerminal();
+  const updated = { ...config, adminPin: await createAdminPin(pin) };
+  await saveTerminalConfig(updated);
+  terminal.set(updated);
+  return updated;
+}
+
+export async function clearAdminPin(): Promise<TerminalConfig> {
+  const config = await loadTerminal();
+  const { adminPin: _adminPin, ...updated } = config;
   await saveTerminalConfig(updated);
   terminal.set(updated);
   return updated;
