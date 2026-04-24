@@ -21,6 +21,14 @@ export async function putOutbox(item: { id: string; type: string; payload: unkno
   await (await getDb()).put('outbox', item);
 }
 
+export async function outboxItems(): Promise<Array<{ id: string; type: string; payload: unknown; createdAt: number; okFrom: string[] }>> {
+  return (await getDb()).getAll('outbox');
+}
+
+export async function recoveryRecords(): Promise<SwapRecoveryRecord[]> {
+  return (await getDb()).getAll('swap_recovery_records');
+}
+
 export async function openPaymentAttempts(): Promise<PaymentAttempt[]> {
   const attempts = await (await getDb()).getAll('payment_attempts');
   return attempts.filter((attempt) => !['settled', 'expired', 'failed'].includes(attempt.status));

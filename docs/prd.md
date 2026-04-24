@@ -3208,3 +3208,6 @@ verification evidence stay close to the source of truth.
   validation, invoice amount bounds checking, and callback payment request
   helper. The browser permission/read loop remains the final Android-tablet
   integration point.
+- Added PWA admin export/recovery visibility: Advanced now shows payment backup
+  and queued record counts, and can export local transaction history as CSV or
+  JSON with tested CSV escaping.
