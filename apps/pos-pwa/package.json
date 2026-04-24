@@ -14,7 +14,9 @@
     "canvas-confetti": "^1.9.3",
     "idb": "^8.0.3",
     "lucide-svelte": "^0.468.0",
+    "nostr-tools": "^2.23.3",
     "qrcode": "^1.5.4",
+    "rx-nostr": "^3.7.4",
     "svelte": "^5.0.0",
     "svelte-spa-router": "^4.0.1",
     "vite-plugin-pwa": "^0.21.1"

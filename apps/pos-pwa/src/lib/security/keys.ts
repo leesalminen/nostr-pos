@@ -1,9 +1,24 @@
+import { generateSecretKey, getPublicKey } from 'nostr-tools/pure';
+
 const alphabet = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+
+export function bytesToHex(bytes: Uint8Array): string {
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+export function hexToBytes(hex: string): Uint8Array {
+  if (!/^[0-9a-fA-F]+$/.test(hex) || hex.length % 2 !== 0) throw new Error('invalid hex');
+  const out = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < out.length; i += 1) {
+    out[i] = Number.parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+  }
+  return out;
+}
 
 export function randomHex(bytes: number): string {
   const data = new Uint8Array(bytes);
   crypto.getRandomValues(data);
-  return Array.from(data, (byte) => byte.toString(16).padStart(2, '0')).join('');
+  return bytesToHex(data);
 }
 
 export function pairingCodeFromPubkey(pubkeyHex: string): string {
@@ -23,7 +38,8 @@ export function pairingCodeFromPubkey(pubkeyHex: string): string {
 }
 
 export function createTerminalKeypair() {
-  const privateKey = randomHex(32);
-  const publicKey = randomHex(32);
+  const secretKey = generateSecretKey();
+  const privateKey = bytesToHex(secretKey);
+  const publicKey = getPublicKey(secretKey);
   return { privateKey, publicKey };
 }

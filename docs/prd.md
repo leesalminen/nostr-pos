@@ -3211,3 +3211,7 @@ verification evidence stay close to the source of truth.
 - Added PWA admin export/recovery visibility: Advanced now shows payment backup
   and queued record counts, and can export local transaction history as CSV or
   JSON with tested CSV escaping.
+- Added browser relay adapter foundations using `nostr-tools`: terminal keys are
+  now real secp256k1 secret/public key pairs, events can be signed and verified,
+  and publish results expose per-server OK counts for the recovery durability
+  rule.
