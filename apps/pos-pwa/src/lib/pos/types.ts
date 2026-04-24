@@ -79,6 +79,12 @@ export type SwapRecoveryRecord = {
   expiresAt: number;
   claimTxHex?: string;
   claimTxid?: string;
+  claimPreparedAt?: number;
+  claimLastTriedAt?: number;
+  claimBroadcastAttempts?: number;
+  claimLastError?: string;
+  claimFeeSatPerVbyte?: number;
+  claimRbfCount?: number;
   status: 'pending' | 'claimable' | 'claimed' | 'failed' | 'expired';
 };
 

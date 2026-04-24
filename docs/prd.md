@@ -3232,6 +3232,10 @@ verification evidence stay close to the source of truth.
 - Advanced recovery claim broadcasts now settle the matching local sale and
   payment attempt, creating the same receipt/outbox records as automatic claim
   settlement when the local ledger rows are still present.
+- Claim recovery records now track prepared time, last broadcast attempt time,
+  attempt count, last error, fee rate, and RBF count slots. Failed prepared
+  claims keep their `claim_tx_hex` and are included in the Advanced retry flow,
+  making broadcast failures visible without losing the durable recovery path.
 - Added local protocol outbox events for sale-created, payment-status, and
   receipt records, plus startup reconciliation that expires stale open attempts
   and records the status update. This is the IndexedDB side of the PRD's

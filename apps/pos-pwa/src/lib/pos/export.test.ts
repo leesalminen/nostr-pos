@@ -72,6 +72,12 @@ describe('recovery backup export', () => {
           expires_at: '1970-01-01T00:00:02.000Z',
           claim_tx_hex: null,
           claim_txid: null,
+          claim_prepared_at: null,
+          claim_last_tried_at: null,
+          claim_broadcast_attempts: 0,
+          claim_last_error: null,
+          claim_fee_sat_per_vbyte: null,
+          claim_rbf_count: 0,
           status: 'pending'
         }
       ]

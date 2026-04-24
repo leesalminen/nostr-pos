@@ -60,6 +60,12 @@ export function recoveryBackupsJson(records: SwapRecoveryRecord[], exportedAt = 
         expires_at: new Date(record.expiresAt).toISOString(),
         claim_tx_hex: record.claimTxHex ?? null,
         claim_txid: record.claimTxid ?? null,
+        claim_prepared_at: record.claimPreparedAt ? new Date(record.claimPreparedAt).toISOString() : null,
+        claim_last_tried_at: record.claimLastTriedAt ? new Date(record.claimLastTriedAt).toISOString() : null,
+        claim_broadcast_attempts: record.claimBroadcastAttempts ?? 0,
+        claim_last_error: record.claimLastError ?? null,
+        claim_fee_sat_per_vbyte: record.claimFeeSatPerVbyte ?? null,
+        claim_rbf_count: record.claimRbfCount ?? 0,
         status: record.status
       }))
     },

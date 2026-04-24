@@ -87,7 +87,12 @@ describe('prepared claim broadcaster', () => {
     ]);
 
     expect(broadcastLiquidTransaction).toHaveBeenCalledWith('https://liquid.example/api/', '02000000', undefined);
-    expect(recoveries.get('swap1')).toMatchObject({ status: 'claimed', claimTxHex: '02000000', claimTxid: 'txid1' });
+    expect(recoveries.get('swap1')).toMatchObject({
+      status: 'claimed',
+      claimTxHex: '02000000',
+      claimTxid: 'txid1',
+      claimBroadcastAttempts: 1
+    });
     expect(recoveries.get('swap2')?.status).toBe('claimable');
   });
 
@@ -125,15 +130,37 @@ describe('prepared claim broadcaster', () => {
     expect(outbox).toHaveLength(2);
   });
 
-  it('leaves a prepared claim retryable when broadcast fails', async () => {
+  it('marks a failed prepared claim retryable when broadcast fails', async () => {
     const { broadcastLiquidTransaction } = await import('../liquid/esplora');
     const { broadcastPreparedClaims } = await import('./claim-engine');
     vi.mocked(broadcastLiquidTransaction).mockRejectedValue(new Error('rejected'));
 
-    await expect(broadcastPreparedClaims(config)).resolves.toMatchObject([
+    await expect(broadcastPreparedClaims(config, { now: 500 })).resolves.toMatchObject([
       { swapId: 'swap1', status: 'failed' }
     ]);
-    expect(recoveries.get('swap1')).toMatchObject({ status: 'claimable', claimTxHex: '02000000' });
+    expect(recoveries.get('swap1')).toMatchObject({
+      status: 'failed',
+      claimTxHex: '02000000',
+      claimBroadcastAttempts: 1,
+      claimLastTriedAt: 500,
+      claimLastError: 'rejected'
+    });
+  });
+
+  it('retries failed prepared claims', async () => {
+    const { broadcastLiquidTransaction } = await import('../liquid/esplora');
+    const { broadcastPreparedClaims } = await import('./claim-engine');
+    recoveries.set('swap1', { ...recoveries.get('swap1')!, status: 'failed', claimLastError: 'previous failure' });
+    vi.mocked(broadcastLiquidTransaction).mockResolvedValue('txid1');
+
+    await expect(broadcastPreparedClaims(config, { now: 600 })).resolves.toEqual([
+      { swapId: 'swap1', status: 'broadcast', txid: 'txid1' }
+    ]);
+    expect(recoveries.get('swap1')).toMatchObject({
+      status: 'claimed',
+      claimLastTriedAt: 600,
+      claimLastError: undefined
+    });
   });
 
   it('reports prepared claims as skipped when no backend is configured', async () => {
@@ -189,9 +216,16 @@ describe('prepared claim broadcaster', () => {
       swap: expect.objectContaining({ id: 'swap3' }),
       lockupTxHex: 'lockuphex',
       destinationAddress: 'lq1destination',
+      feeSatPerVbyte: undefined,
       fetcher: undefined
     });
-    expect(recoveries.get('swap3')).toMatchObject({ status: 'claimed', claimTxHex: 'claimhex', claimTxid: 'claimtxid' });
+    expect(recoveries.get('swap3')).toMatchObject({
+      status: 'claimed',
+      claimTxHex: 'claimhex',
+      claimTxid: 'claimtxid',
+      claimBroadcastAttempts: 1,
+      claimLastError: undefined
+    });
   });
 
   it('fetches the lockup transaction before building a claim when only a txid is available', async () => {

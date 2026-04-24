@@ -49,7 +49,7 @@
   }
 
   function preparedClaimCount() {
-    return recoveryRows.filter((record) => record.status === 'claimable' && record.claimTxHex).length;
+    return recoveryRows.filter((record) => (record.status === 'claimable' || record.status === 'failed') && record.claimTxHex).length;
   }
 
   function downloadFile(filename: string, type: string, content: string) {
@@ -263,7 +263,12 @@
               <div class="grid grid-cols-[1fr_auto] gap-3 px-3 py-2">
                 <div class="min-w-0">
                   <p class="truncate font-bold">{record.swapId}</p>
-                  <p class="text-xs text-[#776b5a] dark:text-[#b9aa91]">{record.status}</p>
+                  <p class="text-xs text-[#776b5a] dark:text-[#b9aa91]">
+                    {record.status}{record.claimBroadcastAttempts ? ` · ${record.claimBroadcastAttempts} tries` : ''}
+                  </p>
+                  {#if record.claimLastError}
+                    <p class="truncate text-xs text-[#8c2d28] dark:text-[#e8a49e]">{record.claimLastError}</p>
+                  {/if}
                 </div>
                 <div class="text-right text-xs text-[#776b5a] dark:text-[#b9aa91]">
                   <p>{record.okFrom.length} OK</p>
