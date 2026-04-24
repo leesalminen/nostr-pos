@@ -16,6 +16,8 @@ export type ReconcileOptions = {
   swapProvider?: SwapProvider;
 };
 
+let reconcileInFlight: Promise<number> | undefined;
+
 function saleStatusForAttempt(attempt: PaymentAttempt): Sale['status'] {
   if (attempt.status === 'expired') return 'expired';
   if (attempt.status === 'failed') return 'failed';
@@ -178,7 +180,7 @@ export async function applySwapStatusUpdate(
   return { changed: true, terminal: true };
 }
 
-export async function reconcileOpenPayments(input?: number | ReconcileOptions): Promise<number> {
+async function reconcileOpenPaymentsOnce(input?: number | ReconcileOptions): Promise<number> {
   const options = normalizeOptions(input);
   const attempts = await openPaymentAttempts();
   debugLiquidVerification('reconcile open payments start', {
@@ -222,6 +224,18 @@ export async function reconcileOpenPayments(input?: number | ReconcileOptions): 
     }
   }
   return changed;
+}
+
+export function reconcileOpenPayments(input?: number | ReconcileOptions): Promise<number> {
+  if (reconcileInFlight) {
+    debugLiquidVerification('reconcile open payments already running');
+    return reconcileInFlight;
+  }
+  const run = reconcileOpenPaymentsOnce(input).finally(() => {
+    if (reconcileInFlight === run) reconcileInFlight = undefined;
+  });
+  reconcileInFlight = run;
+  return reconcileInFlight;
 }
 
 export async function resumeAttempt(attemptId: string): Promise<{ sale: Sale; attempt: PaymentAttempt } | undefined> {

@@ -3510,6 +3510,11 @@ verification evidence stay close to the source of truth.
   transaction, the terminal falls back to LWK's `EsploraClient.fullScanToIndex`
   for the authorized descriptor/index, applies the returned update, and then
   performs the same unblinded output verification.
+- Payment reconciliation is serialized so a slow Liquid descriptor scan cannot
+  be re-entered by the 5-second payment-screen poll. Liquid block timestamps
+  use a 10-minute grace window relative to local sale creation time, because
+  block timestamps can be a few minutes earlier than the terminal wall-clock
+  even for a payment made after the sale is displayed.
 - Removed the early UI placeholder Lightning payload path. The payment screen
   now renders Lightning QR data only when a checksummed Bolt11 invoice exists,
   and live dev pilots use the configured Boltz provider instead of the mock

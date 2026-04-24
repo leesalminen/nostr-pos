@@ -66,23 +66,29 @@
     let swapSubscription: SwapUpdateSubscription | undefined;
     let tabLock: TerminalTabLock | undefined;
     let stopped = false;
+    let refreshInFlight = false;
 
     async function refreshPaymentState() {
-      if (!attempt || stopped || tabReadOnly) return;
-      const now = Date.now();
-      await loadTerminal().then(syncTerminalRecoveryBackups);
-      await reconcileOpenPayments({ now });
-      await loadTerminal().then((config) => resumePreparedClaims(config, { now }));
-      await loadTerminal().then((config) => reconcileClaimBroadcasts(config, { now }));
-      await loadTerminal().then(mergePaymentHistory);
-      const resumed = await resumeAttempt(attempt.id);
-      if (!resumed || stopped) return;
-      sale = resumed.sale;
-      attempt = resumed.attempt;
-      await refreshTransactions();
-      void loadTerminal().then(syncQueuedRecords);
-      if (resumed.sale.status === 'receipt_ready' || resumed.sale.status === 'settled') {
-        location.replace(`#/receipt/${resumed.sale.id}`);
+      if (!attempt || stopped || tabReadOnly || refreshInFlight) return;
+      refreshInFlight = true;
+      try {
+        const now = Date.now();
+        await loadTerminal().then(syncTerminalRecoveryBackups);
+        await reconcileOpenPayments({ now });
+        await loadTerminal().then((config) => resumePreparedClaims(config, { now }));
+        await loadTerminal().then((config) => reconcileClaimBroadcasts(config, { now }));
+        await loadTerminal().then(mergePaymentHistory);
+        const resumed = await resumeAttempt(attempt.id);
+        if (!resumed || stopped) return;
+        sale = resumed.sale;
+        attempt = resumed.attempt;
+        await refreshTransactions();
+        void loadTerminal().then(syncQueuedRecords);
+        if (resumed.sale.status === 'receipt_ready' || resumed.sale.status === 'settled') {
+          location.replace(`#/receipt/${resumed.sale.id}`);
+        }
+      } finally {
+        refreshInFlight = false;
       }
     }
 
