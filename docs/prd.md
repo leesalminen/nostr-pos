@@ -3231,6 +3231,11 @@ verification evidence stay close to the source of truth.
 - Added a pilot activation import path: the PWA can paste the controller/CLI
   approval JSON, verify it matches the displayed pairing code and terminal key,
   then store terminal limits, Liquid backends, and the authorization payload.
+- Added a real relay smoke harness and ran it against the default relay set.
+  After adding Node's WebSocket implementation and fixing OK classification,
+  the probe published a signed kind-30383 pairing announcement to
+  `wss://no.str.cr`, `wss://relay.primal.net`, and `wss://nos.lol`, then read
+  it back by event id.
 
 ### Known follow-ups
 

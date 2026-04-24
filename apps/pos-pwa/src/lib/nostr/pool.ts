@@ -7,6 +7,10 @@ export type PublishResult = {
   message?: string;
 };
 
+export function relayPublishMessageOk(message: string): boolean {
+  return !/^(connection failure|blocked|invalid|error|restricted|rate-limited|auth-required|pow:|duplicate)/i.test(message);
+}
+
 export function signEvent(template: EventTemplate, privateKeyHex: string): Event {
   return finalizeEvent(template, hexToBytes(privateKeyHex));
 }
@@ -19,8 +23,8 @@ export async function publishSignedEvent(relays: string[], event: Event): Promis
   const pool = new SimplePool();
   const settled = await Promise.allSettled(
     pool.publish(relays, event, { maxWait: 5000 }).map(async (promise, index) => {
-      await promise;
-      return { relay: relays[index], ok: true };
+      const message = await promise;
+      return { relay: relays[index], ok: relayPublishMessageOk(message), message };
     })
   );
   pool.destroy();
