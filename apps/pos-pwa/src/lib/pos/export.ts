@@ -1,4 +1,4 @@
-import type { TransactionRow } from './types';
+import type { SwapRecoveryRecord, TransactionRow } from './types';
 
 export function transactionsCsv(rows: TransactionRow[]): string {
   const header = [
@@ -39,4 +39,29 @@ export function transactionsCsv(rows: TransactionRow[]): string {
 function csvCell(value: unknown): string {
   const text = String(value);
   return /[",\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+}
+
+export function recoveryBackupsJson(records: SwapRecoveryRecord[], exportedAt = new Date()): string {
+  return JSON.stringify(
+    {
+      version: 1,
+      exported_at: exportedAt.toISOString(),
+      record_count: records.length,
+      records: records.map((record) => ({
+        sale_id: record.saleId,
+        payment_attempt_id: record.paymentAttemptId,
+        swap_id: record.swapId,
+        encrypted_local_blob: record.encryptedLocalBlob,
+        local_saved_at: new Date(record.localSavedAt).toISOString(),
+        relay_saved_at: record.relaySavedAt ? new Date(record.relaySavedAt).toISOString() : null,
+        ok_from: record.okFrom,
+        expires_at: new Date(record.expiresAt).toISOString(),
+        claim_tx_hex: record.claimTxHex ?? null,
+        claim_txid: record.claimTxid ?? null,
+        status: record.status
+      }))
+    },
+    null,
+    2
+  );
 }

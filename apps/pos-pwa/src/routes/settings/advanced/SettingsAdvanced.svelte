@@ -6,7 +6,7 @@
   import ServerList from '../../../lib/ui/advanced/ServerList.svelte';
   import { loadTerminal, terminal } from '../../../lib/stores/terminal';
   import { outboxItems, recentTransactions, recoveryRecords } from '../../../lib/db/repositories/ledger';
-  import { transactionsCsv } from '../../../lib/pos/export';
+  import { recoveryBackupsJson, transactionsCsv } from '../../../lib/pos/export';
   import { publishPendingOutbox } from '../../../lib/nostr/outbox';
 
   let exportCount = $state(0);
@@ -39,6 +39,12 @@
     const rows = await recentTransactions(500);
     exportCount = rows.length;
     downloadFile('pos-export.csv', 'text/csv', transactionsCsv(rows));
+  }
+
+  async function exportRecoveryBackups() {
+    const records = await recoveryRecords();
+    recoveryCount = records.length;
+    downloadFile('payment-backups.json', 'application/json', recoveryBackupsJson(records));
   }
 
   async function syncNow() {
@@ -79,6 +85,7 @@
         </dl>
         <div class="mt-4 flex flex-wrap items-center gap-3">
           <Button variant="secondary" onclick={syncNow}>Sync now</Button>
+          <Button variant="secondary" onclick={exportRecoveryBackups}><Download size={18} />Export backups</Button>
           {#if syncMessage}
             <p class="text-sm text-[#776b5a] dark:text-[#b9aa91]">{syncMessage}</p>
           {/if}

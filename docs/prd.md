@@ -3222,3 +3222,6 @@ verification evidence stay close to the source of truth.
   payment-screen reconciliation now poll the configured Esplora backend, settle
   detected direct Liquid payments, create receipts, and queue status/receipt
   records without relying on the local simulation button.
+- Added a Settings → Advanced encrypted payment-backup export so a terminal can
+  hand the merchant/controller a portable recovery JSON bundle even if relay
+  sync or another device is unavailable.
