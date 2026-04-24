@@ -21,7 +21,6 @@ export type LocalProtocolEvent = {
 function saleTags(sale: Sale, extra: string[][] = []): string[][] {
   return [
     ['proto', 'nostr-pos', '0.2'],
-    ['terminal', sale.terminalId],
     ...(sale.posRef ? [['a', sale.posRef]] : []),
     ...extra
   ];
@@ -37,7 +36,6 @@ export function pairingAnnouncementEvent(input: {
     tags: [
       ['proto', 'nostr-pos', '0.2'],
       ['d', input.pairingCode],
-      ['pairing', input.pairingCode],
       ['p', input.terminalPubkey],
       ['expiration', String(Math.floor(input.createdAt / 1000) + 300)]
     ],
@@ -132,7 +130,6 @@ export function swapRecoveryEvent(input: {
   const tags = [
     ['proto', 'nostr-pos', '0.2'],
     ['sale', input.saleId],
-    ['terminal', input.terminalId],
     ['swap', input.swapId]
   ];
   if (input.recoveryPubkey) tags.push(['p', input.recoveryPubkey]);

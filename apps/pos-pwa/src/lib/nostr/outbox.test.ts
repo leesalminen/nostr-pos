@@ -147,6 +147,8 @@ describe('signed outbox publisher', () => {
     for (const item of privateItems) {
       const publish = vi.fn(async (_relays: string[], event: Event) => {
         expect(event.content).not.toContain('sale1');
+        expect(event.tags).toContainEqual(['p', terminal.publicKey]);
+        expect(event.tags.some((tag) => tag[0] === 'terminal')).toBe(false);
         expect(decryptContent(event.content, merchant.privateKey, terminal.publicKey)).toEqual({ sale_id: 'sale1' });
         return [{ relay: 'wss://one', ok: true }];
       });

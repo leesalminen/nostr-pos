@@ -34,10 +34,13 @@ void main() {
     expect(event.kind, NostrPosKinds.pairingAnnouncement);
     expect(
       event.tags.any(
-        (tag) =>
-            tag.length == 2 && tag[0] == 'pairing' && tag[1] == '4F7G-YJDP',
+        (tag) => tag.length == 2 && tag[0] == 'd' && tag[1] == '4F7G-YJDP',
       ),
       isTrue,
+    );
+    expect(
+      event.tags.any((tag) => tag.isNotEmpty && tag[0] == 'pairing'),
+      isFalse,
     );
     expect(
       event.tags.any(

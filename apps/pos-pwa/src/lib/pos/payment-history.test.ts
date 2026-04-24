@@ -74,7 +74,7 @@ describe('payment history merge', () => {
         tags: [
           ['proto', 'nostr-pos', '0.2'],
           ['sale', 'sale1'],
-          ['terminal', terminal.publicKey]
+          ['p', terminal.publicKey]
         ],
         content: encryptContent(content, terminal.privateKey, merchant.publicKey),
         created_at: 100
@@ -99,7 +99,7 @@ describe('payment history merge', () => {
         tags: [
           ['proto', 'nostr-pos', '0.2'],
           ['sale', 'sale1'],
-          ['terminal', terminal.publicKey]
+          ['p', terminal.publicKey]
         ],
         content: encryptContent({ sale_id: 'sale1', receipt_id: 'R-1', created_at: 100 }, terminal.privateKey, merchant.publicKey),
         created_at: 100
@@ -110,5 +110,18 @@ describe('payment history merge', () => {
     await expect(mergePaymentHistory(config, async () => [event])).resolves.toBe(1);
     expect(receipts.get('R-1')).toMatchObject({ saleId: 'sale1' });
     expect(sales.get('sale1')?.status).toBe('receipt_ready');
+  });
+
+  it('queries payment history with the indexed p tag', async () => {
+    const { mergePaymentHistory } = await import('./payment-history');
+    const fetchEvents = vi.fn(async () => []);
+
+    await expect(mergePaymentHistory(config, fetchEvents)).resolves.toBe(0);
+
+    expect(fetchEvents).toHaveBeenCalledWith(['wss://one'], {
+      kinds: [9382, 9383],
+      '#p': [terminal.publicKey],
+      limit: 100
+    });
   });
 });

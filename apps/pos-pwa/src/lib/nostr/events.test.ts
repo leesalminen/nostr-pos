@@ -34,7 +34,8 @@ describe('local protocol events', () => {
     });
 
     expect(event.kind).toBe(30383);
-    expect(event.tags).toContainEqual(['pairing', '4F7G-YJDP']);
+    expect(event.tags).toContainEqual(['d', '4F7G-YJDP']);
+    expect(event.tags).not.toContainEqual(['pairing', '4F7G-YJDP']);
     expect(event.tags).toContainEqual(['expiration', '400']);
   });
 

@@ -62,7 +62,7 @@ export async function applyPaymentHistoryEvent(
 ): Promise<boolean> {
   if (!isValidSignedEvent(event)) return false;
   if (event.kind !== KINDS.paymentStatus && event.kind !== KINDS.receipt) return false;
-  if (!event.tags.some((tag) => tag[0] === 'terminal' && tag[1] === config.terminalPubkey)) return false;
+  if (!event.tags.some((tag) => tag[0] === 'p' && tag[1] === config.terminalPubkey)) return false;
   const content = eventContent(config, event);
   const saleId = typeof content?.sale_id === 'string' ? content.sale_id : undefined;
   if (!saleId) return false;
@@ -109,7 +109,7 @@ export async function mergePaymentHistory(
 ): Promise<number> {
   const events = await fetchEvents(config.syncServers, {
     kinds: [KINDS.paymentStatus, KINDS.receipt],
-    '#terminal': [config.terminalPubkey],
+    '#p': [config.terminalPubkey],
     limit: 100
   });
   let changed = 0;

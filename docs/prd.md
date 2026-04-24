@@ -931,7 +931,7 @@ and enter this code:
 Waiting for approval... (30s)
 ```
 
-- Code format: 8 alphanumeric characters, dash-separated. Derived from `first 4 bytes of terminal_pubkey` → crockford-base32 → uppercase.
+- Code format: 8 alphanumeric characters, dash-separated. Derived from the first 5 bytes of `terminal_pubkey` → crockford-base32 → uppercase.
 - Code is a *hint* for the controller, not a secret. The controller verifies by looking up the full terminal pubkey on the pairing discovery relay (default: first of the default relay set).
 - Never shown as "pubkey" or "npub."
 
@@ -1204,7 +1204,6 @@ Tags:
   ["proto", "nostr-pos", "0.2"],
   ["a", "30380:<merchant-controller-pubkey>:<pos_id>"],
   ["p", "<terminal_pubkey>"],
-  ["terminal", "<terminal_pubkey>"],
   ["expires", "<unix_timestamp>"]
 ]
 ```
@@ -1309,7 +1308,7 @@ Tags:
 [
   ["proto", "nostr-pos", "0.2"],
   ["a", "30380:<merchant-controller-pubkey>:<pos_id>"],
-  ["terminal", "<terminal_pubkey>"]
+  ["p", "<terminal_pubkey>"]
 ]
 ```
 
@@ -1411,7 +1410,7 @@ Tags:
 [
   ["proto", "nostr-pos", "0.2"],
   ["a", "30380:<merchant-controller-pubkey>:<pos_id>"],
-  ["terminal", "<terminal_pubkey>"]
+  ["p", "<terminal_pubkey>"]
 ]
 ```
 
@@ -1468,9 +1467,10 @@ Privacy TODO before production pilot:
   payment records refuse plaintext publication when the merchant recovery key is
   missing.
 - Re-review public tags on encrypted events. Even with encrypted content, tags
-  like `terminal`, `swap`, timestamps, and POS `a` refs can leak sales cadence,
-  terminal activity, or business volume patterns. Public `sale`, `status`, and
-  `method` tags have been removed from sale/status/receipt events.
+  like terminal `p` refs, `swap`, timestamps, and POS `a` refs can leak sales
+  cadence, terminal activity, or business volume patterns. Public `sale`,
+  `status`, `method`, and custom `terminal` tags have been removed from
+  sale/status/receipt events.
 - Status, method, and sale IDs are now kept inside encrypted content for
   payment/receipt records rather than relay-visible tags; keep that invariant
   in the UI copy grep/protocol review before pilot.
@@ -1502,10 +1502,10 @@ Discovery protocol:
 1. Terminal generates its Nostr keypair, displays pairing code.
 2. Terminal publishes a transient "pairing announcement" event (kind 30383, addressable,
    `d` tag = pairing code) to the first relay in the default set ("pairing discovery relay").
-   - Tags: ["pairing", "<pairing_code>"], ["p", "<terminal_pubkey>"]
+   - Tags: ["d", "<pairing_code>"], ["p", "<terminal_pubkey>"]
    - Expires after 5 minutes.
 3. Merchant enters pairing code in controller UI.
-4. Controller queries the discovery relay for { kind: 30383, #pairing: [code] } and resolves
+4. Controller queries the discovery relay for { kind: 30383, #d: [code] } and resolves
    the full terminal pubkey from the `p` tag.
 5. Controller presents the merchant: "Terminal wants to pair: Terminal ID ending in ...xyz.
    Approve?"
@@ -3392,8 +3392,8 @@ verification evidence stay close to the source of truth.
   content for controller history.
 - Reduced public metadata on terminal sale/status/receipt records further by
   removing relay-visible `sale` IDs from kind-9380/9382/9383 tags; sale IDs now
-  live only in encrypted content, while terminal reconciliation still uses the
-  terminal tag.
+  live only in encrypted content, while terminal reconciliation uses the
+  standard `p` tag.
 - Added local print tracking for receipts: pressing Print marks the receipt row
   with `printedAt`, and CSV exports now include a `printed_at` column.
 - Added Dart NIP-44 v2 approval encryption via `ndk`'s NIP-44 adapter, kept
@@ -3449,8 +3449,8 @@ verification evidence stay close to the source of truth.
   visible pending, claimable, expiring-soon, failed, queued, and recent recovery
   record state instead of only exposing raw backup/export counts.
 - Added encrypted relay-history merge on the terminal: cashier startup and
-  payment-screen reconciliation fetch kind-9382/9383 records tagged to the
-  terminal, decrypt terminal-authored records via the merchant recovery
+  payment-screen reconciliation fetch kind-9382/9383 records addressed to the
+  terminal via `#p`, decrypt terminal-authored records via the merchant recovery
   conversation key or merchant-authored records via the signer key, and merge
   known sale status/receipt updates back into IndexedDB.
 - The recent-transactions screen now renders local IndexedDB rows before
@@ -3473,9 +3473,21 @@ verification evidence stay close to the source of truth.
   signing, and recovery SDK code gets static checks on every push.
 - README now documents the current smoke commands and the live relay-backed
   pilot activation flow from terminal pairing code through controller approval.
+- Relay-queryable terminal and pairing lookups now use standard indexed Nostr
+  tags only: pairing announcements are queried by `#d`, and terminal-addressed
+  payment status/receipt history is queried by `#p` instead of custom
+  multi-character filters such as `#pairing` or `#terminal`.
 
 ### Known follow-ups
 
+- Terminal frontend should hold long-lived relay websocket connections rather
+  than opening a fresh socket for each subscription/publish. Today every relay
+  operation pays a reconnect handshake, which adds latency to payment polling,
+  recovery reconciliation, and wrap sends, and multiplies load on the relays.
+  Move to a shared connection pool keyed by relay URL with REQ/EVENT
+  multiplexed over the existing socket, plus reconnect-with-backoff, heartbeat
+  pings, and automatic resubscription of active filters after reconnect so
+  callers don't have to care that the socket dropped.
 - Remaining hard gap: fill the Dart `RecoveryClaimBuilder` boundary with a
   native Liquid/Boltz claim transaction builder. Controller recovery is
   production-useful for prepared `claim_tx_hex` records and can use stored

@@ -52,6 +52,10 @@ cd apps/nostr_pos_cli
 dart run bin/nostr_pos.dart fetch-pairing --pairing-code 4F7G-YJDP
 ```
 
+Use `--relays` here when the PWA was opened with a POS profile that overrides
+the default relay set; pairing announcements are discovered by the indexed `d`
+tag on kind `30383`.
+
 4. The controller authorizes the terminal and signs the approval:
 
 ```bash

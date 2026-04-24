@@ -404,7 +404,7 @@ Future<void> _authTerminal(List<String> args) async {
   final pairing =
       await store.latestByTag(
         kind: NostrPosKinds.pairingAnnouncement,
-        tagName: 'pairing',
+        tagName: 'd',
         tagValue: parsed['pairing-code'] as String,
       ) ??
       (parsed['relays'] == null
@@ -502,7 +502,7 @@ Future<void> _recordSale(List<String> args) async {
     pubkey: terminalPubkey,
     kind: NostrPosKinds.saleCreated,
     tags: [
-      ['terminal', terminalPubkey],
+      ['p', terminalPubkey],
     ],
     content: {
       'sale_id': saleId,
@@ -521,7 +521,7 @@ Future<void> _recordSale(List<String> args) async {
     pubkey: terminalPubkey,
     kind: NostrPosKinds.paymentStatus,
     tags: [
-      ['terminal', terminalPubkey],
+      ['p', terminalPubkey],
     ],
     content: {
       'sale_id': saleId,
@@ -535,7 +535,7 @@ Future<void> _recordSale(List<String> args) async {
     pubkey: terminalPubkey,
     kind: NostrPosKinds.receipt,
     tags: [
-      ['terminal', terminalPubkey],
+      ['p', terminalPubkey],
     ],
     content: {'receipt_id': 'R-$saleId', 'sale_id': saleId, 'created_at': now},
   );

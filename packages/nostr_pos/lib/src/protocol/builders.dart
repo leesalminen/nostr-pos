@@ -40,7 +40,6 @@ NostrPosEvent buildPairingAnnouncement({
     createdAt: ts,
     tags: [
       ['d', code],
-      ['pairing', code],
       ['p', terminalPubkey],
       ['expiration', (ts + 300).toString()],
     ],
@@ -64,7 +63,6 @@ NostrPosEvent buildTerminalAuthorizationEvent({
       ['d', '$posId:${authorization.terminalPubkey}'],
       ['a', posRef(merchantPubkey: merchantPubkey, posId: posId)],
       ['p', authorization.terminalPubkey],
-      ['terminal', authorization.terminalPubkey],
       ['expires', authorization.expiresAt.toString()],
     ],
     content: authorization.toJson(),

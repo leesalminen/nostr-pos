@@ -53,6 +53,20 @@ function combinePublishResults(reports: PublishResult[][], relays: string[]): Pu
   });
 }
 
+function isTerminalAddressedRecord(item: OutboxItem): boolean {
+  return ['sale_created', 'payment_status', 'receipt'].includes(item.type);
+}
+
+function terminalAddressedTemplate(template: EventTemplate, terminalPubkey: string): EventTemplate {
+  return {
+    ...template,
+    tags: [
+      ...template.tags.filter((tag) => tag[0] !== 'terminal' && !(tag[0] === 'p' && tag[1] === terminalPubkey)),
+      ['p', terminalPubkey]
+    ]
+  };
+}
+
 async function publishItemEvents(
   config: TerminalConfig,
   item: OutboxItem,
@@ -72,7 +86,12 @@ async function publishItemEvents(
   }
 
   const event = signEvent(
-    outboxItemToTemplate(item, config.terminalPrivkeyEnc, recoveryRecipient),
+    isTerminalAddressedRecord(item)
+      ? terminalAddressedTemplate(
+          outboxItemToTemplate(item, config.terminalPrivkeyEnc, recoveryRecipient),
+          config.terminalPubkey
+        )
+      : outboxItemToTemplate(item, config.terminalPrivkeyEnc, recoveryRecipient),
     config.terminalPrivkeyEnc
   );
   return publish(config.syncServers, event);

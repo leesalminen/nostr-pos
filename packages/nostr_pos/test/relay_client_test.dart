@@ -57,6 +57,10 @@ void main() {
         final socket = await WebSocketTransformer.upgrade(request);
         await for (final message in socket) {
           final decoded = jsonDecode(message as String) as List<Object?>;
+          if (decoded.isEmpty || decoded[0] != 'REQ') continue;
+          final filter = (decoded[2] as Map).cast<String, Object?>();
+          expect(filter, containsPair('#d', ['4F7G-YJDP']));
+          expect(filter.containsKey('#pairing'), isFalse);
           final subId = decoded[1] as String;
           socket.add(jsonEncode(['EVENT', subId, event.toJson()]));
           socket.add(jsonEncode(['EOSE', subId]));

@@ -175,19 +175,42 @@ Future<NostrPosEvent?> findPairingAnnouncement({
   NostrRelayClient? client,
 }) async {
   final relayClient = client ?? NostrRelayClient();
-  final events = await queryEventsFromRelays(
+  final addressableEvents = await queryEventsFromRelays(
     relays: relays,
     client: relayClient,
     filter: {
       'kinds': [NostrPosKinds.pairingAnnouncement],
-      '#pairing': [pairingCode],
+      '#d': [pairingCode],
       'limit': 5,
     },
   );
+  final addressable = _latestValidPairing(addressableEvents, pairingCode);
+  return addressable;
+}
+
+NostrPosEvent? _latestValidPairing(
+  List<NostrPosEvent> events,
+  String pairingCode,
+) {
   final valid =
-      events.where((event) => event.hasProtocolTag && event.idMatches).toList()
+      events
+          .where(
+            (event) =>
+                event.hasProtocolTag &&
+                event.idMatches &&
+                event.kind == NostrPosKinds.pairingAnnouncement &&
+                _hasTag(event, 'p', event.pubkey) &&
+                _hasTag(event, 'd', pairingCode),
+          )
+          .toList()
         ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
   return valid.isEmpty ? null : valid.first;
+}
+
+bool _hasTag(NostrPosEvent event, String name, String value) {
+  return event.tags.any(
+    (tag) => tag.length >= 2 && tag[0] == name && tag[1] == value,
+  );
 }
 
 Future<List<NostrPosEvent>> fetchSwapRecoveryBackups({
