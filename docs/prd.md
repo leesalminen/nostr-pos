@@ -3278,6 +3278,9 @@ verification evidence stay close to the source of truth.
   addition to direct `lightning:https://...` URL records, matching the v1 Web
   NFC flow. NDEF URL records also handle the compact URI-prefix byte used by
   real NFC tags.
+- Recent transaction detail actions are now status-aware: paid sales expose
+  print/share, in-progress payments can resume the charge screen, recovery rows
+  jump to Advanced recovery, and expired/failed rows offer a new sale.
 - Added local protocol outbox events for sale-created, payment-status, and
   receipt records, plus startup reconciliation that expires stale open attempts
   and records the status update. This is the IndexedDB side of the PRD's
