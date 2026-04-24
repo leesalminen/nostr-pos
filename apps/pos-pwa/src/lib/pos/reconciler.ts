@@ -5,7 +5,7 @@ import { paymentStatusEvent } from '../nostr/events';
 import type { PaymentAttempt, Sale } from './types';
 import { settleAttempt } from './settlement';
 import { swapProviderForConfig } from './payment-state';
-import type { SwapProvider } from '../swaps/provider';
+import type { SwapProvider, SwapStatus } from '../swaps/provider';
 
 export type ReconcileOptions = {
   now?: number;
@@ -69,7 +69,26 @@ async function reconcileSwapAttempt(
   } catch {
     return { changed: false, terminal: false };
   }
+  return applySwapStatusUpdate(sale, attempt, status, { now: options.now });
+}
+
+export async function applySwapStatusUpdate(
+  sale: Sale,
+  attempt: PaymentAttempt,
+  status: SwapStatus,
+  options: { now?: number; txid?: string } = {}
+): Promise<{ changed: boolean; terminal: boolean }> {
   const now = options.now ?? Date.now();
+  if (status === 'transaction.claimed') {
+    await settleAttempt({
+      sale,
+      attempt,
+      txid: options.txid ?? `claim_${attempt.swapId ?? attempt.id}`,
+      settledAt: now
+    });
+    return { changed: true, terminal: true };
+  }
+
   const nextStatus =
     status === 'expired' || status === 'failed'
       ? status

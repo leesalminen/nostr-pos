@@ -3350,6 +3350,11 @@ verification evidence stay close to the source of truth.
 - Tightened revocation sync: once a POS profile is loaded, terminal revocation
   events must be signed by that profile's merchant controller key in addition to
   targeting the terminal pubkey.
+- Added live Boltz websocket updates on the payment screen. When an authorized
+  provider exposes `ws_url`, the terminal subscribes to `swap.update`, applies
+  normalized provider statuses through the same reconciliation helper used by
+  polling, queues encrypted status/receipt records, and keeps polling as the
+  offline fallback.
 - CI now runs `dart analyze` for the Dart SDK as well as the CLI so relay,
   signing, and recovery SDK code gets static checks on every push.
 - README now documents the current smoke commands and the live relay-backed

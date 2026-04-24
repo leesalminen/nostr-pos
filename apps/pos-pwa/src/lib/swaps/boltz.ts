@@ -41,7 +41,8 @@ function asNumber(value: unknown, name: string): number {
 }
 
 function normalizeStatus(status: unknown): SwapStatus {
-  if (status === 'invoice.settled' || status === 'transaction.claimed') return 'invoice.paid';
+  if (status === 'transaction.claimed') return 'transaction.claimed';
+  if (status === 'invoice.settled') return 'invoice.paid';
   if (status === 'transaction.mempool' || status === 'transaction.server.mempool') return 'transaction.mempool';
   if (status === 'transaction.confirmed' || status === 'transaction.server.confirmed') return 'transaction.confirmed';
   if (status === 'swap.expired' || status === 'invoice.expired') return 'expired';

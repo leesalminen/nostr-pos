@@ -8,7 +8,7 @@
   import { terminal, loadTerminal, loadPosProfileReference } from '../lib/stores/terminal';
   import { refreshTransactions } from '../lib/stores/ledger';
   import { paymentPayload, simulateSettlement } from '../lib/pos/payment-state';
-  import { reconcileOpenPayments, resumeAttempt, resumeSale } from '../lib/pos/reconciler';
+  import { applySwapStatusUpdate, reconcileOpenPayments, resumeAttempt, resumeSale } from '../lib/pos/reconciler';
   import type { PaymentAttempt, PaymentMethod, Sale } from '../lib/pos/types';
   import { syncQueuedRecords } from '../lib/pos/sync';
   import { decodeIndexPrice } from '../lib/fx/bull-bitcoin';
@@ -16,6 +16,7 @@
   import { formatExchangeRate, formatFiat, formatSats, statusLabel } from '../lib/util/formatting';
   import { payWithWebNfc } from '../lib/nfc/web-nfc';
   import { isPosProfileReference } from '../lib/pos/profile-loader';
+  import { subscribeBoltzSwapUpdates, type SwapUpdateSubscription } from '../lib/swaps/boltz-ws';
 
   let { params = {} }: { params?: { saleId?: string } } = $props();
 
@@ -47,6 +48,7 @@
 
   onMount(() => {
     let pollTimer: ReturnType<typeof setInterval> | undefined;
+    let swapSubscription: SwapUpdateSubscription | undefined;
     let stopped = false;
 
     async function refreshPaymentState() {
@@ -83,6 +85,29 @@
         attempt = resumed.attempt;
         selectedMethod = resumed.attempt.method === 'liquid' ? 'liquid' : 'lightning_swap';
         await refreshTransactions();
+        const config = await loadTerminal();
+        const wsUrl = config.authorization?.swap_providers?.find((provider) => provider.type === 'boltz' && provider.ws_url)?.ws_url;
+        if (wsUrl && resumed.attempt.swapId) {
+          swapSubscription = subscribeBoltzSwapUpdates({
+            wsUrl,
+            swapIds: [resumed.attempt.swapId],
+            async onUpdate(update) {
+              if (stopped || update.id !== resumed.attempt.swapId || !sale || !attempt) return;
+              const applied = await applySwapStatusUpdate(sale, attempt, update.status, { now: Date.now(), txid: update.txid });
+              if (!applied.changed || stopped) return;
+              const latest = await resumeAttempt(attempt.id);
+              if (latest) {
+                sale = latest.sale;
+                attempt = latest.attempt;
+              }
+              await refreshTransactions();
+              void loadTerminal().then(syncQueuedRecords);
+              if (sale?.status === 'receipt_ready' || sale?.status === 'settled') {
+                location.replace(`#/receipt/${sale.id}`);
+              }
+            }
+          });
+        }
         pollTimer = setInterval(() => {
           void refreshPaymentState();
         }, 5000);
@@ -95,6 +120,7 @@
     return () => {
       stopped = true;
       if (pollTimer) clearInterval(pollTimer);
+      swapSubscription?.close();
     };
   });
 

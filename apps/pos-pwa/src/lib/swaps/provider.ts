@@ -24,7 +24,14 @@ export type ReverseSwapResponse = {
   boltzResponse?: Record<string, unknown>;
 };
 
-export type SwapStatus = 'created' | 'invoice.paid' | 'transaction.mempool' | 'transaction.confirmed' | 'expired' | 'failed';
+export type SwapStatus =
+  | 'created'
+  | 'invoice.paid'
+  | 'transaction.mempool'
+  | 'transaction.confirmed'
+  | 'transaction.claimed'
+  | 'expired'
+  | 'failed';
 
 export type VerificationResult = {
   ok: boolean;
