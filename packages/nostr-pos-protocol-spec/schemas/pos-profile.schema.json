@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/nostr-pos/pos-profile.schema.json",
+  "title": "POS Profile",
+  "type": "object",
+  "required": ["name", "merchant_name", "currency", "methods", "relays", "liquid_backends", "swap_providers", "fiat_provider", "public_receipts"],
+  "properties": {
+    "name": { "type": "string", "minLength": 1 },
+    "merchant_name": { "type": "string", "minLength": 1 },
+    "description": { "type": "string" },
+    "branding": {
+      "type": "object",
+      "properties": {
+        "logo_url": { "type": ["string", "null"] },
+        "theme": { "type": "string" },
+        "primary_color": { "type": ["string", "null"] }
+      },
+      "additionalProperties": true
+    },
+    "currency": { "enum": ["USD", "CAD", "EUR", "CRC", "MXN", "ARS", "COP"] },
+    "methods": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["type"],
+        "properties": {
+          "type": { "enum": ["liquid", "lightning_via_swap", "bolt_card"] },
+          "asset": { "type": "string" },
+          "settlement": { "type": "string" },
+          "providers": { "type": "array", "items": { "type": "string" } },
+          "claim_mode": { "enum": ["standard", "covenant"] }
+        },
+        "additionalProperties": false
+      }
+    },
+    "relays": { "type": "array", "items": { "type": "string", "format": "uri" } },
+    "liquid_backends": { "type": "array", "items": { "type": "object" } },
+    "swap_providers": { "type": "array", "items": { "type": "object" } },
+    "fiat_provider": { "type": "object" },
+    "public_receipts": { "type": "boolean" }
+  },
+  "additionalProperties": false
+}

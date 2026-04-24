@@ -1,0 +1,21 @@
+{
+  "name": "nostr-pos-monorepo",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "workspaces": [
+    "apps/pos-pwa"
+  ],
+  "scripts": {
+    "build": "npm run build -w apps/pos-pwa",
+    "dev": "npm run dev -w apps/pos-pwa",
+    "test": "npm run test -w apps/pos-pwa",
+    "check": "npm run check -w apps/pos-pwa && npm run copy-check",
+    "copy-check": "bash scripts/ui-copy-check.sh",
+    "dart:test": "cd packages/nostr_pos && dart test",
+    "dart:cli": "cd apps/nostr_pos_cli && dart run bin/nostr_pos.dart"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}

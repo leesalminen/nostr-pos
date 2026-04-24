@@ -1,0 +1,11 @@
+node_modules/
+.svelte-kit/
+dist/
+build/
+.dart_tool/
+.packages
+pubspec.lock
+coverage/
+.env
+.DS_Store
+*.log

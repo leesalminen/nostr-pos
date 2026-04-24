@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/nostr-pos/terminal-authorization.schema.json",
+  "title": "Terminal Authorization",
+  "type": "object",
+  "required": ["type", "pos_ref", "terminal_pubkey", "terminal_name", "pairing_code_hint", "network", "asset", "settlement", "limits", "claim_mode", "swap_providers", "liquid_backends", "merchant_recovery_pubkey", "expires_at"],
+  "properties": {
+    "type": { "const": "terminal_authorization" },
+    "pos_ref": { "type": "string" },
+    "terminal_pubkey": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+    "terminal_name": { "type": "string" },
+    "pairing_code_hint": { "type": "string", "pattern": "^[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$" },
+    "network": { "enum": ["liquid-mainnet", "liquid-testnet", "liquid-regtest"] },
+    "asset": { "const": "L-BTC" },
+    "settlement": {
+      "type": "object",
+      "required": ["type", "ct_descriptor", "descriptor_fingerprint", "terminal_branch", "lookahead"],
+      "properties": {
+        "type": { "const": "liquid_ct_descriptor" },
+        "ct_descriptor": { "type": "string" },
+        "descriptor_fingerprint": { "type": "string" },
+        "terminal_branch": { "type": "integer", "minimum": 0 },
+        "lookahead": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "limits": {
+      "type": "object",
+      "required": ["max_invoice_sat", "daily_volume_sat", "allow_lightning", "allow_liquid", "allow_bolt_card"],
+      "properties": {
+        "max_invoice_sat": { "type": "integer", "minimum": 1 },
+        "daily_volume_sat": { "type": "integer", "minimum": 1 },
+        "allow_lightning": { "type": "boolean" },
+        "allow_liquid": { "type": "boolean" },
+        "allow_bolt_card": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "claim_mode": { "enum": ["standard", "covenant"] },
+    "swap_providers": { "type": "array", "items": { "type": "object" } },
+    "liquid_backends": { "type": "array", "items": { "type": "object" } },
+    "merchant_recovery_pubkey": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+    "expires_at": { "type": "integer" }
+  },
+  "additionalProperties": false
+}
