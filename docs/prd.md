@@ -1254,6 +1254,7 @@ Notes:
 - `limits.max_invoice_sat` default is **100,000 sats** (~$79 USD at scoping). This is the primary mitigation for the §15 standard-swap theft vector. Merchants may raise but should document risk.
 - `pairing_code_hint` lets the terminal sanity-check that the authorization matches the code it displayed.
 - `claim_mode` defaults to the POS profile value. Reserved for per-terminal override in v1.1.
+- TODO before production pilot: the Dart controller SDK/CLI must encrypt kind-30381 content with NIP-44 v2 to the terminal pubkey before relay publish. The current TypeScript terminal can decrypt NIP-44 v2 authorization events, but pilot plaintext compatibility must remain dev-only and must not be accepted in production builds.
 
 ### 9.4 Terminal Revocation Event
 
@@ -1462,6 +1463,13 @@ Content (encrypted form):
   "discount_fiat": null
 }
 ```
+
+Privacy TODO before production pilot:
+- Confirm kind-9382 payment status events and kind-9383 receipt events are NIP-44 v2 encrypted in every production path. Any plaintext receipt/status compatibility must be dev-only.
+- Re-review public tags on encrypted events. Even with encrypted content, tags like `sale`, `terminal`, `status`, `method`, `swap`, timestamps, and POS `a` refs can leak sales cadence, terminal activity, payment outcomes, or business volume patterns.
+- Decide whether `status` and `method` belong in public tags for v1 or should move into encrypted content only, with less-specific routing tags left public.
+- Audit other relay-visible records for public leakage before pilot: kind-30380 POS profiles, kind-30382 revocations, kind-30383 pairing announcements, kind-9380 sale-created tags, and kind-9381 recovery-backup tags/wrappers.
+- Document the public-receipt variant as explicit merchant opt-in only, with a minimal field set and no notes, discounts, terminal identifiers, or settlement details unless deliberately enabled.
 
 ### 9.9 Claim Request / Claim Proof (v1.1, reserved)
 
@@ -2715,6 +2723,9 @@ Local environment:
 - Revoked terminal cannot create new valid sales after revocation observed
 - Payment status events verified against Liquid backend before final settlement
   display in merchant wallet
+- Production kind-30381 terminal authorization events are never published with
+  plaintext content; Dart controller encrypt -> TypeScript terminal decrypt is
+  covered by an integration test.
 - NIP-44 v2 encryption verified cross-language (Dart ↔ TS)
 ```
 
@@ -2967,6 +2978,8 @@ Proceed in this order:
   is read-only, and must tolerate unavailability with a clear user-facing error.
 - Always persist claim_tx_hex BEFORE broadcasting (§14.3).
 - Always use NIP-44 v2 (not NIP-04) for encrypted content.
+- Always treat relay-visible tags as public metadata and privacy-review them
+  separately from encrypted event content.
 - Always verify event signatures on read.
 - Always bound max_invoice_sat per terminal (default 100k sats).
 ```
@@ -3290,6 +3303,10 @@ verification evidence stay close to the source of truth.
 - Added best-effort automatic sync for queued sale/status/receipt records during
   normal cashier flow; Advanced Sync remains a manual recovery control, but the
   happy path now pushes pending records without cashier involvement.
+- Swapped Lightning payment-backup publishing to NIP-59 gift wraps when a
+  merchant recovery key is authorized: the terminal now publishes separate
+  wrapped recovery records for the merchant recovery key and terminal key, and a
+  relay only counts durable when both wraps are accepted.
 - CI now runs `dart analyze` for the Dart SDK as well as the CLI so relay,
   signing, and recovery SDK code gets static checks on every push.
 - README now documents the current smoke commands and the live relay-backed
