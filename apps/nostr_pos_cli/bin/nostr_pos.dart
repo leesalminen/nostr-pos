@@ -336,7 +336,7 @@ Future<void> _authTerminal(List<String> args) async {
       ? event
       : replaceEventContent(
           event,
-          nip44EncryptToPubkey(
+          await nip44EncryptToPubkey(
             plaintext: event.content,
             privateKeyHex: merchantPrivkey,
             publicKeyHex: terminalPubkey,
