@@ -69,4 +69,17 @@ describe('payment preparation safety', () => {
 
     expect(() => swapProviderForConfig(activeConfig)).toThrow('Lightning is temporarily unavailable');
   });
+
+  it('uses configured Boltz providers during live dev pilots', () => {
+    vi.stubEnv('PROD', false);
+
+    expect(
+      swapProviderForConfig({
+        ...activeConfig,
+        authorization: {
+          swap_providers: [{ id: 'boltz', type: 'boltz', api_base: 'https://api.boltz.exchange' }]
+        }
+      }).id
+    ).toBe('boltz');
+  });
 });

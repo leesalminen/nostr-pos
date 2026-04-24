@@ -8,6 +8,7 @@
   import { terminal, loadTerminal, loadPosProfileReference } from '../lib/stores/terminal';
   import { refreshTransactions } from '../lib/stores/ledger';
   import { paymentPayload } from '../lib/pos/payment-payload';
+  import { normalizeBolt11Invoice } from '../lib/lightning/bolt11';
   import { claimLiquidReverseSwap, reconcileClaimBroadcasts, resumePreparedClaims } from '../lib/pos/claim-engine';
   import { applySwapStatusUpdate, reconcileOpenPayments, resumeAttempt, resumeSale } from '../lib/pos/reconciler';
   import type { PaymentAttempt, PaymentMethod, Sale } from '../lib/pos/types';
@@ -34,11 +35,19 @@
   let tabReadOnly = $state(false);
   const showDevSettle = import.meta.env.DEV;
 
+  const lightningPaymentData = $derived(
+    attempt
+      ? (normalizeBolt11Invoice(attempt.lightningInvoice) ??
+          normalizeBolt11Invoice(attempt.method === 'lightning_swap' || attempt.method === 'bolt_card' ? attempt.paymentData : undefined) ??
+          '')
+      : ''
+  );
+
   const activePaymentData = $derived(
     sale && attempt
       ? selectedMethod === 'liquid'
         ? (attempt.liquidPaymentData ?? paymentPayload('liquid', sale.amountSat, sale.id, attempt.liquidAddress))
-        : (attempt.lightningInvoice ?? attempt.paymentData ?? paymentPayload('lightning_swap', sale.amountSat, sale.id, attempt.liquidAddress))
+        : lightningPaymentData
       : ''
   );
 
@@ -98,7 +107,14 @@
         }
         sale = resumed.sale;
         attempt = resumed.attempt;
-        selectedMethod = resumed.attempt.method === 'liquid' ? 'liquid' : 'lightning_swap';
+        selectedMethod =
+          resumed.attempt.method === 'liquid' ||
+          !(
+            normalizeBolt11Invoice(resumed.attempt.lightningInvoice) ??
+            normalizeBolt11Invoice(resumed.attempt.method === 'lightning_swap' || resumed.attempt.method === 'bolt_card' ? resumed.attempt.paymentData : undefined)
+          )
+            ? 'liquid'
+            : 'lightning_swap';
         await refreshTransactions();
         const config = await loadTerminal();
         const wsUrl = config.authorization?.swap_providers?.find((provider) => provider.type === 'boltz' && provider.ws_url)?.ws_url;
@@ -173,6 +189,7 @@
 
   async function selectMethod(method: PaymentMethod) {
     if (tabReadOnly) return;
+    if (method === 'lightning_swap' && !lightningPaymentData) return;
     selectedMethod = method;
     boltCardPending = false;
     boltCardMessage = '';
@@ -180,7 +197,8 @@
     const paymentData =
       method === 'liquid'
         ? (attempt.liquidPaymentData ?? paymentPayload('liquid', sale.amountSat, sale.id, attempt.liquidAddress))
-        : (attempt.lightningInvoice ?? paymentPayload('lightning_swap', sale.amountSat, sale.id, attempt.liquidAddress));
+        : lightningPaymentData;
+    if (!paymentData) return;
     const nextAttempt: PaymentAttempt = { ...attempt, method, paymentData, updatedAt: Date.now() };
     await putAttempt(nextAttempt);
     attempt = nextAttempt;
@@ -190,19 +208,27 @@
 
   async function startBoltCard() {
     if (!attempt || !sale || tabReadOnly) return;
+    const invoice =
+      normalizeBolt11Invoice(attempt.lightningInvoice) ??
+      normalizeBolt11Invoice(attempt.method === 'lightning_swap' || attempt.method === 'bolt_card' ? attempt.paymentData : undefined);
+    if (!invoice) {
+      boltCardPending = true;
+      boltCardMessage = 'Lightning is not available for this sale. Use Liquid.';
+      return;
+    }
     boltCardPending = true;
     boltCardMessage = 'Hold the card near the back of this device.';
     const nextAttempt: PaymentAttempt = {
       ...attempt,
       method: 'bolt_card',
-      paymentData: attempt.lightningInvoice ?? paymentPayload('lightning_swap', sale.amountSat, sale.id),
+      paymentData: invoice,
       updatedAt: Date.now()
     };
     await putAttempt(nextAttempt);
     attempt = nextAttempt;
     await refreshTransactions();
     try {
-      const result = await payWithWebNfc(activePaymentData);
+      const result = await payWithWebNfc(invoice);
       if (result === 'unsupported') {
         boltCardMessage = 'NFC is not available here. Use the QR code instead.';
       } else {
@@ -213,10 +239,10 @@
     }
   }
 
-  const tabs: Array<{ method: PaymentMethod; label: string }> = [
-    { method: 'lightning_swap', label: 'Lightning' },
+  const tabs = $derived<Array<{ method: PaymentMethod; label: string; disabled?: boolean }>>([
+    { method: 'lightning_swap', label: 'Lightning', disabled: Boolean(attempt) && !lightningPaymentData },
     { method: 'liquid', label: 'Liquid' }
-  ];
+  ]);
 </script>
 
 <main class="min-h-screen bg-[#f5f0e8] text-[#211f1a] dark:bg-[#161512] dark:text-[#fff6e8]">
@@ -270,7 +296,7 @@
                     : 'text-[#5f5547] dark:text-[#c9bca7]'
                 }`}
                 onclick={() => selectMethod(tab.method)}
-                disabled={tabReadOnly}
+                disabled={tabReadOnly || tab.disabled}
               >
                 {tab.label}
               </button>
@@ -284,6 +310,10 @@
               showBoltCard={selectedMethod === 'lightning_swap' && !tabReadOnly}
               onBoltCard={startBoltCard}
             />
+          {:else if selectedMethod === 'lightning_swap'}
+            <div class="w-full rounded-md bg-[#fff4d6] px-4 py-3 text-center text-sm font-semibold text-[#73510f] dark:bg-[#332a18] dark:text-[#e8c778]">
+              Lightning is not available for this sale. Use Liquid.
+            </div>
           {/if}
 
           <p class="text-center text-xs text-[#776b5a] tabular-nums dark:text-[#b9aa91]">

@@ -3492,6 +3492,10 @@ verification evidence stay close to the source of truth.
   LWK watch-only wallet built from the authorized `settlement.ct_descriptor`,
   and only settles after unblinding enough policy-asset L-BTC sats at the
   expected address/index.
+- Removed the early UI placeholder Lightning payload path. The payment screen
+  now renders Lightning QR data only when a checksummed Bolt11 invoice exists,
+  and live dev pilots use the configured Boltz provider instead of the mock
+  adapter whenever the authorization supplies one.
 
 ### Known follow-ups
 

@@ -46,7 +46,7 @@ export function assertTerminalCanCharge(config: TerminalConfig, now = Date.now()
 
 export function swapProviderForConfig(config: TerminalConfig): SwapProvider {
   const provider = config.authorization?.swap_providers?.find((candidate) => candidate.type === 'boltz' && candidate.api_base);
-  if (provider && import.meta.env.PROD) return new BoltzReverseSwapProvider({ apiBase: provider.api_base });
+  if (provider) return new BoltzReverseSwapProvider({ apiBase: provider.api_base });
   if (import.meta.env.PROD) throw new Error('Lightning is temporarily unavailable. Use Liquid instead.');
   return new MockBoltzReverseSwapProvider();
 }
