@@ -2,6 +2,7 @@ import type { PaymentAttempt, Sale } from '../pos/types';
 
 export const KINDS = {
   terminalAuthorization: 30381,
+  terminalRevocation: 30382,
   pairingAnnouncement: 30383,
   saleCreated: 9380,
   swapRecovery: 9381,

@@ -104,6 +104,8 @@ export type TerminalConfig = {
   terminalPrivkeyEnc?: string;
   pairingCode: string;
   activatedAt?: number;
+  revokedAt?: number;
+  revocationReason?: string;
   authorization?: TerminalAuthorization;
   maxInvoiceSat: number;
   syncServers: string[];

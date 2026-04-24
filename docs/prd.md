@@ -3253,6 +3253,9 @@ verification evidence stay close to the source of truth.
   polls for matching terminal-authorization events, supports both plaintext
   CLI pilot payloads and NIP-44 encrypted payloads addressed to the terminal,
   validates the pairing code/key, saves the authorization, and enters the POS.
+- Added terminal revocation sync: on cashier startup the PWA checks the
+  configured backup servers for matching owner-removal events and locks the
+  terminal before any new sale can be created.
 
 ### Known follow-ups
 

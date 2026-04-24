@@ -9,14 +9,21 @@
   import { refreshTransactions } from '../lib/stores/ledger';
   import { reconcileOpenPayments } from '../lib/pos/reconciler';
   import { createSale, markReady } from '../lib/pos/payment-state';
+  import { syncTerminalRevocation } from '../lib/activation/revocation-sync';
 
   let amount = $state('');
   let note = $state('');
   let preparing = $state(false);
   let error = $state('');
+  let lockedMessage = $state('');
 
   onMount(async () => {
     const config = await loadTerminal();
+    const revoked = await syncTerminalRevocation(config);
+    if (revoked) {
+      lockedMessage = 'This terminal was removed by the owner.';
+      return;
+    }
     if (!config.activatedAt) {
       location.hash = '#/activate';
       return;
@@ -70,6 +77,12 @@
       </header>
 
       <div class="mx-auto flex w-full max-w-xl flex-1 flex-col justify-center gap-4 sm:gap-6">
+        {#if lockedMessage}
+          <div class="rounded-md bg-[#ffe0d9] px-5 py-4 text-center text-[#8c2d28]">
+            <p class="font-display text-3xl uppercase tracking-display leading-none">Terminal locked</p>
+            <p class="mt-2 text-sm font-semibold">{lockedMessage}</p>
+          </div>
+        {:else}
         <AmountDisplay amount={displayAmount} currency={$terminal?.currency ?? 'CRC'} />
         <Keypad onInput={applyInput} />
         <textarea
@@ -81,13 +94,16 @@
         {#if error}
           <p class="rounded-md bg-[#ffe0d9] px-4 py-3 text-sm font-semibold text-[#8c2d28]">{error}</p>
         {/if}
+        {/if}
         <BullFooter />
       </div>
 
       <div class="sticky bottom-0 mx-auto mt-3 flex w-full max-w-xl flex-col bg-gradient-to-t from-[#f5f0e8] from-60% to-transparent pb-[max(0.25rem,env(safe-area-inset-bottom))] pt-3 dark:from-[#161512]">
-        <Button disabled={!canCharge || preparing} onclick={charge}>
-          {preparing ? 'Preparing' : 'Charge'}
-        </Button>
+        {#if !lockedMessage}
+          <Button disabled={!canCharge || preparing} onclick={charge}>
+            {preparing ? 'Preparing' : 'Charge'}
+          </Button>
+        {/if}
       </div>
     </section>
   </div>
