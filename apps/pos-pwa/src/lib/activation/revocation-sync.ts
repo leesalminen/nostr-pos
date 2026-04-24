@@ -7,6 +7,7 @@ import type { TerminalConfig } from '../pos/types';
 export function configFromRevocationEvent(config: TerminalConfig, event: Event, now = Date.now()): TerminalConfig | undefined {
   if (event.kind !== KINDS.terminalRevocation) return undefined;
   if (!event.tags.some((tag) => tag[0] === 'p' && tag[1] === config.terminalPubkey)) return undefined;
+  if (config.posProfile?.merchantPubkey && event.pubkey !== config.posProfile.merchantPubkey) return undefined;
   let reason = 'owner_removed';
   try {
     const content = JSON.parse(event.content) as { reason?: unknown; revoked_at?: unknown };

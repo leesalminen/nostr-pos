@@ -52,6 +52,64 @@ describe('revocation relay sync', () => {
     expect(configFromRevocationEvent(config, event, 1000)).toBeUndefined();
   });
 
+  it('ignores revocations not signed by the loaded POS owner', () => {
+    const event = signEvent(
+      {
+        kind: 30382,
+        tags: [['p', terminalKeys.publicKey]],
+        content: '{}',
+        created_at: 2000
+      },
+      createTerminalKeypair().privateKey
+    );
+
+    expect(
+      configFromRevocationEvent(
+        {
+          ...config,
+          posProfile: {
+            merchantPubkey: merchantKeys.publicKey,
+            posId: 'seguras',
+            eventId: 'profile1',
+            loadedAt: 1000,
+            relays: ['wss://one']
+          }
+        },
+        event,
+        1000
+      )
+    ).toBeUndefined();
+  });
+
+  it('accepts revocations signed by the loaded POS owner', () => {
+    const event = signEvent(
+      {
+        kind: 30382,
+        tags: [['p', terminalKeys.publicKey]],
+        content: '{}',
+        created_at: 2000
+      },
+      merchantKeys.privateKey
+    );
+
+    expect(
+      configFromRevocationEvent(
+        {
+          ...config,
+          posProfile: {
+            merchantPubkey: merchantKeys.publicKey,
+            posId: 'seguras',
+            eventId: 'profile1',
+            loadedAt: 1000,
+            relays: ['wss://one']
+          }
+        },
+        event,
+        1000
+      )?.revokedAt
+    ).toBe(1000);
+  });
+
   it('finds newest matching revocation from fetched events', async () => {
     const event = signEvent(
       {

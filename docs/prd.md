@@ -3347,6 +3347,9 @@ verification evidence stay close to the source of truth.
   reconciliation against the configured swap provider, so refresh after invoice
   display can detect provider-side lockup progress and queue encrypted status
   updates instead of relying only on local button-driven settlement.
+- Tightened revocation sync: once a POS profile is loaded, terminal revocation
+  events must be signed by that profile's merchant controller key in addition to
+  targeting the terminal pubkey.
 - CI now runs `dart analyze` for the Dart SDK as well as the CLI so relay,
   signing, and recovery SDK code gets static checks on every push.
 - README now documents the current smoke commands and the live relay-backed
