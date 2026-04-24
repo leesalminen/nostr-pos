@@ -3265,6 +3265,8 @@ verification evidence stay close to the source of truth.
 - Added Dart relay publishing and a `nostr_pos_cli publish-events` command so
   signed controller events in the local event store can be written to configured
   relays with per-relay OK reporting.
+- Verified the Dart CLI relay write path live by publishing a signed kind-30380
+  POS profile smoke event to all three default relays; each returned OK.
 
 ### Known follow-ups
 
