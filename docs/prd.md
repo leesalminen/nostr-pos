@@ -3276,7 +3276,8 @@ verification evidence stay close to the source of truth.
   if Lightning preparation cannot complete.
 - Bolt Card LNURL handling now accepts bech32 `LNURL...` NFC payloads in
   addition to direct `lightning:https://...` URL records, matching the v1 Web
-  NFC flow.
+  NFC flow. NDEF URL records also handle the compact URI-prefix byte used by
+  real NFC tags.
 - Added local protocol outbox events for sale-created, payment-status, and
   receipt records, plus startup reconciliation that expires stale open attempts
   and records the status update. This is the IndexedDB side of the PRD's
