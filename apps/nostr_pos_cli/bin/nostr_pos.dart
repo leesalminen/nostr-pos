@@ -15,6 +15,7 @@ void main(List<String> args) async {
     ..addCommand('list-events')
     ..addCommand('list-sales')
     ..addCommand('export-sales')
+    ..addCommand('recover-swaps')
     ..addCommand('quote');
 
   if (args.isEmpty) {
@@ -44,6 +45,8 @@ void main(List<String> args) async {
       await _listSales(rest);
     case 'export-sales':
       await _exportSales(rest);
+    case 'recover-swaps':
+      await _recoverSwaps(rest);
     case 'quote':
       await _quote(rest);
     default:
@@ -81,6 +84,19 @@ Future<void> _exportSales(List<String> args) async {
   } else {
     stdout.write(salesHistoryCsv(rows));
   }
+}
+
+Future<void> _recoverSwaps(List<String> args) async {
+  final parser = ArgParser()
+    ..addOption('store', defaultsTo: '.nostr-pos/events.jsonl')
+    ..addFlag('plan', defaultsTo: true);
+  final parsed = parser.parse(args);
+  final events = await LocalEventStore(parsed['store'] as String).readAll();
+  final recoveries = swapRecoveriesFromEvents(events);
+  final output = parsed['plan'] == true
+      ? recoveryClaimPlan(recoveries)
+      : recoveries.map((recovery) => recovery.toJson()).toList();
+  stdout.writeln(const JsonEncoder.withIndent('  ').convert(output));
 }
 
 Future<void> _createPos(List<String> args) async {
