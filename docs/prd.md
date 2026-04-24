@@ -3145,3 +3145,26 @@ Selection rationale:
 
 - **v0.2 (2026-04-23)** — Locked decisions for implementation. Controller = Dart lib + CLI targeting `bullbitcoin-mobile`. Boltz standard mode with per-terminal caps; covenant reserved for v1.1. Bull Bitcoin anonymous `/api/price` for FX (USD/CAD/EUR/CRC/MXN/ARS/COP). Keypad-only v1 (no catalog/cart/tip/tax). Bolt Card stays. Stack: Svelte 5 + Vite (not SvelteKit). Nostr-as-plumbing UX rule with CI grep check. Pairing code activation (§9.10). Sale Created and Payment Status always encrypted. Recovery record adds `fiat_rate_*`. Phase 6 controller recovery merged into Phase 5. Default relays: no.str.cr, relay.primal.net, nos.lol. Pilot: Seguras Butcher. Open questions 1–15 resolved.
 - **v0.1 (initial)** — First brief.
+
+---
+
+## Implementation Notes
+
+This section is maintained during implementation so decisions, deviations, and
+verification evidence stay close to the source of truth.
+
+### 2026-04-23
+
+- Initialized the repository after `git init`.
+- Confirmed the Bull Bitcoin anonymous rates endpoint works without cookies or
+  API keys for CRC/BTC:
+  `POST https://www.bullbitcoin.com/api/price` returned an `indexPrice` with
+  `precision: 2` and `priceCurrency: "CRC"`.
+- Cloned `SatoshiPortal/bullbitcoin-mobile` for the Phase 1 integration survey.
+  Findings are recorded in `docs/bullwallet-integration-conventions.md`.
+- Implementation scope for this pass: create a working monorepo with protocol
+  schemas/test vectors, Dart library + CLI foundations, and a static Svelte PWA
+  with local ledger, recovery-safe simulated payments, receipts, UI copy checks,
+  and automated tests. Real network payment adapters are kept behind interfaces
+  so Boltz/Liquid/Nostr production wiring can replace the deterministic pilot
+  adapters without changing cashier UX.
