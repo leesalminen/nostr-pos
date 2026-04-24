@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import '../protocol/event.dart';
 import '../protocol/kinds.dart';
+import '../protocol/nip44.dart';
 
 class SaleSummary {
   SaleSummary({
@@ -42,14 +43,45 @@ class SaleSummary {
   };
 }
 
+class _DecodedAccountingEvent {
+  _DecodedAccountingEvent({required this.kind, required this.content});
+
+  final int kind;
+  final Map<String, Object?> content;
+}
+
 List<SaleSummary> salesHistoryFromEvents(List<NostrPosEvent> events) {
+  return _salesHistoryFromDecoded(
+    events
+        .map(_decodePlainAccountingEvent)
+        .whereType<_DecodedAccountingEvent>(),
+  );
+}
+
+Future<List<SaleSummary>> salesHistoryFromEventsForMerchant(
+  List<NostrPosEvent> events, {
+  required String merchantRecoveryPrivkey,
+}) async {
+  final decoded = <_DecodedAccountingEvent>[];
+  for (final event in events) {
+    final content = await _decodeMerchantAccountingEvent(
+      event,
+      merchantRecoveryPrivkey: merchantRecoveryPrivkey,
+    );
+    if (content != null) decoded.add(content);
+  }
+  return _salesHistoryFromDecoded(decoded);
+}
+
+List<SaleSummary> _salesHistoryFromDecoded(
+  Iterable<_DecodedAccountingEvent> events,
+) {
   final created = <String, Map<String, Object?>>{};
   final latestStatus = <String, Map<String, Object?>>{};
   final receipts = <String, Map<String, Object?>>{};
 
   for (final event in events) {
-    if (!event.idMatches || !event.hasProtocolTag) continue;
-    final content = jsonDecode(event.content) as Map<String, Object?>;
+    final content = event.content;
     final saleId = content['sale_id'] as String?;
     if (saleId == null) continue;
     switch (event.kind) {
@@ -88,6 +120,55 @@ List<SaleSummary> salesHistoryFromEvents(List<NostrPosEvent> events) {
     );
   }).toList()..sort((a, b) => b.createdAt.compareTo(a.createdAt));
   return summaries;
+}
+
+_DecodedAccountingEvent? _decodePlainAccountingEvent(NostrPosEvent event) {
+  if (!_isAccountingEnvelope(event)) return null;
+  final content = _decodeJsonObject(event.content);
+  if (content == null) return null;
+  return _DecodedAccountingEvent(kind: event.kind, content: content);
+}
+
+Future<_DecodedAccountingEvent?> _decodeMerchantAccountingEvent(
+  NostrPosEvent event, {
+  required String merchantRecoveryPrivkey,
+}) async {
+  if (!_isAccountingEnvelope(event)) return null;
+  final plain = _decodeJsonObject(event.content);
+  if (plain != null) {
+    return _DecodedAccountingEvent(kind: event.kind, content: plain);
+  }
+
+  try {
+    final decrypted = await nip44DecryptFromPubkey(
+      payload: event.content,
+      privateKeyHex: merchantRecoveryPrivkey,
+      publicKeyHex: event.pubkey,
+    );
+    final content = _decodeJsonObject(decrypted);
+    if (content == null) return null;
+    return _DecodedAccountingEvent(kind: event.kind, content: content);
+  } catch (_) {
+    return null;
+  }
+}
+
+bool _isAccountingEnvelope(NostrPosEvent event) {
+  return event.idMatches &&
+      event.hasProtocolTag &&
+      (event.kind == NostrPosKinds.saleCreated ||
+          event.kind == NostrPosKinds.paymentStatus ||
+          event.kind == NostrPosKinds.receipt);
+}
+
+Map<String, Object?>? _decodeJsonObject(String value) {
+  try {
+    final decoded = jsonDecode(value);
+    if (decoded is! Map) return null;
+    return decoded.cast<String, Object?>();
+  } catch (_) {
+    return null;
+  }
 }
 
 String salesHistoryCsv(List<SaleSummary> rows) {

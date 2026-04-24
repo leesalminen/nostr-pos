@@ -87,9 +87,9 @@ NostrPosEvent _maybeSign(NostrPosEvent event, String? privateKeyHex) {
 Future<void> _listSales(List<String> args) async {
   final parser = ArgParser()
     ..addOption('store', defaultsTo: '.nostr-pos/events.jsonl');
+  _addSalesReadOptions(parser);
   final parsed = parser.parse(args);
-  final events = await LocalEventStore(parsed['store'] as String).readAll();
-  final rows = salesHistoryFromEvents(events);
+  final rows = await _salesRows(parsed);
   stdout.writeln(
     const JsonEncoder.withIndent(
       '  ',
@@ -101,9 +101,9 @@ Future<void> _exportSales(List<String> args) async {
   final parser = ArgParser()
     ..addOption('store', defaultsTo: '.nostr-pos/events.jsonl')
     ..addOption('format', defaultsTo: 'csv', allowed: ['csv', 'json']);
+  _addSalesReadOptions(parser);
   final parsed = parser.parse(args);
-  final events = await LocalEventStore(parsed['store'] as String).readAll();
-  final rows = salesHistoryFromEvents(events);
+  final rows = await _salesRows(parsed);
   if (parsed['format'] == 'json') {
     stdout.writeln(
       const JsonEncoder.withIndent(
@@ -113,6 +113,53 @@ Future<void> _exportSales(List<String> args) async {
   } else {
     stdout.write(salesHistoryCsv(rows));
   }
+}
+
+void _addSalesReadOptions(ArgParser parser) {
+  parser
+    ..addOption('relays', help: 'Comma-separated relays to read sales from.')
+    ..addOption(
+      'merchant-recovery-privkey',
+      help: 'Private key used to decrypt encrypted sale history.',
+    )
+    ..addOption('author', help: 'Only include events signed by this pubkey.')
+    ..addOption(
+      'pos-ref',
+      help: 'Only include events tagged with this POS ref.',
+    )
+    ..addOption('limit', defaultsTo: '500');
+}
+
+Future<List<SaleSummary>> _salesRows(ArgResults parsed) async {
+  final events = <NostrPosEvent>[
+    ...await LocalEventStore(parsed['store'] as String).readAll(),
+  ];
+  if (parsed['relays'] != null) {
+    events.addAll(
+      await queryEventsFromRelays(
+        relays: _parseRelays(parsed['relays'] as String),
+        filter: {
+          'kinds': [
+            NostrPosKinds.saleCreated,
+            NostrPosKinds.paymentStatus,
+            NostrPosKinds.receipt,
+          ],
+          if (parsed['author'] != null) 'authors': [parsed['author'] as String],
+          if (parsed['pos-ref'] != null) '#a': [parsed['pos-ref'] as String],
+          'limit': int.parse(parsed['limit'] as String),
+        },
+      ),
+    );
+  }
+
+  final recoveryPrivkey = parsed['merchant-recovery-privkey'] as String?;
+  if (recoveryPrivkey != null && recoveryPrivkey.isNotEmpty) {
+    return salesHistoryFromEventsForMerchant(
+      events,
+      merchantRecoveryPrivkey: recoveryPrivkey,
+    );
+  }
+  return salesHistoryFromEvents(events);
 }
 
 Future<void> _recoverSwaps(List<String> args) async {

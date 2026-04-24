@@ -3323,6 +3323,11 @@ verification evidence stay close to the source of truth.
   now queries kind-1059 gift wraps, unwraps them with `ndk`, filters decrypted
   kind-9381 recovery records, and `nostr_pos_cli recover-swaps` accepts
   `--merchant-recovery-privkey` for relay-based claim planning.
+- Extended controller accounting reads for production privacy: the Dart SDK can
+  decrypt NIP-44 sale/status/receipt contents with the merchant recovery key,
+  and `nostr_pos_cli list-sales` / `export-sales` can merge local records with
+  relay-fetched kind-9380/9382/9383 records via `--relays`,
+  `--pos-ref`, and `--merchant-recovery-privkey`.
 - CI now runs `dart analyze` for the Dart SDK as well as the CLI so relay,
   signing, and recovery SDK code gets static checks on every push.
 - README now documents the current smoke commands and the live relay-backed
