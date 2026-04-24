@@ -3168,3 +3168,17 @@ verification evidence stay close to the source of truth.
   and automated tests. Real network payment adapters are kept behind interfaces
   so Boltz/Liquid/Nostr production wiring can replace the deterministic pilot
   adapters without changing cashier UX.
+- Commit `537fd1f` created the protocol/controller foundation: protocol package,
+  JSON schemas, test vectors, Dart SDK basics, CLI commands, CI workflow, and
+  local infra scaffold.
+- Commit `597c44a` created the Svelte 5 PWA foundation: installable Vite shell,
+  keypad cashier screen, activation screen, receipt printing route, local
+  IndexedDB transaction sheet, Bull Bitcoin FX helpers, encrypted local recovery
+  blobs for simulated Lightning/Bolt Card attempts, confetti/haptics, Advanced
+  diagnostics, and UI copy enforcement.
+- Verification passed after this milestone:
+  `npm run check && npm run test && npm run build`, `dart test` in
+  `packages/nostr_pos`, and `dart analyze` in `apps/nostr_pos_cli`.
+- Production network adapters still to replace deterministic pilot adapters:
+  live relay pool + signing/encryption, LWK address derivation and Liquid
+  watcher, Boltz reverse swap creation/claim/broadcast, and real Web NFC reads.
