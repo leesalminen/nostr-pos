@@ -9,7 +9,8 @@ export type PublishResult = {
 };
 
 export function relayPublishMessageOk(message: string): boolean {
-  return !/^(connection failure|blocked|invalid|error|restricted|rate-limited|auth-required|pow:|duplicate)/i.test(message);
+  if (/^duplicate/i.test(message)) return true;
+  return !/^(connection failure|blocked|invalid|error|restricted|rate-limited|auth-required|pow:)/i.test(message);
 }
 
 export function signEvent(template: EventTemplate, privateKeyHex: string): Event {

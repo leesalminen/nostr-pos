@@ -25,6 +25,11 @@ class RelayPublishResult {
   };
 }
 
+bool relayPublishAccepted(bool ok, String? message) {
+  if (ok) return true;
+  return message != null && message.toLowerCase().startsWith('duplicate');
+}
+
 class NostrRelayClient {
   NostrRelayClient({this.timeout = const Duration(seconds: 8)});
 
@@ -93,7 +98,10 @@ class NostrRelayClient {
             done.complete(
               RelayPublishResult(
                 relay: relayUrl,
-                ok: decoded[2] == true,
+                ok: relayPublishAccepted(
+                  decoded[2] == true,
+                  decoded[3] as String?,
+                ),
                 message: decoded[3] as String?,
               ),
             );

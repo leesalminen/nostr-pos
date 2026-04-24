@@ -25,6 +25,7 @@ describe('Nostr pool helpers', () => {
 
   it('treats relay connection failure messages as publish failures', () => {
     expect(relayPublishMessageOk('stored')).toBe(true);
+    expect(relayPublishMessageOk('duplicate: already have this event')).toBe(true);
     expect(relayPublishMessageOk('connection failure: WebSocket is not defined')).toBe(false);
     expect(relayPublishMessageOk('blocked: policy')).toBe(false);
   });

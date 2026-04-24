@@ -56,6 +56,9 @@ Use `--relays` here when the PWA was opened with a POS profile that overrides
 the default relay set; pairing announcements are discovered by the indexed `d`
 tag on kind `30383`.
 
+If a relay returns `duplicate` during publish, it already has that event. The
+controller treats that as accepted so activation retries are safe.
+
 4. The controller authorizes the terminal and signs the approval:
 
 ```bash

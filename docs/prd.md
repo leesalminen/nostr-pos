@@ -3477,6 +3477,9 @@ verification evidence stay close to the source of truth.
   tags only: pairing announcements are queried by `#d`, and terminal-addressed
   payment status/receipt history is queried by `#p` instead of custom
   multi-character filters such as `#pairing` or `#terminal`.
+- Relay publish retries now treat NIP-20 `duplicate` responses as idempotent
+  success. If a relay already has the exact event id, the activation or sync
+  retry should continue instead of failing the publish step.
 
 ### Known follow-ups
 

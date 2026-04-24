@@ -45,6 +45,43 @@ void main() {
     await server.close(force: true);
   });
 
+  test('treats duplicate relay publishes as accepted', () async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    final event = signNostrPosEvent(
+      buildUnsignedEvent(
+        pubkey: publicKeyFromPrivateKey(
+          '0000000000000000000000000000000000000000000000000000000000000001',
+        ),
+        kind: NostrPosKinds.posProfile,
+        tags: [
+          ['d', 'seguras'],
+        ],
+        content: {'name': 'Counter 1'},
+        createdAt: 1000,
+      ),
+      '0000000000000000000000000000000000000000000000000000000000000001',
+    );
+    unawaited(
+      server.forEach((request) async {
+        final socket = await WebSocketTransformer.upgrade(request);
+        await for (final message in socket) {
+          final decoded = jsonDecode(message as String) as List<Object?>;
+          expect(decoded[0], 'EVENT');
+          socket.add(
+            jsonEncode(['OK', event.id, false, 'duplicate: already have it']),
+          );
+        }
+      }),
+    );
+
+    final relayUrl = 'ws://${server.address.host}:${server.port}';
+    final result = await publishEventToRelays(relays: [relayUrl], event: event);
+
+    expect(result.single.ok, isTrue);
+    expect(result.single.message, 'duplicate: already have it');
+    await server.close(force: true);
+  });
+
   test('queries pairing announcements from a relay websocket', () async {
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     final event = buildPairingAnnouncement(
