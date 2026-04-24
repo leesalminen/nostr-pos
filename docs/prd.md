@@ -1050,7 +1050,7 @@ Sync servers (3 configured, 3 healthy)
   [Add server]  [Remove]
 
 Liquid backend
-  https://blockstream.info/liquid/api
+  https://liquid.bullbitcoin.com/api
 
 Swap provider
   https://api.boltz.exchange
@@ -1168,7 +1168,7 @@ Content:
     "wss://nos.lol"
   ],
   "liquid_backends": [
-    { "type": "esplora", "url": "https://blockstream.info/liquid/api" }
+    { "type": "esplora", "url": "https://liquid.bullbitcoin.com/api" }
   ],
   "swap_providers": [
     { "id": "boltz-mainnet",
@@ -1242,7 +1242,7 @@ Encrypted content (NIP-44 v2) to terminal:
       "supports_covenants": true }
   ],
   "liquid_backends": [
-    { "type": "esplora", "url": "https://blockstream.info/liquid/api" }
+    { "type": "esplora", "url": "https://liquid.bullbitcoin.com/api" }
   ],
   "merchant_recovery_pubkey": "<hex>",
   "expires_at": 1777600000

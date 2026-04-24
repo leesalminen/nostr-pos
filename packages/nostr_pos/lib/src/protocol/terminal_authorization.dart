@@ -58,7 +58,7 @@ class TerminalAuthorization {
       },
     ],
     'liquid_backends': [
-      {'type': 'esplora', 'url': 'https://blockstream.info/liquid/api'},
+      {'type': 'esplora', 'url': 'https://liquid.bullbitcoin.com/api'},
     ],
     'merchant_recovery_pubkey': merchantRecoveryPubkey,
     'expires_at': expiresAt,

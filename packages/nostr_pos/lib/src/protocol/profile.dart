@@ -40,7 +40,7 @@ class PosProfile {
     ],
     'relays': relays,
     'liquid_backends': [
-      {'type': 'esplora', 'url': 'https://blockstream.info/liquid/api'},
+      {'type': 'esplora', 'url': 'https://liquid.bullbitcoin.com/api'},
     ],
     'swap_providers': [
       {

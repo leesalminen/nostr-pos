@@ -29,7 +29,7 @@
     "wss://nos.lol"
   ],
   "liquid_backends": [
-    { "type": "esplora", "url": "https://blockstream.info/liquid/api" }
+    { "type": "esplora", "url": "https://liquid.bullbitcoin.com/api" }
   ],
   "swap_providers": [
     {

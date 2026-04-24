@@ -100,5 +100,5 @@ dart run bin/nostr_pos.dart recover-swaps \
   --relays wss://no.str.cr,wss://relay.primal.net,wss://nos.lol \
   --merchant-recovery-privkey <merchant-recovery-private-key-hex> \
   --broadcast-prepared \
-  --liquid-api https://blockstream.info/liquid/api
+  --liquid-api https://liquid.bullbitcoin.com/api
 ```

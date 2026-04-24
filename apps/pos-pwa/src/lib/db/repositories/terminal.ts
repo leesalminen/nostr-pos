@@ -32,7 +32,7 @@ export function defaultTerminalConfig(): TerminalConfig {
     terminalPrivkeyEnc: keys.privateKey,
     pairingCode: pairingCodeFromPubkey(keys.publicKey),
     authorization: {
-      liquid_backends: [{ type: 'esplora', url: 'https://blockstream.info/liquid/api' }]
+      liquid_backends: [{ type: 'esplora', url: 'https://liquid.bullbitcoin.com/api' }]
     },
     maxInvoiceSat: 100000,
     syncServers: ['wss://no.str.cr', 'wss://relay.primal.net', 'wss://nos.lol']
