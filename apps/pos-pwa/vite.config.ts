@@ -1,13 +1,21 @@
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
+import wasm from 'vite-plugin-wasm';
 
 export default defineConfig({
+  build: {
+    target: 'esnext'
+  },
   plugins: [
+    wasm(),
     svelte(),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg'],
+      workbox: {
+        maximumFileSizeToCacheInBytes: 12 * 1024 * 1024
+      },
       manifest: {
         name: 'Retail POS',
         short_name: 'POS',

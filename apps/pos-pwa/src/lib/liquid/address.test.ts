@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { deriveLiquidAddress, liquidBip21 } from './address';
 import type { TerminalConfig } from '../pos/types';
 
@@ -14,12 +14,24 @@ const config: TerminalConfig = {
 };
 
 describe('Liquid address adapter', () => {
-  it('derives a stable terminal-scoped address', () => {
-    expect(deriveLiquidAddress(config, 42)).toEqual({
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('keeps deterministic fallback addresses for dev/test harnesses', async () => {
+    await expect(deriveLiquidAddress(config, 42)).resolves.toEqual({
       address: 'tex1q23cf0f49b6112a000000000000000000000000',
       addressIndex: 42,
       terminalBranch: 17
     });
+  });
+
+  it('requires a descriptor before production address derivation', async () => {
+    vi.stubEnv('PROD', true);
+
+    await expect(deriveLiquidAddress(config, 42)).rejects.toThrow(
+      'Liquid descriptor is required'
+    );
   });
 
   it('creates BIP21 payloads in BTC units', () => {

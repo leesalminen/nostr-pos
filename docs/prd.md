@@ -3334,6 +3334,10 @@ verification evidence stay close to the source of truth.
   publish sale-created, payment-status, receipt, or recovery-backup records
   unless the merchant recovery key is available, keeping plaintext accounting
   compatibility limited to dev/test flows.
+- Added the LWK WASM dependency to the PWA address path: production builds now
+  require an authorized `ct_descriptor` and derive Liquid receive addresses
+  through `WolletDescriptor`/`Wollet`; the deterministic `tex1q...` address
+  generator remains only as a dev/test harness fallback.
 - CI now runs `dart analyze` for the Dart SDK as well as the CLI so relay,
   signing, and recovery SDK code gets static checks on every push.
 - README now documents the current smoke commands and the live relay-backed

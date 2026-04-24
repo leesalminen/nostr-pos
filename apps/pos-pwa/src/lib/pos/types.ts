@@ -87,8 +87,17 @@ export type LiquidBackend = {
 };
 
 export type TerminalAuthorization = {
+  ct_descriptor?: string;
+  descriptor_fingerprint?: string;
   liquid_backends?: LiquidBackend[];
   merchant_recovery_pubkey?: string;
+  swap_providers?: {
+    id: string;
+    type: 'boltz';
+    api_base: string;
+    ws_url?: string;
+    supports_covenants?: boolean;
+  }[];
   settlement?: {
     terminal_branch?: number;
   };

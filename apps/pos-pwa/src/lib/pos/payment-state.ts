@@ -62,7 +62,7 @@ export async function createSale(
 
   const now = Date.now();
   const addressIndex = await reserveAddressIndex();
-  const liquid = deriveLiquidAddress(config, addressIndex);
+  const liquid = await deriveLiquidAddress(config, addressIndex);
   const swapProvider = new MockBoltzReverseSwapProvider();
   const swap = await swapProvider.createReverseSwap({
     saleId: ulid(now + 2),
