@@ -23,14 +23,19 @@
   async function shareReceipt() {
     await navigator.share?.({ title: 'Receipt', url: location.href });
   }
+
+  function goBack() {
+    if (history.length > 1) history.back();
+    else location.hash = '#/';
+  }
 </script>
 
 <main class="min-h-screen bg-[#f5f0e8] px-5 py-5 text-[#211f1a] dark:bg-[#161512] dark:text-[#fff6e8]">
   <div class="no-print mx-auto mb-5 flex max-w-xl items-center justify-between">
-    <a class="inline-flex min-h-12 items-center gap-2 rounded-md font-bold" href="#/">
+    <button class="inline-flex min-h-12 items-center gap-2 rounded-md font-bold" onclick={goBack}>
       <ArrowLeft size={21} />
-      New sale
-    </a>
+      Back
+    </button>
     <div class="flex gap-2">
       <Button variant="secondary" onclick={() => window.print()}><Printer size={18} />Print</Button>
       <Button variant="ghost" onclick={shareReceipt}><Share2 size={18} />Share</Button>
