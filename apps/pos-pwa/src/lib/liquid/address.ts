@@ -6,8 +6,10 @@ export type DerivedLiquidAddress = {
   terminalBranch: number;
 };
 
-function authorizationDescriptor(config: TerminalConfig): string | undefined {
-  const descriptor = config.authorization?.ct_descriptor;
+export function authorizationDescriptor(config: TerminalConfig): string | undefined {
+  const descriptor =
+    config.authorization?.settlement?.ct_descriptor ??
+    config.authorization?.ct_descriptor;
   return typeof descriptor === 'string' && descriptor.trim() ? descriptor.trim() : undefined;
 }
 

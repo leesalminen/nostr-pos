@@ -112,7 +112,11 @@ export type TerminalAuthorization = {
     supports_covenants?: boolean;
   }[];
   settlement?: {
+    type?: 'liquid_ct_descriptor';
+    ct_descriptor?: string;
+    descriptor_fingerprint?: string;
     terminal_branch?: number;
+    lookahead?: number;
   };
   [key: string]: unknown;
 };

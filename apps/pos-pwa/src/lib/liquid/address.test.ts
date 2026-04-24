@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { deriveLiquidAddress, liquidBip21 } from './address';
+import { authorizationDescriptor, deriveLiquidAddress, liquidBip21 } from './address';
 import type { TerminalConfig } from '../pos/types';
 
 const config: TerminalConfig = {
@@ -32,6 +32,21 @@ describe('Liquid address adapter', () => {
     await expect(deriveLiquidAddress(config, 42)).rejects.toThrow(
       'Liquid descriptor is required'
     );
+  });
+
+  it('reads descriptors from terminal authorization settlement payloads', () => {
+    expect(
+      authorizationDescriptor({
+        ...config,
+        authorization: {
+          settlement: {
+            type: 'liquid_ct_descriptor',
+            ct_descriptor: ' ct(slip77(00),elwpkh(xpub-demo/0/*)) ',
+            terminal_branch: 23
+          }
+        }
+      })
+    ).toBe('ct(slip77(00),elwpkh(xpub-demo/0/*))');
   });
 
   it('creates BIP21 payloads in BTC units', () => {

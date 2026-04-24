@@ -71,8 +71,12 @@ dart run bin/nostr_pos.dart auth-terminal \
 5. Paste the approval JSON into the PWA, or publish it with:
 
 ```bash
-dart run bin/nostr_pos.dart publish-events --kind 30381
+dart run bin/nostr_pos.dart publish-events --kind 30381 --limit 1
 ```
+
+`publish-events` sends the newest matching event first, so `--kind 30381
+--limit 1` publishes the authorization that was just created even when the
+local store contains older terminal approvals.
 
 ## Recovery Operations
 

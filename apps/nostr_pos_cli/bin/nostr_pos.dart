@@ -264,13 +264,13 @@ Future<void> _publishEvents(List<String> args) async {
       : int.parse(parsed['kind'] as String);
   final limit = int.parse(parsed['limit'] as String);
   final allEvents = await LocalEventStore(parsed['store'] as String).readAll();
-  final events = allEvents
-      .where((event) => kind == null || event.kind == kind)
-      .take(limit)
-      .toList();
+  final events =
+      allEvents.where((event) => kind == null || event.kind == kind).toList()
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+  final selected = events.take(limit).toList();
   final relays = _parseRelays(parsed['relays'] as String);
   final output = <Map<String, Object?>>[];
-  for (final event in events) {
+  for (final event in selected) {
     final results = await publishEventToRelays(relays: relays, event: event);
     output.add({
       'event_id': event.id,
@@ -418,6 +418,12 @@ Future<void> _authTerminal(List<String> args) async {
     exitCode = 66;
     return;
   }
+  final descriptor = (parsed['descriptor'] as String).trim();
+  if (descriptor.isEmpty) {
+    stderr.writeln('Liquid CT descriptor is required.');
+    exitCode = 64;
+    return;
+  }
   await store.append(pairing);
   final terminalPubkey = pairing.tags.firstWhere((tag) => tag[0] == 'p')[1];
   final authorization = TerminalAuthorization(
@@ -428,7 +434,7 @@ Future<void> _authTerminal(List<String> args) async {
     terminalPubkey: terminalPubkey,
     terminalName: parsed['terminal-name'] as String,
     pairingCodeHint: parsed['pairing-code'] as String,
-    ctDescriptor: parsed['descriptor'] as String,
+    ctDescriptor: descriptor,
     descriptorFingerprint: parsed['fingerprint'] as String,
     terminalBranch: int.parse(parsed['branch'] as String),
     merchantRecoveryPubkey: parsed['merchant-recovery-pubkey'] as String,

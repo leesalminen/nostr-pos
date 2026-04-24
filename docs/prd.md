@@ -3480,6 +3480,12 @@ verification evidence stay close to the source of truth.
 - Relay publish retries now treat NIP-20 `duplicate` responses as idempotent
   success. If a relay already has the exact event id, the activation or sync
   retry should continue instead of failing the publish step.
+- Controller `publish-events --kind ... --limit ...` publishes newest matching
+  events first so activation commands do not accidentally relay an older
+  terminal authorization from a reused local store.
+- Terminal address derivation now reads the PRD/schema-native nested
+  `settlement.ct_descriptor` field from kind-30381 authorization payloads;
+  legacy top-level `ct_descriptor` remains a compatibility fallback only.
 
 ### Known follow-ups
 
