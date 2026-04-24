@@ -181,8 +181,9 @@
       method === 'liquid'
         ? (attempt.liquidPaymentData ?? paymentPayload('liquid', sale.amountSat, sale.id, attempt.liquidAddress))
         : (attempt.lightningInvoice ?? paymentPayload('lightning_swap', sale.amountSat, sale.id, attempt.liquidAddress));
-    attempt = { ...attempt, method, paymentData, updatedAt: Date.now() };
-    await putAttempt(attempt);
+    const nextAttempt: PaymentAttempt = { ...attempt, method, paymentData, updatedAt: Date.now() };
+    await putAttempt(nextAttempt);
+    attempt = nextAttempt;
     await refreshTransactions();
     await reconcileOpenPayments({ now: Date.now() });
   }
@@ -191,13 +192,14 @@
     if (!attempt || !sale || tabReadOnly) return;
     boltCardPending = true;
     boltCardMessage = 'Hold the card near the back of this device.';
-    attempt = {
+    const nextAttempt: PaymentAttempt = {
       ...attempt,
       method: 'bolt_card',
       paymentData: attempt.lightningInvoice ?? paymentPayload('lightning_swap', sale.amountSat, sale.id),
       updatedAt: Date.now()
     };
-    await putAttempt(attempt);
+    await putAttempt(nextAttempt);
+    attempt = nextAttempt;
     await refreshTransactions();
     try {
       const result = await payWithWebNfc(activePaymentData);
