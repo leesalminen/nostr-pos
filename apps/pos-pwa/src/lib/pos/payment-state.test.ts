@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { assertTerminalCanCharge, posRefForConfig, recoveryDurabilityMet } from './payment-state';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { assertTerminalCanCharge, posRefForConfig, recoveryDurabilityMet, swapProviderForConfig } from './payment-state';
 import type { TerminalConfig } from './types';
 
 const activeConfig: TerminalConfig = {
@@ -13,6 +13,10 @@ const activeConfig: TerminalConfig = {
   maxInvoiceSat: 100000,
   syncServers: []
 };
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 describe('payment preparation safety', () => {
   it('requires two backup server confirmations before showing Lightning payment data', () => {
@@ -58,5 +62,11 @@ describe('payment preparation safety', () => {
     expect(() =>
       assertTerminalCanCharge({ ...activeConfig, authorization: { expires_at: 1 } }, 2000)
     ).toThrow('expired');
+  });
+
+  it('does not fall back to mock Lightning providers in production', () => {
+    vi.stubEnv('PROD', true);
+
+    expect(() => swapProviderForConfig(activeConfig)).toThrow('Lightning is temporarily unavailable');
   });
 });

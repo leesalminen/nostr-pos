@@ -3426,6 +3426,9 @@ verification evidence stay close to the source of truth.
   production authorizations with a Boltz provider create BTC Lightning →
   L-BTC swaps with locally generated preimages and claim keys before the
   recovery durability rule exposes the invoice.
+- Production Lightning prep now fails closed when no authorized Boltz provider
+  is present instead of falling back to the deterministic mock adapter; the
+  keypad can then fall back to a Liquid charge.
 - Persisted Boltz swap ids on Lightning/Bolt Card attempts and added startup
   reconciliation against the configured swap provider, so refresh after invoice
   display can detect provider-side lockup progress and queue encrypted status
