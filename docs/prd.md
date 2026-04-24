@@ -3476,4 +3476,9 @@ verification evidence stay close to the source of truth.
 
 ### Known follow-ups
 
-- No open implementation handoff notes at this checkpoint.
+- Remaining hard gap: fill the Dart `RecoveryClaimBuilder` boundary with a
+  native Liquid/Boltz claim transaction builder. Controller recovery is
+  production-useful for prepared `claim_tx_hex` records and can use stored
+  lockup tx hex/provider data, but rebuilding a brand-new claim transaction in
+  pure Dart still requires a suitable Liquid signing stack or a Bull Wallet
+  integration point.
