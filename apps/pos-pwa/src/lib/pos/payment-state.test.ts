@@ -1,6 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { posRefForConfig, recoveryDurabilityMet } from './payment-state';
+import { assertTerminalCanCharge, posRefForConfig, recoveryDurabilityMet } from './payment-state';
 import type { TerminalConfig } from './types';
+
+const activeConfig: TerminalConfig = {
+  merchantName: 'Merchant',
+  posName: 'Counter',
+  currency: 'CRC',
+  terminalId: 'term1',
+  terminalPubkey: 'a'.repeat(64),
+  pairingCode: '4F7G-YJDP',
+  activatedAt: 1000,
+  maxInvoiceSat: 100000,
+  syncServers: []
+};
 
 describe('payment preparation safety', () => {
   it('requires two backup server confirmations before showing Lightning payment data', () => {
@@ -26,14 +38,7 @@ describe('payment preparation safety', () => {
 
   it('uses loaded POS profile coordinates for sale records', () => {
     const config: TerminalConfig = {
-      merchantName: 'Merchant',
-      posName: 'Counter',
-      currency: 'CRC',
-      terminalId: 'term1',
-      terminalPubkey: 'a'.repeat(64),
-      pairingCode: '4F7G-YJDP',
-      maxInvoiceSat: 100000,
-      syncServers: [],
+      ...activeConfig,
       posProfile: {
         merchantPubkey: 'b'.repeat(64),
         posId: 'seguras',
@@ -44,5 +49,14 @@ describe('payment preparation safety', () => {
     };
 
     expect(posRefForConfig(config)).toBe(`30380:${'b'.repeat(64)}:seguras`);
+  });
+
+  it('refuses to charge inactive, removed, or expired terminals', () => {
+    expect(() => assertTerminalCanCharge(activeConfig, 2000)).not.toThrow();
+    expect(() => assertTerminalCanCharge({ ...activeConfig, activatedAt: undefined }, 2000)).toThrow('owner approval');
+    expect(() => assertTerminalCanCharge({ ...activeConfig, revokedAt: 1500 }, 2000)).toThrow('removed');
+    expect(() =>
+      assertTerminalCanCharge({ ...activeConfig, authorization: { expires_at: 1 } }, 2000)
+    ).toThrow('expired');
   });
 });

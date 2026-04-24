@@ -35,6 +35,17 @@ export function posRefForConfig(config: TerminalConfig): string {
   return config.posProfile ? `30380:${config.posProfile.merchantPubkey}:${config.posProfile.posId}` : 'pilot-seguras-butcher';
 }
 
+export function assertTerminalCanCharge(config: TerminalConfig, now = Date.now()): void {
+  if (!config.activatedAt) throw new Error('This terminal needs owner approval before taking payments.');
+  if (config.revokedAt) throw new Error('This terminal was removed by the owner.');
+  const expiresAt = config.authorization && typeof config.authorization.expires_at === 'number'
+    ? config.authorization.expires_at
+    : undefined;
+  if (expiresAt && expiresAt * 1000 <= now) {
+    throw new Error('Owner approval expired. Reconnect this terminal.');
+  }
+}
+
 export async function createSale(
   config: TerminalConfig,
   fiatAmount: string,
@@ -42,6 +53,7 @@ export async function createSale(
   note?: string,
   options: CreateSaleOptions = {}
 ) {
+  assertTerminalCanCharge(config);
   const rate = await getBullBitcoinRate(config.currency);
   const amountSat = fiatToSats(Number(fiatAmount), rate);
   if (amountSat > config.maxInvoiceSat) {

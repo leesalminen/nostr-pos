@@ -3284,6 +3284,9 @@ verification evidence stay close to the source of truth.
 - Linked terminal sale/status/receipt records to the loaded POS profile
   coordinate, so relay/accounting history carries the required profile `a` tag
   instead of the previous pilot placeholder reference.
+- Added terminal-charge safety checks before invoice preparation: inactive,
+  owner-removed, and expired-authorization terminals now fail before a sale or
+  payment request is created.
 - CI now runs `dart analyze` for the Dart SDK as well as the CLI so relay,
   signing, and recovery SDK code gets static checks on every push.
 - README now documents the current smoke commands and the live relay-backed
