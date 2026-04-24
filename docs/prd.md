@@ -3240,6 +3240,10 @@ verification evidence stay close to the source of truth.
   the sale/payment attempt before navigation, the payment screen routes by
   sale id, and refresh resumes the existing attempt instead of creating a
   duplicate swap or ledger record.
+- Integrated relays into pairing activation: the PWA now queues and immediately
+  publishes the terminal approval request to the configured backup servers, and
+  the Dart SDK/CLI can fetch that pairing announcement from relays by pairing
+  code for controller authorization.
 
 ### Known follow-ups
 

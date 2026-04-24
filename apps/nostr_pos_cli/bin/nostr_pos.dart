@@ -4,10 +4,17 @@ import 'dart:io';
 import 'package:args/args.dart';
 import 'package:nostr_pos/nostr_pos.dart';
 
+const defaultRelays = [
+  'wss://no.str.cr',
+  'wss://relay.primal.net',
+  'wss://nos.lol',
+];
+
 void main(List<String> args) async {
   final parser = ArgParser()
     ..addCommand('create-pos')
     ..addCommand('pairing-code')
+    ..addCommand('fetch-pairing')
     ..addCommand('announce-terminal')
     ..addCommand('auth-terminal')
     ..addCommand('revoke-terminal')
@@ -31,6 +38,8 @@ void main(List<String> args) async {
       await _createPos(rest);
     case 'pairing-code':
       _pairingCode(rest);
+    case 'fetch-pairing':
+      await _fetchPairing(rest);
     case 'announce-terminal':
       await _announceTerminal(rest);
     case 'auth-terminal':
@@ -53,6 +62,15 @@ void main(List<String> args) async {
       stdout.writeln(parser.usage);
       exitCode = 64;
   }
+}
+
+List<String> _parseRelays(String value) {
+  if (value.trim().isEmpty) return const [];
+  return value
+      .split(',')
+      .map((relay) => relay.trim())
+      .where((relay) => relay.isNotEmpty)
+      .toList();
 }
 
 Future<void> _listSales(List<String> args) async {
@@ -129,6 +147,25 @@ void _pairingCode(List<String> args) {
   stdout.writeln(pairingCodeFromPubkey(parsed['terminal-pubkey'] as String));
 }
 
+Future<void> _fetchPairing(List<String> args) async {
+  final parser = ArgParser()
+    ..addOption('pairing-code', mandatory: true)
+    ..addOption('relays', defaultsTo: defaultRelays.join(','));
+  final parsed = parser.parse(args);
+  final event = await findPairingAnnouncement(
+    relays: _parseRelays(parsed['relays'] as String),
+    pairingCode: parsed['pairing-code'] as String,
+  );
+  if (event == null) {
+    stderr.writeln(
+      'No terminal announced that pairing code on the configured relays.',
+    );
+    exitCode = 66;
+    return;
+  }
+  stdout.writeln(const JsonEncoder.withIndent('  ').convert(event.toJson()));
+}
+
 Future<void> _announceTerminal(List<String> args) async {
   final parser = ArgParser()
     ..addOption('terminal-pubkey', mandatory: true)
@@ -154,19 +191,32 @@ Future<void> _authTerminal(List<String> args) async {
     )
     ..addOption('fingerprint', defaultsTo: 'demo-fingerprint')
     ..addOption('branch', defaultsTo: '17')
+    ..addOption(
+      'relays',
+      help:
+          'Comma-separated relays to search if the local store has no pairing announcement.',
+    )
     ..addOption('store', defaultsTo: '.nostr-pos/events.jsonl');
   final parsed = parser.parse(args);
   final store = LocalEventStore(parsed['store'] as String);
-  final pairing = await store.latestByTag(
-    kind: NostrPosKinds.pairingAnnouncement,
-    tagName: 'pairing',
-    tagValue: parsed['pairing-code'] as String,
-  );
+  final pairing =
+      await store.latestByTag(
+        kind: NostrPosKinds.pairingAnnouncement,
+        tagName: 'pairing',
+        tagValue: parsed['pairing-code'] as String,
+      ) ??
+      (parsed['relays'] == null
+          ? null
+          : await findPairingAnnouncement(
+              relays: _parseRelays(parsed['relays'] as String),
+              pairingCode: parsed['pairing-code'] as String,
+            ));
   if (pairing == null) {
     stderr.writeln('No terminal announced that pairing code.');
     exitCode = 66;
     return;
   }
+  await store.append(pairing);
   final terminalPubkey = pairing.tags.firstWhere((tag) => tag[0] == 'p')[1];
   final authorization = TerminalAuthorization(
     posRef: posRef(

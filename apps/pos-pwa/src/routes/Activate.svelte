@@ -10,11 +10,15 @@
   let approvalText = $state('');
   let approvalError = $state('');
   let applying = $state(false);
+  let requestMessage = $state('Preparing approval request...');
   const isDev = import.meta.env.DEV;
 
   onMount(async () => {
     const config = await loadTerminal();
-    await announcePairingRequest(config);
+    const result = await announcePairingRequest(config);
+    requestMessage = result.published
+      ? 'Ready for owner approval.'
+      : 'Approval request saved. Connect to the internet, then try Sync now in Advanced.';
     announced = true;
   });
 
@@ -41,7 +45,7 @@
       {$terminal?.pairingCode ?? '4F7G-YJDP'}
     </div>
     <p class="mb-5 text-sm text-[#776b5a] dark:text-[#b9aa91]">
-      {announced ? 'Waiting for owner approval.' : 'Preparing approval request...'}
+      {announced ? requestMessage : 'Preparing approval request...'}
     </p>
     <div class="mb-5 text-left">
       <label class="text-sm font-bold" for="approval-json">Approval JSON</label>
