@@ -2,23 +2,31 @@
   let { width = 140 }: { width?: number } = $props();
 </script>
 
-<div class="flex justify-center py-4 opacity-70">
-  <picture>
-    <source srcset="/bb-logo.webp" type="image/webp" />
+<div class="flex justify-center py-4">
+  <a
+    href="https://bullbitcoin.com"
+    target="_blank"
+    rel="noopener noreferrer"
+    aria-label="Bull Bitcoin"
+    class="inline-block transition hover:opacity-80"
+  >
     <img
-      src="/bull-bitcoin-banner-logo.png"
+      src="/bb-logo-light.png"
       alt="Bull Bitcoin"
-      class="bb-banner"
+      class="bb-banner block dark:hidden"
       {width}
-      height={Math.round(width / 4)}
     />
-  </picture>
+    <img
+      src="/bb-logo-dark.png"
+      alt="Bull Bitcoin"
+      class="bb-banner hidden dark:block"
+      {width}
+    />
+  </a>
 </div>
 
 <style>
-  @media (prefers-color-scheme: dark) {
-    .bb-banner {
-      filter: invert(1) hue-rotate(180deg);
-    }
+  .bb-banner {
+    height: auto;
   }
 </style>
