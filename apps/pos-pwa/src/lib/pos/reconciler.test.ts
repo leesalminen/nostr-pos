@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { PaymentAttempt, Receipt, Sale, TerminalConfig } from './types';
+import type { PaymentAttempt, Receipt, Sale, SwapRecoveryRecord, TerminalConfig } from './types';
 
 const sales = new Map<string, Sale>();
 const attempts = new Map<string, PaymentAttempt>();
 const receipts = new Map<string, Receipt>();
+const recoveries = new Map<string, SwapRecoveryRecord>();
 const outbox: unknown[] = [];
 let config: TerminalConfig | undefined;
 
@@ -12,7 +13,9 @@ vi.mock('../db/repositories/ledger', () => ({
   getSale: vi.fn((id: string) => sales.get(id)),
   getAttempt: vi.fn((id: string) => attempts.get(id)),
   getReceiptBySale: vi.fn((saleId: string) => Array.from(receipts.values()).find((receipt) => receipt.saleId === saleId)),
+  getRecoveryBySwap: vi.fn((swapId: string) => recoveries.get(swapId)),
   putAttempt: vi.fn((attempt: PaymentAttempt) => attempts.set(attempt.id, attempt)),
+  putRecovery: vi.fn((record: SwapRecoveryRecord) => recoveries.set(record.swapId, record)),
   putReceipt: vi.fn((receipt: Receipt) => receipts.set(receipt.id, receipt)),
   putSale: vi.fn((sale: Sale) => sales.set(sale.id, sale)),
   putOutbox: vi.fn((item: unknown) => outbox.push(item))
@@ -27,6 +30,7 @@ describe('startup reconciliation', () => {
     sales.clear();
     attempts.clear();
     receipts.clear();
+    recoveries.clear();
     outbox.length = 0;
     config = undefined;
   });
@@ -155,6 +159,16 @@ describe('startup reconciliation', () => {
       updatedAt: 0,
       expiresAt: 100
     });
+    recoveries.set('swap4', {
+      saleId: 'sale4',
+      paymentAttemptId: 'attempt4',
+      swapId: 'swap4',
+      encryptedLocalBlob: 'ciphertext',
+      localSavedAt: 0,
+      okFrom: ['wss://one', 'wss://two'],
+      expiresAt: 100,
+      status: 'pending'
+    });
 
     await expect(
       reconcileOpenPayments({
@@ -172,6 +186,7 @@ describe('startup reconciliation', () => {
       })
     ).resolves.toBe(1);
     expect(attempts.get('attempt4')?.status).toBe('detected');
+    expect(recoveries.get('swap4')?.status).toBe('claimable');
     expect(sales.get('sale4')?.status).toBe('payment_detected');
     expect(outbox).toHaveLength(1);
   });

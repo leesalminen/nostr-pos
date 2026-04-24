@@ -3355,6 +3355,10 @@ verification evidence stay close to the source of truth.
   normalized provider statuses through the same reconciliation helper used by
   polling, queues encrypted status/receipt records, and keeps polling as the
   offline fallback.
+- Added terminal recovery state transitions for Lightning swaps: when provider
+  polling or websocket updates report lockup progress, the matching local
+  recovery record is marked `claimable`; when a claimed update is observed, the
+  recovery record moves to `claimed` alongside receipt settlement.
 - CI now runs `dart analyze` for the Dart SDK as well as the CLI so relay,
   signing, and recovery SDK code gets static checks on every push.
 - README now documents the current smoke commands and the live relay-backed

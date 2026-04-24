@@ -6,6 +6,7 @@ import type { PaymentAttempt, Sale } from './types';
 import { settleAttempt } from './settlement';
 import { swapProviderForConfig } from './payment-state';
 import type { SwapProvider, SwapStatus } from '../swaps/provider';
+import { markSwapClaimable, markSwapRecoveryFinished } from './recovery-state';
 
 export type ReconcileOptions = {
   now?: number;
@@ -80,6 +81,7 @@ export async function applySwapStatusUpdate(
 ): Promise<{ changed: boolean; terminal: boolean }> {
   const now = options.now ?? Date.now();
   if (status === 'transaction.claimed') {
+    if (attempt.swapId) await markSwapRecoveryFinished({ swapId: attempt.swapId, claimTxid: options.txid });
     await settleAttempt({
       sale,
       attempt,
@@ -96,6 +98,9 @@ export async function applySwapStatusUpdate(
         ? 'detected'
         : undefined;
   if (!nextStatus || nextStatus === attempt.status) return { changed: false, terminal: false };
+  if (attempt.swapId && (status === 'transaction.mempool' || status === 'transaction.confirmed')) {
+    await markSwapClaimable({ swapId: attempt.swapId, claimTxid: options.txid });
+  }
   const nextAttempt: PaymentAttempt = { ...attempt, status: nextStatus, updatedAt: now };
   const nextSale: Sale = { ...sale, status: saleStatusForAttempt(nextAttempt), updatedAt: now };
   await putAttempt(nextAttempt);

@@ -33,6 +33,10 @@ export async function recoveryRecords(): Promise<SwapRecoveryRecord[]> {
   return (await getDb()).getAll('swap_recovery_records');
 }
 
+export async function getRecoveryBySwap(swapId: string): Promise<SwapRecoveryRecord | undefined> {
+  return (await getDb()).get('swap_recovery_records', swapId);
+}
+
 export async function openPaymentAttempts(): Promise<PaymentAttempt[]> {
   const attempts = await (await getDb()).getAll('payment_attempts');
   return attempts.filter((attempt) => !['settled', 'expired', 'failed'].includes(attempt.status));
