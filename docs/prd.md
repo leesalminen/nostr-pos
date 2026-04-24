@@ -3486,6 +3486,12 @@ verification evidence stay close to the source of truth.
 - Terminal address derivation now reads the PRD/schema-native nested
   `settlement.ct_descriptor` field from kind-30381 authorization payloads;
   legacy top-level `ct_descriptor` remains a compatibility fallback only.
+- Direct Liquid payment reconciliation now fails closed for confidential
+  address history: Esplora `address/<lq1>/txs` membership is only treated as a
+  candidate hit. The terminal fetches recent candidate tx hex, applies it to an
+  LWK watch-only wallet built from the authorized `settlement.ct_descriptor`,
+  and only settles after unblinding enough policy-asset L-BTC sats at the
+  expected address/index.
 
 ### Known follow-ups
 

@@ -4,8 +4,73 @@ import {
   fetchAddressTransactions,
   fetchTransactionHex,
   fetchTransactionStatus,
+  verifyConfidentialAddressPayment,
   verifyAddressPayment
 } from './esplora';
+
+vi.mock('lwk_wasm', () => {
+  class Address {
+    value: string;
+    constructor(value: string) {
+      this.value = value;
+    }
+    isMainnet() {
+      return true;
+    }
+    toUnconfidential() {
+      return new Address(this.value === 'lq1qqconfidential' ? 'ex1qtarget' : this.value);
+    }
+    toString() {
+      return this.value;
+    }
+  }
+  class Network {
+    static mainnet() {
+      return new Network();
+    }
+    static testnet() {
+      return new Network();
+    }
+    policyAsset() {
+      return { toString: () => 'policy-asset' };
+    }
+  }
+  class WolletDescriptor {
+    constructor(_descriptor: string) {}
+  }
+  class Transaction {
+    static fromString(_hex: string) {
+      return new Transaction();
+    }
+  }
+  class Wollet {
+    constructor(_network: Network, _descriptor: WolletDescriptor) {}
+    address(_index: number) {
+      return { address: () => new Address('lq1qqconfidential') };
+    }
+    applyTransaction(_tx: Transaction) {}
+    transactions() {
+      return [
+        {
+          txid: () => ({ toString: () => 'confidentialtx' }),
+          outputs: () => [
+            {
+              get: () => ({
+                wildcardIndex: () => 7,
+                address: () => new Address('lq1qqconfidential'),
+                unblinded: () => ({
+                  asset: () => ({ toString: () => 'policy-asset' }),
+                  value: () => BigInt(25_000)
+                })
+              })
+            }
+          ]
+        }
+      ];
+    }
+  }
+  return { Address, Network, Transaction, Wollet, WolletDescriptor };
+});
 
 describe('Liquid Esplora adapter', () => {
   it('fetches address transactions', async () => {
@@ -90,20 +155,9 @@ describe('Liquid Esplora adapter', () => {
     expect(result).toEqual({ detected: true, confirmed: true, receivedSat: 25_000, txid: 'tx1' });
   });
 
-  it('detects confidential address payments returned by the address endpoint', () => {
+  it('does not verify confidential address payments without unblinding amounts', () => {
     const result = verifyAddressPayment(
       [
-        {
-          txid: 'oldtx',
-          status: { confirmed: true, block_time: 100 },
-          vout: [
-            {
-              scriptpubkey_address: 'ex1qold',
-              valuecommitment: '08old',
-              assetcommitment: '0aold'
-            }
-          ]
-        },
         {
           txid: 'confidentialtx',
           status: { confirmed: true, block_time: 200 },
@@ -121,12 +175,41 @@ describe('Liquid Esplora adapter', () => {
       { minCreatedAt: 150_000 }
     );
 
-    expect(result).toEqual({
+    expect(result).toEqual({ detected: false, confirmed: false, receivedSat: 0, txid: undefined });
+  });
+
+  it('verifies confidential address payments by unblinding wallet outputs', async () => {
+    const fetcher = vi.fn(async () => ({
+      ok: true,
+      text: async () => '02000000'
+    }));
+
+    await expect(
+      verifyConfidentialAddressPayment(
+        [
+          {
+            txid: 'confidentialtx',
+            status: { confirmed: true, block_time: 200 },
+            vout: [{ scriptpubkey_address: 'ex1qunconfidential', valuecommitment: '08commitment' }]
+          }
+        ],
+        'lq1qqconfidential',
+        25_000,
+        {
+          apiBase: 'https://example.test/api',
+          descriptor: 'ct(slip77(00),elwpkh(xpub-demo/0/*))',
+          addressIndex: 7,
+          fetcher: fetcher as unknown as typeof fetch,
+          minCreatedAt: 150_000
+        }
+      )
+    ).resolves.toEqual({
       detected: true,
       confirmed: true,
       receivedSat: 25_000,
       txid: 'confidentialtx'
     });
+    expect(fetcher).toHaveBeenCalledWith('https://example.test/api/tx/confidentialtx/hex');
   });
 
   it('ignores old confidential address history before the sale', () => {

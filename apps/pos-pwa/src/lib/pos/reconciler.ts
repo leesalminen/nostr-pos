@@ -1,6 +1,7 @@
 import { getAttempt, getSale, openPaymentAttempts, putAttempt, putOutbox, putSale } from '../db/repositories/ledger';
 import { getTerminalConfig } from '../db/repositories/terminal';
-import { fetchAddressTransactions, verifyAddressPayment } from '../liquid/esplora';
+import { authorizationDescriptor } from '../liquid/address';
+import { fetchAddressTransactions, verifyAddressPayment, verifyConfidentialAddressPayment } from '../liquid/esplora';
 import { paymentStatusEvent } from '../nostr/events';
 import type { PaymentAttempt, Sale } from './types';
 import { claimLiquidReverseSwap } from './claim-engine';
@@ -42,7 +43,17 @@ async function verifyLiquidAttempt(
 
   try {
     const transactions = await fetchAddressTransactions(backend.url, attempt.liquidAddress, options.fetcher ?? fetch);
-    const verification = verifyAddressPayment(transactions, attempt.liquidAddress, sale.amountSat, { minCreatedAt: sale.createdAt });
+    let verification = verifyAddressPayment(transactions, attempt.liquidAddress, sale.amountSat, { minCreatedAt: sale.createdAt });
+    const descriptor = config ? authorizationDescriptor(config) : undefined;
+    if (!verification.detected && descriptor) {
+      verification = await verifyConfidentialAddressPayment(transactions, attempt.liquidAddress, sale.amountSat, {
+        apiBase: backend.url,
+        descriptor,
+        addressIndex: attempt.addressIndex,
+        fetcher: options.fetcher,
+        minCreatedAt: sale.createdAt
+      });
+    }
     if (!verification.detected) return { changed: false, terminal: false };
     await settleAttempt({
       sale,

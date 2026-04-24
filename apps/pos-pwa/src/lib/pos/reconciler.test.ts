@@ -191,7 +191,7 @@ describe('startup reconciliation', () => {
     expect(outbox).toHaveLength(2);
   });
 
-  it('settles confidential Liquid address hits without visible output amounts', async () => {
+  it('does not settle confidential Liquid address hits without verified unblinded amounts', async () => {
     const { reconcileOpenPayments } = await import('./reconciler');
     config = {
       merchantName: 'Merchant',
@@ -246,13 +246,13 @@ describe('startup reconciliation', () => {
       )
     );
 
-    await expect(reconcileOpenPayments({ now: 220_000, fetcher })).resolves.toBe(1);
+    await expect(reconcileOpenPayments({ now: 220_000, fetcher })).resolves.toBe(0);
     expect(attempts.get('attempt-confidential')).toMatchObject({
       method: 'liquid',
-      status: 'settled',
-      settlementTxid: 'confidentialtx'
+      status: 'waiting'
     });
-    expect(sales.get('sale-confidential')?.status).toBe('receipt_ready');
+    expect(attempts.get('attempt-confidential')?.settlementTxid).toBeUndefined();
+    expect(sales.get('sale-confidential')?.status).toBe('payment_ready');
   });
 
   it('marks Lightning swaps detected by the provider after refresh', async () => {

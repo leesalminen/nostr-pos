@@ -27,6 +27,13 @@ export type PaymentVerificationOptions = {
   minCreatedAt?: number;
 };
 
+export type ConfidentialPaymentVerificationOptions = PaymentVerificationOptions & {
+  apiBase: string;
+  descriptor: string;
+  addressIndex?: number;
+  fetcher?: typeof fetch;
+};
+
 export async function fetchAddressTransactions(apiBase: string, address: string, fetcher: typeof fetch = fetch): Promise<EsploraTx[]> {
   const response = await fetcher(`${apiBase.replace(/\/$/, '')}/address/${address}/txs`);
   if (!response.ok) throw new Error("Can't verify Liquid payments right now.");
@@ -94,17 +101,68 @@ export function verifyAddressPayment(
       confirmed ||= Boolean(tx.status?.confirmed);
     }
   }
-  if (receivedSat < expectedSat && isConfidentialAddress(address)) {
-    const confidentialHit = transactions.find((tx) => txIsRecentEnough(tx, options.minCreatedAt));
-    if (confidentialHit) {
-      return {
-        detected: true,
-        confirmed: Boolean(confidentialHit.status?.confirmed),
-        receivedSat: expectedSat,
-        txid: confidentialHit.txid
-      };
+  return {
+    detected: receivedSat >= expectedSat,
+    confirmed: receivedSat >= expectedSat && confirmed,
+    receivedSat,
+    txid
+  };
+}
+
+export async function verifyConfidentialAddressPayment(
+  transactions: EsploraTx[],
+  address: string,
+  expectedSat: number,
+  options: ConfidentialPaymentVerificationOptions
+): Promise<PaymentVerification> {
+  if (!isConfidentialAddress(address)) {
+    return verifyAddressPayment(transactions, address, expectedSat, options);
+  }
+
+  const { Address, Network, Transaction, Wollet, WolletDescriptor } = await import('lwk_wasm');
+  const target = new Address(address);
+  const targetUnconfidential = target.toUnconfidential().toString();
+  const descriptor = new WolletDescriptor(options.descriptor);
+  const network = target.isMainnet() ? Network.mainnet() : Network.testnet();
+  const wallet = new Wollet(network, descriptor);
+  const policyAsset = network.policyAsset().toString();
+
+  if (options.addressIndex !== undefined) {
+    const derived = wallet.address(options.addressIndex).address();
+    if (derived.toString() !== address && derived.toUnconfidential().toString() !== targetUnconfidential) {
+      return { detected: false, confirmed: false, receivedSat: 0 };
     }
   }
+
+  let receivedSat = 0;
+  let confirmed = false;
+  let txid: string | undefined;
+  for (const tx of transactions) {
+    if (!txIsRecentEnough(tx, options.minCreatedAt)) continue;
+    let walletTx;
+    try {
+      const txHex = await fetchTransactionHex(options.apiBase, tx.txid, options.fetcher ?? fetch);
+      const transaction = Transaction.fromString(txHex);
+      wallet.applyTransaction(transaction);
+      walletTx = wallet.transactions().find((candidate) => candidate.txid().toString() === tx.txid);
+    } catch {
+      continue;
+    }
+    if (!walletTx) continue;
+    for (const output of walletTx.outputs()) {
+      const walletOutput = output.get();
+      if (!walletOutput) continue;
+      if (options.addressIndex !== undefined && walletOutput.wildcardIndex() !== options.addressIndex) continue;
+      const outputAddress = walletOutput.address();
+      if (outputAddress.toString() !== address && outputAddress.toUnconfidential().toString() !== targetUnconfidential) continue;
+      const unblinded = walletOutput.unblinded();
+      if (unblinded.asset().toString() !== policyAsset) continue;
+      receivedSat += Number(unblinded.value());
+      txid ??= tx.txid;
+      confirmed ||= Boolean(tx.status?.confirmed);
+    }
+  }
+
   return {
     detected: receivedSat >= expectedSat,
     confirmed: receivedSat >= expectedSat && confirmed,
