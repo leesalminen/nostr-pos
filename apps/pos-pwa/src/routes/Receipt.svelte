@@ -7,6 +7,7 @@
   import type { PaymentAttempt, Sale } from '../lib/pos/types';
   import { getAttempt, getSale } from '../lib/db/repositories/ledger';
   import { loadTerminal, terminal } from '../lib/stores/terminal';
+  import { markReceiptPrinted } from '../lib/pos/receipt';
 
   let { params = {} }: { params?: { saleId?: string } } = $props();
 
@@ -25,6 +26,11 @@
     await navigator.share?.({ title: 'Receipt', url: location.href });
   }
 
+  async function printReceipt() {
+    if (sale) await markReceiptPrinted(sale.id);
+    window.print();
+  }
+
   function goBack() {
     if (history.length > 1) history.back();
     else location.hash = '#/';
@@ -38,7 +44,7 @@
       Back
     </button>
     <div class="flex gap-2">
-      <Button variant="secondary" onclick={() => window.print()}><Printer size={18} />Print</Button>
+      <Button variant="secondary" onclick={printReceipt}><Printer size={18} />Print</Button>
       <Button variant="ghost" onclick={shareReceipt}><Share2 size={18} />Share</Button>
     </div>
   </div>

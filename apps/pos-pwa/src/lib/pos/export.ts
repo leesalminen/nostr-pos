@@ -13,9 +13,10 @@ export function transactionsCsv(rows: TransactionRow[]): string {
     'status',
     'settlement_txid',
     'discount',
-    'note'
+    'note',
+    'printed_at'
   ];
-  const lines = rows.map(({ sale, attempt }) =>
+  const lines = rows.map(({ sale, attempt, receipt }) =>
     [
       sale.receiptNumber,
       new Date(sale.createdAt).toISOString(),
@@ -28,7 +29,8 @@ export function transactionsCsv(rows: TransactionRow[]): string {
       sale.status,
       attempt?.settlementTxid ?? '',
       sale.discountFiat ?? '',
-      sale.note ?? ''
+      sale.note ?? '',
+      receipt?.printedAt ? new Date(receipt.printedAt).toISOString() : ''
     ]
       .map(csvCell)
       .join(',')

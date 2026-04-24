@@ -26,12 +26,14 @@ describe('transaction CSV export', () => {
           settlementTxid: 'txid',
           createdAt: 0,
           updatedAt: 0
-        }
+        },
+        receipt: { id: 'receipt1', saleId: 'sale1', createdAt: 0, printedAt: 1000 }
       }
     ]);
 
     expect(csv).toContain('receipt_number,date,sale_id');
     expect(csv).toContain('"hello, counter"');
+    expect(csv).toContain('1970-01-01T00:00:01.000Z');
   });
 });
 
