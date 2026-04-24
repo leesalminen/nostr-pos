@@ -1,0 +1,17 @@
+{
+  "receipt_id": "R-sale-demo",
+  "sale_id": "sale-demo",
+  "created_at": 1761264030,
+  "merchant_name": "Seguras Butcher",
+  "pos_name": "Counter 1",
+  "amount": {
+    "fiat_currency": "CRC",
+    "fiat_amount": "8500",
+    "sat_amount": 25000
+  },
+  "method": "liquid",
+  "status": "settled",
+  "settlement_txid": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "note": "counter sale",
+  "discount_fiat": null
+}

@@ -1,0 +1,14 @@
+{
+  "sale_id": "sale-demo",
+  "status": "settled",
+  "method": "liquid",
+  "updated_at": 1761264020,
+  "payment": {
+    "settlement_txid": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+    "settlement_vout": null,
+    "boltz_swap_id": null,
+    "liquid_address": "tex1qdemo",
+    "address_index": 0,
+    "terminal_branch": 17
+  }
+}

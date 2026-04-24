@@ -1,0 +1,12 @@
+{
+  "sale_id": "sale-demo",
+  "created_at": 1761264000,
+  "amount": {
+    "fiat_currency": "CRC",
+    "fiat_amount": "8500",
+    "sat_amount": 25000
+  },
+  "note": "counter sale",
+  "discount_fiat": null,
+  "status": "created"
+}

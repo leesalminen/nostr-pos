@@ -1,0 +1,31 @@
+{
+  "protocol": "nostr-pos",
+  "version": 2,
+  "type": "swap_recovery",
+  "sale_id": "sale-demo",
+  "payment_attempt_id": "attempt-demo",
+  "swap_id": "swap-demo",
+  "amount": {
+    "invoice_sat": 25000,
+    "settlement_amount_sat": 24800,
+    "fiat_currency": "CRC",
+    "fiat_amount": "8500"
+  },
+  "settlement": {
+    "terminal_branch": 17,
+    "address_index": 0,
+    "address": "tex1qdemo"
+  },
+  "swap": {
+    "id": "swap-demo",
+    "invoice": "lnbc25000n1pdemo",
+    "expected_amount_sat": 24800,
+    "claim_address": "tex1qdemo"
+  },
+  "claim": {
+    "mode": "standard",
+    "preimage_revealed": false,
+    "claim_tx_hex": null,
+    "claim_txid": null
+  }
+}

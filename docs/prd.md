@@ -3225,3 +3225,6 @@ verification evidence stay close to the source of truth.
 - Added a Settings → Advanced encrypted payment-backup export so a terminal can
   hand the merchant/controller a portable recovery JSON bundle even if relay
   sync or another device is unavailable.
+- Added protocol schema validation in CI using JSON Schema test vectors for the
+  POS profile, terminal authorization, sale-created, payment-status, receipt,
+  and swap-recovery payloads.
