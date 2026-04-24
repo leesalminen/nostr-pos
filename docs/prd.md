@@ -3362,6 +3362,11 @@ verification evidence stay close to the source of truth.
 - Expanded Settings → Advanced into a practical terminal recovery center with
   visible pending, claimable, expiring-soon, failed, queued, and recent recovery
   record state instead of only exposing raw backup/export counts.
+- Added encrypted relay-history merge on the terminal: cashier startup and
+  payment-screen reconciliation fetch kind-9382/9383 records tagged to the
+  terminal, decrypt terminal-authored records via the merchant recovery
+  conversation key or merchant-authored records via the signer key, and merge
+  known sale status/receipt updates back into IndexedDB.
 - CI now runs `dart analyze` for the Dart SDK as well as the CLI so relay,
   signing, and recovery SDK code gets static checks on every push.
 - README now documents the current smoke commands and the live relay-backed
