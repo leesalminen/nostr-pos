@@ -9,6 +9,7 @@
   import { refreshTransactions } from '../lib/stores/ledger';
   import { reconcileOpenPayments } from '../lib/pos/reconciler';
   import { createSale, markReady } from '../lib/pos/payment-state';
+  import { syncQueuedRecords } from '../lib/pos/sync';
   import { syncTerminalRevocation } from '../lib/activation/revocation-sync';
 
   let amount = $state('');
@@ -46,6 +47,7 @@
       const created = await createSale(config, displayAmount, 'lightning_swap', note || undefined);
       await markReady(created.sale, created.attempt);
       await refreshTransactions();
+      void syncQueuedRecords(config);
       location.hash = `#/pos/${created.sale.id}`;
     } catch (err) {
       error = err instanceof Error ? err.message : 'Could not prepare payment. Try again.';

@@ -10,6 +10,7 @@
   import { paymentPayload, simulateSettlement } from '../lib/pos/payment-state';
   import { reconcileOpenPayments, resumeAttempt, resumeSale } from '../lib/pos/reconciler';
   import type { PaymentAttempt, PaymentMethod, Sale } from '../lib/pos/types';
+  import { syncQueuedRecords } from '../lib/pos/sync';
   import { decodeIndexPrice } from '../lib/fx/bull-bitcoin';
   import { putAttempt } from '../lib/db/repositories/ledger';
   import { formatExchangeRate, formatFiat, formatSats, statusLabel } from '../lib/util/formatting';
@@ -56,6 +57,7 @@
       sale = resumed.sale;
       attempt = resumed.attempt;
       await refreshTransactions();
+      void loadTerminal().then(syncQueuedRecords);
       if (resumed.sale.status === 'receipt_ready' || resumed.sale.status === 'settled') {
         location.replace(`#/receipt/${resumed.sale.id}`);
       }
@@ -106,6 +108,7 @@
     sale = { ...sale, status: 'receipt_ready', updatedAt: Date.now() };
     attempt = { ...selectedAttempt, status: 'settled', updatedAt: Date.now() };
     await refreshTransactions();
+    void loadTerminal().then(syncQueuedRecords);
     settling = false;
     location.replace(`#/receipt/${receipt.saleId}`);
   }

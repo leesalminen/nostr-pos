@@ -3287,6 +3287,9 @@ verification evidence stay close to the source of truth.
 - Added terminal-charge safety checks before invoice preparation: inactive,
   owner-removed, and expired-authorization terminals now fail before a sale or
   payment request is created.
+- Added best-effort automatic sync for queued sale/status/receipt records during
+  normal cashier flow; Advanced Sync remains a manual recovery control, but the
+  happy path now pushes pending records without cashier involvement.
 - CI now runs `dart analyze` for the Dart SDK as well as the CLI so relay,
   signing, and recovery SDK code gets static checks on every push.
 - README now documents the current smoke commands and the live relay-backed
