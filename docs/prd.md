@@ -3244,6 +3244,11 @@ verification evidence stay close to the source of truth.
   publishes the terminal approval request to the configured backup servers, and
   the Dart SDK/CLI can fetch that pairing announcement from relays by pairing
   code for controller authorization.
+- Replaced the mocked Lightning recovery durability shortcut with real publish
+  enforcement: Lightning/Bolt Card payment data is only returned after the
+  encrypted recovery backup is written locally and receives at least two backup
+  server confirmations; otherwise the attempt is failed before an invoice is
+  shown.
 
 ### Known follow-ups
 

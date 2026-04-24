@@ -8,7 +8,14 @@ import { deriveLiquidAddress, liquidBip21 } from '../liquid/address';
 import { MockBoltzReverseSwapProvider } from '../swaps/mock-boltz';
 import { ulid } from '../util/ulid';
 import { paymentStatusEvent, saleCreatedEvent, swapRecoveryEvent } from '../nostr/events';
+import { publishOutboxItem, type OutboxPublishReport } from '../nostr/outbox';
 import { settleAttempt } from './settlement';
+import type { OutboxItem, SwapRecoveryRecord } from './types';
+
+export type CreateSaleOptions = {
+  minRecoveryOk?: number;
+  publishRecovery?: typeof publishOutboxItem;
+};
 
 export function statusAfterDetection(method: PaymentMethod): SaleStatus {
   return method === 'liquid' ? 'settled' : 'settling';
@@ -20,7 +27,17 @@ export function paymentPayload(method: PaymentMethod, amountSat: number, saleId:
   return `lnbc${amountSat}n1p${saleId.toLowerCase()}lightning`;
 }
 
-export async function createSale(config: TerminalConfig, fiatAmount: string, method: PaymentMethod, note?: string) {
+export function recoveryDurabilityMet(report: Pick<OutboxPublishReport, 'results'>, minOk = 2): boolean {
+  return report.results.filter((result) => result.ok).length >= minOk;
+}
+
+export async function createSale(
+  config: TerminalConfig,
+  fiatAmount: string,
+  method: PaymentMethod,
+  note?: string,
+  options: CreateSaleOptions = {}
+) {
   const rate = await getBullBitcoinRate(config.currency);
   const amountSat = fiatToSats(Number(fiatAmount), rate);
   if (amountSat > config.maxInvoiceSat) {
@@ -91,8 +108,8 @@ export async function createSale(config: TerminalConfig, fiatAmount: string, met
   });
 
   if (method !== 'liquid') {
-    const okFrom = config.syncServers.slice(0, 2);
-    if (okFrom.length < 2) {
+    const minRecoveryOk = options.minRecoveryOk ?? 2;
+    if (config.syncServers.length < minRecoveryOk) {
       throw new Error('Could not safely prepare Lightning payment. Try again.');
     }
     const swapId = swap.id;
@@ -123,19 +140,18 @@ export async function createSale(config: TerminalConfig, fiatAmount: string, met
       }
     };
     const encryptedLocalBlob = await encryptJson(recoveryPayload, config.terminalId);
-    const recoveryRecord = {
+    const recoveryRecord: SwapRecoveryRecord = {
       saleId: sale.id,
       paymentAttemptId: attempt.id,
       swapId,
       encryptedLocalBlob,
       localSavedAt: Date.now(),
-      relaySavedAt: Date.now(),
-      okFrom,
+      okFrom: [],
       expiresAt: attempt.expiresAt!,
       status: 'pending'
-    } as const;
+    };
     await putRecovery(recoveryRecord);
-    await putOutbox({
+    const recoveryOutboxItem: OutboxItem = {
       id: `recovery_${swapId}`,
       type: 'payment_backup',
       payload: swapRecoveryEvent({
@@ -147,8 +163,21 @@ export async function createSale(config: TerminalConfig, fiatAmount: string, met
         expiresAt: attempt.expiresAt!
       }),
       createdAt: Date.now(),
-      okFrom
+      okFrom: []
+    };
+    await putOutbox(recoveryOutboxItem);
+    const report = await (options.publishRecovery ?? publishOutboxItem)(config, recoveryOutboxItem);
+    const okFrom = Array.from(new Set(report.results.filter((result) => result.ok).map((result) => result.relay)));
+    await putRecovery({
+      ...recoveryRecord,
+      okFrom,
+      relaySavedAt: recoveryDurabilityMet(report, minRecoveryOk) ? Date.now() : undefined
     });
+    if (!recoveryDurabilityMet(report, minRecoveryOk)) {
+      await putSale({ ...sale, status: 'failed', updatedAt: Date.now() });
+      await putAttempt({ ...attempt, status: 'failed', updatedAt: Date.now() });
+      throw new Error('Could not safely prepare Lightning payment. Try again.');
+    }
   }
 
   return { sale, attempt, rate };
