@@ -31,6 +31,9 @@ export function defaultTerminalConfig(): TerminalConfig {
     terminalPubkey: keys.publicKey,
     terminalPrivkeyEnc: keys.privateKey,
     pairingCode: pairingCodeFromPubkey(keys.publicKey),
+    authorization: {
+      liquid_backends: [{ type: 'esplora', url: 'https://blockstream.info/liquid/api' }]
+    },
     maxInvoiceSat: 100000,
     syncServers: ['wss://no.str.cr', 'wss://relay.primal.net', 'wss://nos.lol']
   };

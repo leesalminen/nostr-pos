@@ -3218,3 +3218,7 @@ verification evidence stay close to the source of truth.
 - Added signed outbox publishing, publishable recovery-backup records, queued
   pairing announcements from the activation flow, controller `recover-swaps`
   planning, and a Web NFC Bolt Card read loop wired to the LNURL-withdraw helper.
+- Wired Liquid payment verification into the terminal state machine: startup and
+  payment-screen reconciliation now poll the configured Esplora backend, settle
+  detected direct Liquid payments, create receipts, and queue status/receipt
+  records without relying on the local simulation button.

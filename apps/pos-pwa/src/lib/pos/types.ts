@@ -74,6 +74,20 @@ export type SwapRecoveryRecord = {
   status: 'pending' | 'claimable' | 'claimed' | 'failed' | 'expired';
 };
 
+export type LiquidBackend = {
+  type: 'esplora';
+  url: string;
+};
+
+export type TerminalAuthorization = {
+  liquid_backends?: LiquidBackend[];
+  merchant_recovery_pubkey?: string;
+  settlement?: {
+    terminal_branch?: number;
+  };
+  [key: string]: unknown;
+};
+
 export type TerminalConfig = {
   merchantName: string;
   posName: string;
@@ -83,7 +97,7 @@ export type TerminalConfig = {
   terminalPrivkeyEnc?: string;
   pairingCode: string;
   activatedAt?: number;
-  authorization?: unknown;
+  authorization?: TerminalAuthorization;
   maxInvoiceSat: number;
   syncServers: string[];
 };

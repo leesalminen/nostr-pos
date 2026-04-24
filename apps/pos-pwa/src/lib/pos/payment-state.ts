@@ -1,13 +1,14 @@
 import confetti from 'canvas-confetti';
 import type { PaymentAttempt, PaymentMethod, Receipt, Sale, SaleStatus, TerminalConfig } from './types';
 import { encryptJson } from '../db/crypto';
-import { putAttempt, putOutbox, putReceipt, putRecovery, putSale } from '../db/repositories/ledger';
+import { putAttempt, putOutbox, putRecovery, putSale } from '../db/repositories/ledger';
 import { reserveAddressIndex } from '../db/repositories/terminal';
 import { getBullBitcoinRate, fiatToSats } from '../fx/bull-bitcoin';
 import { deriveLiquidAddress, liquidBip21 } from '../liquid/address';
 import { MockBoltzReverseSwapProvider } from '../swaps/mock-boltz';
 import { ulid } from '../util/ulid';
-import { paymentStatusEvent, receiptEvent, saleCreatedEvent, swapRecoveryEvent } from '../nostr/events';
+import { paymentStatusEvent, saleCreatedEvent, swapRecoveryEvent } from '../nostr/events';
+import { settleAttempt } from './settlement';
 
 export function statusAfterDetection(method: PaymentMethod): SaleStatus {
   return method === 'liquid' ? 'settled' : 'settling';
@@ -167,26 +168,7 @@ export async function simulateSettlement(sale: Sale, attempt: PaymentAttempt): P
   await new Promise((resolve) => setTimeout(resolve, attempt.method === 'liquid' ? 500 : 1400));
   const settledAt = Date.now();
   const txid = crypto.randomUUID().replaceAll('-', '');
-  const finalSale = { ...sale, status: 'receipt_ready' as const, updatedAt: settledAt };
-  const finalAttempt = { ...attempt, status: 'settled' as const, settlementTxid: txid, updatedAt: settledAt };
-  await putSale(finalSale);
-  await putAttempt(finalAttempt);
-  const receipt = { id: ulid(settledAt), saleId: sale.id, createdAt: settledAt };
-  await putReceipt(receipt);
-  await putOutbox({
-    id: `status_${attempt.id}_${settledAt}`,
-    type: 'payment_status',
-    payload: paymentStatusEvent(finalSale, finalAttempt),
-    createdAt: settledAt,
-    okFrom: []
-  });
-  await putOutbox({
-    id: `receipt_${sale.id}`,
-    type: 'receipt',
-    payload: receiptEvent(finalSale, finalAttempt),
-    createdAt: settledAt,
-    okFrom: []
-  });
+  const receipt = await settleAttempt({ sale, attempt, txid, settledAt });
 
   navigator.vibrate?.(80);
   void confetti({ particleCount: 90, spread: 70, origin: { y: 0.78 } });

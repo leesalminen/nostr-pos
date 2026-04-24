@@ -8,6 +8,7 @@
   import { terminal, loadTerminal } from '../lib/stores/terminal';
   import { refreshTransactions } from '../lib/stores/ledger';
   import { createSale, markReady, paymentPayload, simulateSettlement } from '../lib/pos/payment-state';
+  import { reconcileOpenPayments, resumeAttempt } from '../lib/pos/reconciler';
   import type { PaymentAttempt, PaymentMethod, Sale } from '../lib/pos/types';
   import type { FxRate } from '../lib/fx/bull-bitcoin';
   import { decodeIndexPrice } from '../lib/fx/bull-bitcoin';
@@ -43,21 +44,48 @@
           : 'text-[#1e4e73] dark:text-[#9fc6e3]'
   );
 
-  onMount(async () => {
-    try {
-      const config = await loadTerminal();
+  onMount(() => {
+    let pollTimer: ReturnType<typeof setInterval> | undefined;
+    let stopped = false;
+
+    async function refreshPaymentState() {
+      if (!attempt || stopped) return;
+      await reconcileOpenPayments({ now: Date.now() });
+      const resumed = await resumeAttempt(attempt.id);
+      if (!resumed || stopped) return;
+      sale = resumed.sale;
+      attempt = resumed.attempt;
       await refreshTransactions();
-      const created = await createSale(config, amount, 'lightning_swap', rawNote || undefined);
-      sale = created.sale;
-      attempt = created.attempt;
-      rate = created.rate;
-      await markReady(created.sale, created.attempt);
-      sale = { ...created.sale, status: 'payment_ready' };
-      attempt = { ...created.attempt, status: 'waiting' };
-      await refreshTransactions();
-    } catch (err) {
-      error = err instanceof Error ? err.message : 'Could not prepare payment. Try again.';
+      if (resumed.sale.status === 'receipt_ready' || resumed.sale.status === 'settled') {
+        location.replace(`#/receipt/${resumed.sale.id}`);
+      }
     }
+
+    async function prepare() {
+      try {
+        const config = await loadTerminal();
+        await refreshTransactions();
+        const created = await createSale(config, amount, 'lightning_swap', rawNote || undefined);
+        sale = created.sale;
+        attempt = created.attempt;
+        rate = created.rate;
+        await markReady(created.sale, created.attempt);
+        sale = { ...created.sale, status: 'payment_ready' };
+        attempt = { ...created.attempt, status: 'waiting' };
+        await refreshTransactions();
+        pollTimer = setInterval(() => {
+          void refreshPaymentState();
+        }, 5000);
+      } catch (err) {
+        error = err instanceof Error ? err.message : 'Could not prepare payment. Try again.';
+      }
+    }
+
+    void prepare();
+    return () => {
+      stopped = true;
+      if (pollTimer) clearInterval(pollTimer);
+    };
   });
 
   async function settle() {
@@ -82,6 +110,7 @@
     attempt = { ...attempt, method, paymentData: paymentPayload(method, sale.amountSat, sale.id, attempt.liquidAddress), updatedAt: Date.now() };
     await putAttempt(attempt);
     await refreshTransactions();
+    await reconcileOpenPayments({ now: Date.now() });
   }
 
   async function startBoltCard() {
