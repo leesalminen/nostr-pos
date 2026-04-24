@@ -3319,6 +3319,10 @@ verification evidence stay close to the source of truth.
   `nostr-tools` vectors around the SDK wrapper, and switched signed
   `nostr_pos_cli auth-terminal` approvals to encrypt kind-30381 content to the
   terminal key before signing/publishing.
+- Extended controller recovery to read the terminal's NIP-59 path: the Dart SDK
+  now queries kind-1059 gift wraps, unwraps them with `ndk`, filters decrypted
+  kind-9381 recovery records, and `nostr_pos_cli recover-swaps` accepts
+  `--merchant-recovery-privkey` for relay-based claim planning.
 - CI now runs `dart analyze` for the Dart SDK as well as the CLI so relay,
   signing, and recovery SDK code gets static checks on every push.
 - README now documents the current smoke commands and the live relay-backed

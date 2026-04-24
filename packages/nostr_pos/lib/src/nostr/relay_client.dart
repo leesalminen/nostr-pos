@@ -2,6 +2,12 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:ndk/data_layer/models/nip_01_event_model.dart';
+import 'package:ndk/data_layer/repositories/signers/bip340_event_signer.dart';
+import 'package:ndk/domain_layer/entities/nip_01_event.dart';
+import 'package:ndk/domain_layer/usecases/accounts/accounts.dart';
+import 'package:ndk/domain_layer/usecases/gift_wrap/gift_wrap.dart';
+
 import '../protocol/event.dart';
 import '../protocol/kinds.dart';
 
@@ -187,25 +193,106 @@ Future<NostrPosEvent?> findPairingAnnouncement({
 Future<List<NostrPosEvent>> fetchSwapRecoveryBackups({
   required List<String> relays,
   String? recoveryPubkey,
+  String? recoveryPrivkey,
   NostrRelayClient? client,
 }) async {
-  final filter = <String, Object?>{
+  final relayClient = client ?? NostrRelayClient();
+  final legacyFilter = <String, Object?>{
     'kinds': [NostrPosKinds.swapRecoveryBackup],
     'limit': 100,
   };
   if (recoveryPubkey != null && recoveryPubkey.isNotEmpty) {
-    filter['#p'] = [recoveryPubkey];
+    legacyFilter['#p'] = [recoveryPubkey];
   }
 
-  return (await queryEventsFromRelays(
-        relays: relays,
-        filter: filter,
-        client: client,
-      ))
-      .where(
-        (event) =>
-            event.kind == NostrPosKinds.swapRecoveryBackup &&
-            event.hasProtocolTag,
-      )
-      .toList();
+  final recoveries =
+      (await queryEventsFromRelays(
+            relays: relays,
+            filter: legacyFilter,
+            client: relayClient,
+          ))
+          .where(
+            (event) =>
+                event.kind == NostrPosKinds.swapRecoveryBackup &&
+                event.hasProtocolTag,
+          )
+          .toList();
+
+  if (recoveryPrivkey != null && recoveryPrivkey.isNotEmpty) {
+    final recipientPubkey = publicKeyFromPrivateKey(recoveryPrivkey);
+    final wrapped = await queryEventsFromRelays(
+      relays: relays,
+      filter: {
+        'kinds': [NostrPosKinds.giftWrap],
+        '#p': [recoveryPubkey ?? recipientPubkey],
+        'limit': 100,
+      },
+      client: relayClient,
+    );
+    recoveries.addAll(
+      await unwrapRecoveryGiftWraps(
+        wrappedEvents: wrapped,
+        recoveryPrivkey: recoveryPrivkey,
+      ),
+    );
+  }
+
+  final byId = <String, NostrPosEvent>{};
+  for (final recovery in recoveries) {
+    byId[recovery.id] = recovery;
+  }
+  return byId.values.toList()
+    ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+}
+
+Future<List<NostrPosEvent>> unwrapRecoveryGiftWraps({
+  required List<NostrPosEvent> wrappedEvents,
+  required String recoveryPrivkey,
+}) async {
+  final signer = Bip340EventSigner(
+    privateKey: recoveryPrivkey,
+    publicKey: publicKeyFromPrivateKey(recoveryPrivkey),
+  );
+  final giftWrap = GiftWrap(accounts: Accounts());
+  final recoveries = <NostrPosEvent>[];
+  for (final wrapped in wrappedEvents) {
+    if (wrapped.kind != NostrPosKinds.giftWrap || !wrapped.idMatches) continue;
+    try {
+      final rumor = await giftWrap.fromGiftWrap(
+        giftWrap: _toNip01Event(wrapped),
+        customSigner: signer,
+      );
+      if (rumor.kind != NostrPosKinds.swapRecoveryBackup) continue;
+      final event = _fromNip01Event(rumor);
+      if (event.hasProtocolTag && event.idMatches) recoveries.add(event);
+    } catch (_) {
+      // Ignore wraps that are not decryptable by the supplied recovery key.
+    }
+  }
+  return recoveries;
+}
+
+Nip01EventModel _toNip01Event(NostrPosEvent event) {
+  return Nip01EventModel(
+    id: event.id,
+    pubKey: event.pubkey,
+    createdAt: event.createdAt,
+    kind: event.kind,
+    tags: event.tags,
+    content: event.content,
+    sig: event.sig,
+  );
+}
+
+NostrPosEvent _fromNip01Event(Nip01Event event) {
+  final id = event.id;
+  return NostrPosEvent(
+    id: id,
+    pubkey: event.pubKey,
+    createdAt: event.createdAt,
+    kind: event.kind,
+    tags: event.tags,
+    content: event.content,
+    sig: event.sig ?? 'unsigned:$id',
+  );
 }

@@ -2,6 +2,10 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:ndk/data_layer/repositories/signers/bip340_event_signer.dart';
+import 'package:ndk/domain_layer/entities/nip_01_event.dart';
+import 'package:ndk/domain_layer/usecases/accounts/accounts.dart';
+import 'package:ndk/domain_layer/usecases/gift_wrap/gift_wrap.dart';
 import 'package:nostr_pos/nostr_pos.dart';
 import 'package:test/test.dart';
 
@@ -107,6 +111,81 @@ void main() {
     );
 
     expect(found.single.id, event.id);
+    await server.close(force: true);
+  });
+
+  test('fetches and unwraps NIP-59 swap recovery backups', () async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    const terminalPrivkey =
+        '0000000000000000000000000000000000000000000000000000000000000002';
+    const recoveryPrivkey =
+        '0000000000000000000000000000000000000000000000000000000000000003';
+    final terminalPubkey = publicKeyFromPrivateKey(terminalPrivkey);
+    final recoveryPubkey = publicKeyFromPrivateKey(recoveryPrivkey);
+    final recovery = buildUnsignedEvent(
+      pubkey: terminalPubkey,
+      kind: NostrPosKinds.swapRecoveryBackup,
+      tags: [
+        ['p', recoveryPubkey],
+        ['sale', 'sale1'],
+        ['swap', 'swap1'],
+      ],
+      content: {
+        'sale_id': 'sale1',
+        'payment_attempt_id': 'attempt1',
+        'swap_id': 'swap1',
+        'expires_at': DateTime.now().millisecondsSinceEpoch ~/ 1000 + 3600,
+        'encrypted_local_blob': 'ciphertext',
+      },
+      createdAt: 1000,
+    );
+    final giftWrap = GiftWrap(accounts: Accounts());
+    final wrapped = await giftWrap.toGiftWrap(
+      rumor: Nip01Event(
+        id: recovery.id,
+        pubKey: recovery.pubkey,
+        createdAt: recovery.createdAt,
+        kind: recovery.kind,
+        tags: recovery.tags,
+        content: recovery.content,
+        sig: null,
+      ),
+      recipientPubkey: recoveryPubkey,
+      customSigner: Bip340EventSigner(
+        privateKey: terminalPrivkey,
+        publicKey: terminalPubkey,
+      ),
+    );
+    final wrappedEvent = NostrPosEvent(
+      id: wrapped.id,
+      pubkey: wrapped.pubKey,
+      createdAt: wrapped.createdAt,
+      kind: wrapped.kind,
+      tags: wrapped.tags,
+      content: wrapped.content,
+      sig: wrapped.sig!,
+    );
+
+    unawaited(
+      server.forEach((request) async {
+        final socket = await WebSocketTransformer.upgrade(request);
+        await for (final message in socket) {
+          final decoded = jsonDecode(message as String) as List<Object?>;
+          final subId = decoded[1] as String;
+          socket.add(jsonEncode(['EVENT', subId, wrappedEvent.toJson()]));
+          socket.add(jsonEncode(['EOSE', subId]));
+        }
+      }),
+    );
+
+    final relayUrl = 'ws://${server.address.host}:${server.port}';
+    final found = await fetchSwapRecoveryBackups(
+      relays: [relayUrl],
+      recoveryPrivkey: recoveryPrivkey,
+    );
+
+    expect(found.single.id, recovery.id);
+    expect(jsonDecode(found.single.content), containsPair('swap_id', 'swap1'));
     await server.close(force: true);
   });
 }

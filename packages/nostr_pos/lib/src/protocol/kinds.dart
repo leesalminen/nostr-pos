@@ -3,6 +3,7 @@ class NostrPosKinds {
   static const terminalAuthorization = 30381;
   static const terminalRevocation = 30382;
   static const pairingAnnouncement = 30383;
+  static const giftWrap = 1059;
   static const saleCreated = 9380;
   static const swapRecoveryBackup = 9381;
   static const paymentStatus = 9382;

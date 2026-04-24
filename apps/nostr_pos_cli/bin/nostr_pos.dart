@@ -123,8 +123,18 @@ Future<void> _recoverSwaps(List<String> args) async {
       help: 'Comma-separated relays to scan for recovery backups.',
     )
     ..addOption('merchant-recovery-pubkey')
+    ..addOption(
+      'merchant-recovery-privkey',
+      help: 'Private key used to unwrap NIP-59 recovery backups.',
+    )
     ..addFlag('plan', defaultsTo: true);
   final parsed = parser.parse(args);
+  final recoveryPrivkey = parsed['merchant-recovery-privkey'] as String?;
+  final recoveryPubkey =
+      parsed['merchant-recovery-pubkey'] as String? ??
+      (recoveryPrivkey == null
+          ? null
+          : publicKeyFromPrivateKey(recoveryPrivkey));
   final events = <NostrPosEvent>[
     ...await LocalEventStore(parsed['store'] as String).readAll(),
   ];
@@ -132,7 +142,8 @@ Future<void> _recoverSwaps(List<String> args) async {
     events.addAll(
       await fetchSwapRecoveryBackups(
         relays: _parseRelays(parsed['relays'] as String),
-        recoveryPubkey: parsed['merchant-recovery-pubkey'] as String?,
+        recoveryPubkey: recoveryPubkey,
+        recoveryPrivkey: recoveryPrivkey,
       ),
     );
   }
