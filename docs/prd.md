@@ -3338,6 +3338,11 @@ verification evidence stay close to the source of truth.
   require an authorized `ct_descriptor` and derive Liquid receive addresses
   through `WolletDescriptor`/`Wollet`; the deterministic `tex1q...` address
   generator remains only as a dev/test harness fallback.
+- Added a production Boltz v2 reverse-swap adapter behind the existing swap
+  provider interface. Dev/test still use the deterministic mock, while
+  production authorizations with a Boltz provider create BTC Lightning →
+  L-BTC swaps with locally generated preimages and claim keys before the
+  recovery durability rule exposes the invoice.
 - CI now runs `dart analyze` for the Dart SDK as well as the CLI so relay,
   signing, and recovery SDK code gets static checks on every push.
 - README now documents the current smoke commands and the live relay-backed

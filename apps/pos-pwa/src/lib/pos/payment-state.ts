@@ -5,7 +5,9 @@ import { putAttempt, putOutbox, putRecovery, putSale } from '../db/repositories/
 import { reserveAddressIndex } from '../db/repositories/terminal';
 import { getBullBitcoinRate, fiatToSats } from '../fx/bull-bitcoin';
 import { deriveLiquidAddress, liquidBip21 } from '../liquid/address';
+import { BoltzReverseSwapProvider } from '../swaps/boltz';
 import { MockBoltzReverseSwapProvider } from '../swaps/mock-boltz';
+import type { SwapProvider } from '../swaps/provider';
 import { ulid } from '../util/ulid';
 import { paymentStatusEvent, saleCreatedEvent, swapRecoveryEvent } from '../nostr/events';
 import { merchantRecoveryPubkey, publishOutboxItem, type OutboxPublishReport } from '../nostr/outbox';
@@ -15,6 +17,7 @@ import type { OutboxItem, SwapRecoveryRecord } from './types';
 export type CreateSaleOptions = {
   minRecoveryOk?: number;
   publishRecovery?: typeof publishOutboxItem;
+  swapProvider?: SwapProvider;
 };
 
 export function statusAfterDetection(method: PaymentMethod): SaleStatus {
@@ -46,6 +49,12 @@ export function assertTerminalCanCharge(config: TerminalConfig, now = Date.now()
   }
 }
 
+export function swapProviderForConfig(config: TerminalConfig): SwapProvider {
+  const provider = config.authorization?.swap_providers?.find((candidate) => candidate.type === 'boltz' && candidate.api_base);
+  if (provider && import.meta.env.PROD) return new BoltzReverseSwapProvider({ apiBase: provider.api_base });
+  return new MockBoltzReverseSwapProvider();
+}
+
 export async function createSale(
   config: TerminalConfig,
   fiatAmount: string,
@@ -63,7 +72,7 @@ export async function createSale(
   const now = Date.now();
   const addressIndex = await reserveAddressIndex();
   const liquid = await deriveLiquidAddress(config, addressIndex);
-  const swapProvider = new MockBoltzReverseSwapProvider();
+  const swapProvider = options.swapProvider ?? swapProviderForConfig(config);
   const swap = await swapProvider.createReverseSwap({
     saleId: ulid(now + 2),
     invoiceSat: amountSat,

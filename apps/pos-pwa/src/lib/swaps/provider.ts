@@ -14,10 +14,14 @@ export type ReverseSwapRequest = {
 export type ReverseSwapResponse = {
   id: string;
   invoice: string;
+  preimage?: string;
   preimageHash: string;
+  claimPrivateKey?: string;
+  claimPublicKey?: string;
   timeoutBlockHeight: number;
   claimAddress: string;
   expectedAmountSat: number;
+  boltzResponse?: Record<string, unknown>;
 };
 
 export type SwapStatus = 'created' | 'invoice.paid' | 'transaction.mempool' | 'transaction.confirmed' | 'expired' | 'failed';
