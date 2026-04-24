@@ -32,6 +32,11 @@ export type Sale = {
   amountSat: number;
   note?: string;
   discountFiat?: string;
+  fxRate?: {
+    indexPrice: number;
+    precision: number;
+    createdAt?: string;
+  };
   status: SaleStatus;
   activePaymentAttemptId?: string;
   createdAt: number;
@@ -44,6 +49,8 @@ export type PaymentAttempt = {
   method: PaymentMethod;
   status: PaymentStatus;
   paymentData?: string;
+  lightningInvoice?: string;
+  liquidPaymentData?: string;
   liquidAddress?: string;
   addressIndex?: number;
   terminalBranch?: number;

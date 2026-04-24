@@ -120,4 +120,35 @@ describe('startup reconciliation', () => {
     expect(Array.from(receipts.values())).toHaveLength(1);
     expect(outbox).toHaveLength(2);
   });
+
+  it('resumes an existing sale without creating a new attempt', async () => {
+    const { resumeSale } = await import('./reconciler');
+    sales.set('sale3', {
+      id: 'sale3',
+      receiptNumber: 'R-3',
+      posRef: 'pos',
+      terminalId: 'term1',
+      amountFiat: '8500',
+      fiatCurrency: 'CRC',
+      amountSat: 25000,
+      status: 'payment_ready',
+      activePaymentAttemptId: 'attempt3',
+      createdAt: 0,
+      updatedAt: 0
+    });
+    attempts.set('attempt3', {
+      id: 'attempt3',
+      saleId: 'sale3',
+      method: 'lightning_swap',
+      status: 'waiting',
+      paymentData: 'lnbc25000n1demo',
+      createdAt: 0,
+      updatedAt: 0
+    });
+
+    await expect(resumeSale('sale3')).resolves.toEqual({
+      sale: sales.get('sale3'),
+      attempt: attempts.get('attempt3')
+    });
+  });
 });

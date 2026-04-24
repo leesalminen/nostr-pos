@@ -7,32 +7,31 @@
   import QrCard from '../lib/ui/QrCard.svelte';
   import { terminal, loadTerminal } from '../lib/stores/terminal';
   import { refreshTransactions } from '../lib/stores/ledger';
-  import { createSale, markReady, paymentPayload, simulateSettlement } from '../lib/pos/payment-state';
-  import { reconcileOpenPayments, resumeAttempt } from '../lib/pos/reconciler';
+  import { paymentPayload, simulateSettlement } from '../lib/pos/payment-state';
+  import { reconcileOpenPayments, resumeAttempt, resumeSale } from '../lib/pos/reconciler';
   import type { PaymentAttempt, PaymentMethod, Sale } from '../lib/pos/types';
-  import type { FxRate } from '../lib/fx/bull-bitcoin';
   import { decodeIndexPrice } from '../lib/fx/bull-bitcoin';
   import { putAttempt } from '../lib/db/repositories/ledger';
   import { formatExchangeRate, formatFiat, formatSats, statusLabel } from '../lib/util/formatting';
   import { payWithWebNfc } from '../lib/nfc/web-nfc';
 
-  let { params = {} }: { params?: { link?: string } } = $props();
+  let { params = {} }: { params?: { saleId?: string } } = $props();
 
   let sale = $state<Sale | undefined>();
   let attempt = $state<PaymentAttempt | undefined>();
-  let rate = $state<FxRate | undefined>();
   let selectedMethod = $state<PaymentMethod>('lightning_swap');
   let boltCardPending = $state(false);
   let boltCardMessage = $state('');
   let error = $state('');
   let settling = $state(false);
 
-  const decoded = $derived(decodeURIComponent(params.link ?? 'liquid:0:'));
-  const parts = $derived(decoded.split(':'));
-  const rawAmount = $derived(parts[1]);
-  const rawNote = $derived(parts[2]);
-  const amount = $derived(String(Number(rawAmount || '0')));
-  const activePaymentData = $derived(sale ? paymentPayload(selectedMethod, sale.amountSat, sale.id, attempt?.liquidAddress) : '');
+  const activePaymentData = $derived(
+    sale && attempt
+      ? selectedMethod === 'liquid'
+        ? (attempt.liquidPaymentData ?? paymentPayload('liquid', sale.amountSat, sale.id, attempt.liquidAddress))
+        : (attempt.lightningInvoice ?? attempt.paymentData ?? paymentPayload('lightning_swap', sale.amountSat, sale.id, attempt.liquidAddress))
+      : ''
+  );
 
   const statusTone = $derived(
     !sale
@@ -63,15 +62,16 @@
 
     async function prepare() {
       try {
-        const config = await loadTerminal();
+        await loadTerminal();
         await refreshTransactions();
-        const created = await createSale(config, amount, 'lightning_swap', rawNote || undefined);
-        sale = created.sale;
-        attempt = created.attempt;
-        rate = created.rate;
-        await markReady(created.sale, created.attempt);
-        sale = { ...created.sale, status: 'payment_ready' };
-        attempt = { ...created.attempt, status: 'waiting' };
+        const resumed = params.saleId ? await resumeSale(params.saleId) : undefined;
+        if (!resumed) {
+          error = 'Payment not found.';
+          return;
+        }
+        sale = resumed.sale;
+        attempt = resumed.attempt;
+        selectedMethod = resumed.attempt.method === 'liquid' ? 'liquid' : 'lightning_swap';
         await refreshTransactions();
         pollTimer = setInterval(() => {
           void refreshPaymentState();
@@ -107,7 +107,11 @@
     boltCardPending = false;
     boltCardMessage = '';
     if (!attempt || !sale) return;
-    attempt = { ...attempt, method, paymentData: paymentPayload(method, sale.amountSat, sale.id, attempt.liquidAddress), updatedAt: Date.now() };
+    const paymentData =
+      method === 'liquid'
+        ? (attempt.liquidPaymentData ?? paymentPayload('liquid', sale.amountSat, sale.id, attempt.liquidAddress))
+        : (attempt.lightningInvoice ?? paymentPayload('lightning_swap', sale.amountSat, sale.id, attempt.liquidAddress));
+    attempt = { ...attempt, method, paymentData, updatedAt: Date.now() };
     await putAttempt(attempt);
     await refreshTransactions();
     await reconcileOpenPayments({ now: Date.now() });
@@ -117,7 +121,12 @@
     if (!attempt || !sale) return;
     boltCardPending = true;
     boltCardMessage = 'Hold the card near the back of this device.';
-    attempt = { ...attempt, method: 'bolt_card', paymentData: paymentPayload('lightning_swap', sale.amountSat, sale.id), updatedAt: Date.now() };
+    attempt = {
+      ...attempt,
+      method: 'bolt_card',
+      paymentData: attempt.lightningInvoice ?? paymentPayload('lightning_swap', sale.amountSat, sale.id),
+      updatedAt: Date.now()
+    };
     await putAttempt(attempt);
     await refreshTransactions();
     try {
@@ -200,7 +209,7 @@
           {/if}
 
           <p class="text-center text-xs text-[#776b5a] tabular-nums dark:text-[#b9aa91]">
-            {formatSats(sale.amountSat)}{#if rate} &middot; {formatExchangeRate(decodeIndexPrice(rate), sale.fiatCurrency)}{/if}
+            {formatSats(sale.amountSat)}{#if sale.fxRate} &middot; {formatExchangeRate(decodeIndexPrice(sale.fxRate), sale.fiatCurrency)}{/if}
           </p>
 
           {#if boltCardPending}

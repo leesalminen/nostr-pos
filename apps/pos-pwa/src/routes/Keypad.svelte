@@ -8,9 +8,12 @@
   import { terminal, loadTerminal } from '../lib/stores/terminal';
   import { refreshTransactions } from '../lib/stores/ledger';
   import { reconcileOpenPayments } from '../lib/pos/reconciler';
+  import { createSale, markReady } from '../lib/pos/payment-state';
 
   let amount = $state('');
   let note = $state('');
+  let preparing = $state(false);
+  let error = $state('');
 
   onMount(async () => {
     const config = await loadTerminal();
@@ -25,6 +28,23 @@
   function applyInput(value: string) {
     if (value === 'back') amount = amount.slice(0, -1);
     else amount = (amount + value).replace(/^0+(?=\d)/, '').slice(0, 9);
+  }
+
+  async function charge() {
+    if (!canCharge || preparing) return;
+    error = '';
+    preparing = true;
+    try {
+      const config = await loadTerminal();
+      const created = await createSale(config, displayAmount, 'lightning_swap', note || undefined);
+      await markReady(created.sale, created.attempt);
+      await refreshTransactions();
+      location.hash = `#/pos/${created.sale.id}`;
+    } catch (err) {
+      error = err instanceof Error ? err.message : 'Could not prepare payment. Try again.';
+    } finally {
+      preparing = false;
+    }
   }
 
   const canCharge = $derived(Number(amount) > 0);
@@ -58,12 +78,15 @@
           placeholder="Add note"
           rows="1"
         ></textarea>
+        {#if error}
+          <p class="rounded-md bg-[#ffe0d9] px-4 py-3 text-sm font-semibold text-[#8c2d28]">{error}</p>
+        {/if}
         <BullFooter />
       </div>
 
       <div class="sticky bottom-0 mx-auto mt-3 flex w-full max-w-xl flex-col bg-gradient-to-t from-[#f5f0e8] from-60% to-transparent pb-[max(0.25rem,env(safe-area-inset-bottom))] pt-3 dark:from-[#161512]">
-        <Button disabled={!canCharge} href={`#/pos/${encodeURIComponent(`charge:${displayAmount}:${note}`)}`}>
-          Charge
+        <Button disabled={!canCharge || preparing} onclick={charge}>
+          {preparing ? 'Preparing' : 'Charge'}
         </Button>
       </div>
     </section>

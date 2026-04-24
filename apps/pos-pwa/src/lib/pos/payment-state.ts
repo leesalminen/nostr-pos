@@ -53,6 +53,11 @@ export async function createSale(config: TerminalConfig, fiatAmount: string, met
     fiatCurrency: config.currency,
     amountSat,
     note,
+    fxRate: {
+      indexPrice: rate.indexPrice,
+      precision: rate.precision,
+      createdAt: rate.createdAt
+    },
     status: 'payment_preparing',
     createdAt: now,
     updatedAt: now
@@ -64,6 +69,8 @@ export async function createSale(config: TerminalConfig, fiatAmount: string, met
     method,
     status: 'created',
     paymentData: method === 'liquid' ? liquidBip21(liquid.address, amountSat) : swap.invoice,
+    lightningInvoice: swap.invoice,
+    liquidPaymentData: liquidBip21(liquid.address, amountSat),
     liquidAddress: liquid.address,
     addressIndex: liquid.addressIndex,
     terminalBranch: liquid.terminalBranch,

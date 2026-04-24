@@ -94,3 +94,11 @@ export async function resumeAttempt(attemptId: string): Promise<{ sale: Sale; at
   if (!sale) return undefined;
   return { sale, attempt };
 }
+
+export async function resumeSale(saleId: string): Promise<{ sale: Sale; attempt: PaymentAttempt } | undefined> {
+  const sale = await getSale(saleId);
+  if (!sale?.activePaymentAttemptId) return undefined;
+  const attempt = await getAttempt(sale.activePaymentAttemptId);
+  if (!attempt) return undefined;
+  return { sale, attempt };
+}

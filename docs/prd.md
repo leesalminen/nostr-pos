@@ -3236,16 +3236,11 @@ verification evidence stay close to the source of truth.
   the probe published a signed kind-30383 pairing announcement to
   `wss://no.str.cr`, `wss://relay.primal.net`, and `wss://nos.lol`, then read
   it back by event id.
+- Completed the sale-lifecycle handoff note: Charge now creates and persists
+  the sale/payment attempt before navigation, the payment screen routes by
+  sale id, and refresh resumes the existing attempt instead of creating a
+  duplicate swap or ledger record.
 
 ### Known follow-ups
 
-- **Create sale record on Charge click, not on Pos mount.** Today the Keypad
-  encodes `charge:${amount}:${note}` into the route and `Pos.svelte` calls
-  `createSale` in `onMount`. That means a refresh of the Pos screen mints a
-  *new* sale + attempt + boltz swap for the same intent, duplicating records
-  and payment-data. The fix is: Charge click persists the sale (`createSale` +
-  `markReady`, including swap creation), navigates to `#/pos/:saleId`, and
-  `Pos.svelte` loads by id. Requires a "preparing" state on the keypad while
-  the async swap/rate work happens, and a route shape change from
-  `/pos/:link` → `/pos/:saleId`. Deferred so it doesn't collide with the
-  in-flight reconciler/NFC work on Pos.svelte.
+- No open implementation handoff notes at this checkpoint.

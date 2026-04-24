@@ -10,7 +10,7 @@
 
   const routes = {
     '/': KeypadRoute,
-    '/pos/:link': PosRoute,
+    '/pos/:saleId': PosRoute,
     '/activate': ActivateRoute,
     '/receipt/:saleId': ReceiptRoute,
     '/transactions': TransactionsRoute,
