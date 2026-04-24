@@ -163,10 +163,9 @@ class ControllerRecoveryExecutor {
       );
     }
 
+    SwapStatusDetails? status;
     try {
-      final status = await _swapStatusClient.getSwapStatusDetails(
-        recovery.swapId,
-      );
+      status = await _swapStatusClient.getSwapStatusDetails(recovery.swapId);
       if (status.status == 'transaction.claimed') {
         return ControllerRecoveryResult(
           swapId: recovery.swapId,
@@ -174,6 +173,17 @@ class ControllerRecoveryExecutor {
           providerStatus: status.status,
         );
       }
+    } catch (error) {
+      if (recovery.claimTxHex == null && recovery.lockupTxHex == null) {
+        return ControllerRecoveryResult(
+          swapId: recovery.swapId,
+          status: 'failed',
+          reason: '$error',
+        );
+      }
+    }
+
+    try {
       if (recovery.claimTxHex != null && recovery.claimTxHex!.isNotEmpty) {
         final claimTxid = await _liquidClient.broadcastTransaction(
           recovery.claimTxHex!,
@@ -181,11 +191,11 @@ class ControllerRecoveryExecutor {
         return ControllerRecoveryResult(
           swapId: recovery.swapId,
           status: 'broadcast',
-          providerStatus: status.status,
+          providerStatus: status?.status,
           claimTxid: claimTxid,
         );
       }
-      if (!_claimableStatus(status.status)) {
+      if (status != null && !_claimableStatus(status.status)) {
         return ControllerRecoveryResult(
           swapId: recovery.swapId,
           status: 'waiting',
@@ -193,16 +203,18 @@ class ControllerRecoveryExecutor {
         );
       }
 
+      final statusTxid = status?.txid;
       final lockupTxHex =
-          status.transactionHex ??
-          (status.txid == null
+          recovery.lockupTxHex ??
+          status?.transactionHex ??
+          (statusTxid == null
               ? null
-              : await _liquidClient.fetchTransactionHex(status.txid!));
+              : await _liquidClient.fetchTransactionHex(statusTxid));
       if (lockupTxHex == null || lockupTxHex.isEmpty) {
         return ControllerRecoveryResult(
           swapId: recovery.swapId,
           status: 'failed',
-          providerStatus: status.status,
+          providerStatus: status?.status,
           reason: 'Provider did not expose a Liquid lockup transaction.',
         );
       }
@@ -215,7 +227,7 @@ class ControllerRecoveryExecutor {
         return ControllerRecoveryResult(
           swapId: recovery.swapId,
           status: 'failed',
-          providerStatus: status.status,
+          providerStatus: status?.status,
           reason: 'Recovery material does not contain swap data.',
         );
       }
@@ -232,7 +244,7 @@ class ControllerRecoveryExecutor {
       return ControllerRecoveryResult(
         swapId: recovery.swapId,
         status: 'broadcast',
-        providerStatus: status.status,
+        providerStatus: status?.status,
         claimTxid: claimTxid,
       );
     } catch (error) {

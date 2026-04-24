@@ -69,6 +69,56 @@ void main() {
     expect(liquid.fetchedTxids, isEmpty);
   });
 
+  test(
+    'broadcasts prepared claim hex even when provider polling fails',
+    () async {
+      final liquid = _FakeLiquidClient();
+      final executor = ControllerRecoveryExecutor(
+        swapStatusClient: _ThrowingSwapStatusClient(),
+        liquidClient: liquid,
+        claimBuilder: (_) async => throw StateError('not used'),
+      );
+
+      final result = await executor.recoverClaim(
+        _recovery(claimTxHex: 'preparedclaimhex'),
+      );
+
+      expect(result.status, 'broadcast');
+      expect(result.providerStatus, isNull);
+      expect(result.claimTxid, 'claimtxid');
+      expect(liquid.broadcastHexes, ['preparedclaimhex']);
+    },
+  );
+
+  test(
+    'builds claims from stored lockup hex when provider polling fails',
+    () async {
+      late RecoveryClaimBuildRequest buildRequest;
+      final liquid = _FakeLiquidClient();
+      final executor = ControllerRecoveryExecutor(
+        swapStatusClient: _ThrowingSwapStatusClient(),
+        liquidClient: liquid,
+        claimBuilder: (request) async {
+          buildRequest = request;
+          return 'claimtxhex';
+        },
+      );
+
+      final result = await executor.recoverClaim(
+        _recovery(lockupTxHex: 'storedlockuphex'),
+        feeSatPerVbyte: 0.4,
+      );
+
+      expect(result.status, 'broadcast');
+      expect(result.providerStatus, isNull);
+      expect(result.claimTxid, 'claimtxid');
+      expect(buildRequest.lockupTxHex, 'storedlockuphex');
+      expect(buildRequest.feeSatPerVbyte, 0.4);
+      expect(liquid.fetchedTxids, isEmpty);
+      expect(liquid.broadcastHexes, ['claimtxhex']);
+    },
+  );
+
   test('reports expired recoveries without polling providers', () async {
     final statusClient = _FakeSwapStatusClient(
       SwapStatusDetails(status: 'transaction.confirmed'),
@@ -89,17 +139,20 @@ void main() {
   });
 }
 
-SwapRecoverySummary _recovery({int? expiresAt, String? claimTxHex}) =>
-    SwapRecoverySummary(
-      saleId: 'sale1',
-      paymentAttemptId: 'attempt1',
-      swapId: 'swap1',
-      expiresAt:
-          expiresAt ?? DateTime.now().millisecondsSinceEpoch ~/ 1000 + 3600,
-      encryptedLocalBlob: _encryptedLocalBlob,
-      terminalId: 'term1',
-      claimTxHex: claimTxHex,
-    );
+SwapRecoverySummary _recovery({
+  int? expiresAt,
+  String? claimTxHex,
+  String? lockupTxHex,
+}) => SwapRecoverySummary(
+  saleId: 'sale1',
+  paymentAttemptId: 'attempt1',
+  swapId: 'swap1',
+  expiresAt: expiresAt ?? DateTime.now().millisecondsSinceEpoch ~/ 1000 + 3600,
+  encryptedLocalBlob: _encryptedLocalBlob,
+  terminalId: 'term1',
+  lockupTxHex: lockupTxHex,
+  claimTxHex: claimTxHex,
+);
 
 class _FakeSwapStatusClient implements SwapStatusClient {
   _FakeSwapStatusClient(this.status);
@@ -111,6 +164,13 @@ class _FakeSwapStatusClient implements SwapStatusClient {
   Future<SwapStatusDetails> getSwapStatusDetails(String swapId) async {
     calls += 1;
     return status;
+  }
+}
+
+class _ThrowingSwapStatusClient implements SwapStatusClient {
+  @override
+  Future<SwapStatusDetails> getSwapStatusDetails(String swapId) async {
+    throw StateError('provider offline');
   }
 }
 
