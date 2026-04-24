@@ -3270,6 +3270,10 @@ verification evidence stay close to the source of truth.
   address now reconcile direct Liquid payments even when the default rail was
   Lightning. The settled attempt is rewritten to `liquid` so receipts/history
   reflect the rail actually paid.
+- Direct Liquid charge preparation no longer depends on Boltz availability:
+  `createSale(..., "liquid")` derives the Liquid address and persists the sale
+  without creating a reverse swap, and the keypad falls back to a Liquid charge
+  if Lightning preparation cannot complete.
 - Added local protocol outbox events for sale-created, payment-status, and
   receipt records, plus startup reconciliation that expires stale open attempts
   and records the status update. This is the IndexedDB side of the PRD's

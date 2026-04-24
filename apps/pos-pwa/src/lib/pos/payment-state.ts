@@ -7,7 +7,7 @@ import { getBullBitcoinRate, fiatToSats } from '../fx/bull-bitcoin';
 import { deriveLiquidAddress, liquidBip21 } from '../liquid/address';
 import { BoltzReverseSwapProvider } from '../swaps/boltz';
 import { MockBoltzReverseSwapProvider } from '../swaps/mock-boltz';
-import type { SwapProvider } from '../swaps/provider';
+import type { ReverseSwapResponse, SwapProvider } from '../swaps/provider';
 import { ulid } from '../util/ulid';
 import { paymentStatusEvent, saleCreatedEvent, swapRecoveryEvent } from '../nostr/events';
 import { merchantRecoveryPubkey, publishOutboxItem, type OutboxPublishReport } from '../nostr/outbox';
@@ -73,18 +73,21 @@ export async function createSale(
   const addressIndex = await reserveAddressIndex();
   const liquid = await deriveLiquidAddress(config, addressIndex);
   const swapProvider = options.swapProvider ?? swapProviderForConfig(config);
-  const swap = await swapProvider.createReverseSwap({
-    saleId: ulid(now + 2),
-    invoiceSat: amountSat,
-    claimAddress: liquid.address
-  });
-  const verification = swapProvider.verifySwap(swap, {
-    saleId: swap.id.replace(/^swap_/, ''),
-    invoiceSat: amountSat,
-    claimAddress: liquid.address
-  });
-  if (!verification.ok) {
-    throw new Error('Could not safely prepare Lightning payment. Try again.');
+  let swap: ReverseSwapResponse | undefined;
+  if (method !== 'liquid') {
+    swap = await swapProvider.createReverseSwap({
+      saleId: ulid(now + 2),
+      invoiceSat: amountSat,
+      claimAddress: liquid.address
+    });
+    const verification = swapProvider.verifySwap(swap, {
+      saleId: swap.id.replace(/^swap_/, ''),
+      invoiceSat: amountSat,
+      claimAddress: liquid.address
+    });
+    if (!verification.ok) {
+      throw new Error('Could not safely prepare Lightning payment. Try again.');
+    }
   }
   const sale: Sale = {
     id: ulid(now),
@@ -110,13 +113,13 @@ export async function createSale(
     saleId: sale.id,
     method,
     status: 'created',
-    paymentData: method === 'liquid' ? liquidBip21(liquid.address, amountSat) : swap.invoice,
-    lightningInvoice: swap.invoice,
+    paymentData: method === 'liquid' ? liquidBip21(liquid.address, amountSat) : swap!.invoice,
+    lightningInvoice: swap?.invoice,
     liquidPaymentData: liquidBip21(liquid.address, amountSat),
     liquidAddress: liquid.address,
     addressIndex: liquid.addressIndex,
     terminalBranch: liquid.terminalBranch,
-    swapId: method === 'liquid' ? undefined : swap.id,
+    swapId: method === 'liquid' ? undefined : swap!.id,
     createdAt: now,
     updatedAt: now,
     expiresAt: now + 15 * 60_000
@@ -134,6 +137,7 @@ export async function createSale(
   });
 
   if (method !== 'liquid') {
+    if (!swap) throw new Error('Could not safely prepare Lightning payment. Try again.');
     const minRecoveryOk = options.minRecoveryOk ?? 2;
     if (config.syncServers.length < minRecoveryOk) {
       throw new Error('Could not safely prepare Lightning payment. Try again.');
