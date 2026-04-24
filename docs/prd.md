@@ -3506,6 +3506,10 @@ verification evidence stay close to the source of truth.
   as authoritative. The stored local address index is logged when it disagrees
   with LWK's wildcard index, but it is not allowed to reject an otherwise valid
   target-address, policy-asset, sufficient-amount payment.
+- When one-off `Wollet.applyTransaction()` does not surface a matching wallet
+  transaction, the terminal falls back to LWK's `EsploraClient.fullScanToIndex`
+  for the authorized descriptor/index, applies the returned update, and then
+  performs the same unblinded output verification.
 - Removed the early UI placeholder Lightning payload path. The payment screen
   now renders Lightning QR data only when a checksummed Bolt11 invoice exists,
   and live dev pilots use the configured Boltz provider instead of the mock

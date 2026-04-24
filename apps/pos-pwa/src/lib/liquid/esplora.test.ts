@@ -38,6 +38,12 @@ vi.mock('lwk_wasm', () => {
   class WolletDescriptor {
     constructor(_descriptor: string) {}
   }
+  class EsploraClient {
+    constructor(_network: Network, _url: string, _waterfalls: boolean, _concurrency: number, _utxoOnly: boolean) {}
+    async fullScanToIndex(_wallet: Wollet, _index: number) {
+      return undefined;
+    }
+  }
   class Transaction {
     static fromString(_hex: string) {
       return new Transaction();
@@ -49,6 +55,7 @@ vi.mock('lwk_wasm', () => {
       return { address: () => new Address('lq1qqconfidential') };
     }
     applyTransaction(_tx: Transaction) {}
+    applyUpdate(_update: unknown) {}
     transactions() {
       return [
         {
@@ -117,7 +124,7 @@ vi.mock('lwk_wasm', () => {
       ];
     }
   }
-  return { Address, Network, Transaction, Wollet, WolletDescriptor };
+  return { Address, EsploraClient, Network, Transaction, Wollet, WolletDescriptor };
 });
 
 describe('Liquid Esplora adapter', () => {

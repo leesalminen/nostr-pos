@@ -152,7 +152,7 @@ export async function verifyConfidentialAddressPayment(
     return verifyAddressPayment(transactions, address, expectedSat, options);
   }
 
-  const { Address, Network, Transaction, Wollet, WolletDescriptor } = await import('lwk_wasm');
+  const { Address, EsploraClient, Network, Transaction, Wollet, WolletDescriptor } = await import('lwk_wasm');
   const target = new Address(address);
   const targetUnconfidential = target.toUnconfidential().toString();
   const descriptor = new WolletDescriptor(options.descriptor);
@@ -258,6 +258,12 @@ export async function verifyConfidentialAddressPayment(
     debugLiquidVerification('inspected wallet tx', { walletTxid, inspected, receivedSat });
   }
 
+  function walletTxIsRecentEnough(walletTx: ReturnType<typeof wallet.transactions>[number]): boolean {
+    if (!options.minCreatedAt) return true;
+    const timestamp = walletTx.timestamp();
+    return timestamp === undefined || timestamp * 1000 >= options.minCreatedAt;
+  }
+
   for (const tx of transactions) {
     if (!txIsRecentEnough(tx, options.minCreatedAt)) {
       debugLiquidVerification('skipped old tx', { txid: tx.txid });
@@ -304,6 +310,42 @@ export async function verifyConfidentialAddressPayment(
       continue;
     }
     countWalletTx(walletTx, Boolean(tx.status?.confirmed));
+  }
+
+  if (receivedSat < expectedSat && options.addressIndex !== undefined) {
+    try {
+      debugLiquidVerification('running esplora scan fallback', {
+        apiBase: options.apiBase,
+        addressIndex: options.addressIndex
+      });
+      const client = new EsploraClient(network, options.apiBase.replace(/\/$/, ''), false, 4, false);
+      const update = await client.fullScanToIndex(wallet, options.addressIndex);
+      if (update) {
+        wallet.applyUpdate(update);
+        debugLiquidVerification('applied esplora scan update', {
+          addressIndex: options.addressIndex,
+          walletTxCount: wallet.transactions().length
+        });
+        for (const walletTx of wallet.transactions()) {
+          if (!walletTxIsRecentEnough(walletTx)) {
+            debugLiquidVerification('skipped old wallet tx from scan', {
+              txid: walletTx.txid().toString(),
+              timestamp: walletTx.timestamp()
+            });
+            continue;
+          }
+          countWalletTx(walletTx, walletTx.height() !== undefined);
+        }
+      } else {
+        debugLiquidVerification('esplora scan fallback returned no update', {
+          addressIndex: options.addressIndex
+        });
+      }
+    } catch (err) {
+      debugLiquidVerification('esplora scan fallback failed', {
+        reason: err instanceof Error ? err.message : String(err)
+      });
+    }
   }
 
   debugLiquidVerification('finished', {
