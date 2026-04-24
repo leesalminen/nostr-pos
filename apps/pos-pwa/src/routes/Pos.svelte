@@ -18,7 +18,7 @@
   import { formatExchangeRate, formatFiat, formatSats, statusLabel } from '../lib/util/formatting';
   import { payWithWebNfc } from '../lib/nfc/web-nfc';
   import { isPosProfileReference } from '../lib/pos/profile-loader';
-  import { subscribeBoltzSwapUpdates, type SwapUpdateSubscription } from '../lib/swaps/boltz-ws';
+  import { boltzWebSocketUrl, subscribeBoltzSwapUpdates, type SwapUpdateSubscription } from '../lib/swaps/boltz-ws';
   import { mergePaymentHistory } from '../lib/pos/payment-history';
   import { syncTerminalRecoveryBackups } from '../lib/pos/recovery-sync';
   import { createTerminalTabLock, type TerminalTabLock } from '../lib/security/tab-lock';
@@ -123,7 +123,7 @@
             : 'lightning_swap';
         await refreshTransactions();
         const config = await loadTerminal();
-        const wsUrl = config.authorization?.swap_providers?.find((provider) => provider.type === 'boltz' && provider.ws_url)?.ws_url;
+        const wsUrl = boltzWebSocketUrl(config.authorization?.swap_providers?.find((provider) => provider.type === 'boltz'));
         if (wsUrl && resumed.attempt.swapId) {
           swapSubscription = subscribeBoltzSwapUpdates({
             wsUrl,

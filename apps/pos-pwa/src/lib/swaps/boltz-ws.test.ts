@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { subscribeBoltzSwapUpdates } from './boltz-ws';
+import { boltzWebSocketUrl, normalizeBoltzWebSocketUrl, subscribeBoltzSwapUpdates } from './boltz-ws';
 
 class FakeSocket {
   static instances: FakeSocket[] = [];
@@ -27,6 +27,13 @@ class FakeSocket {
 }
 
 describe('Boltz websocket updates', () => {
+  it('normalizes legacy and API-base websocket URLs to Boltz v2', () => {
+    expect(normalizeBoltzWebSocketUrl('wss://api.boltz.exchange/ws')).toBe('wss://api.boltz.exchange/v2/ws');
+    expect(normalizeBoltzWebSocketUrl('https://api.boltz.exchange')).toBe('wss://api.boltz.exchange/v2/ws');
+    expect(boltzWebSocketUrl({ type: 'boltz', api_base: 'https://api.boltz.exchange' })).toBe('wss://api.boltz.exchange/v2/ws');
+    expect(boltzWebSocketUrl({ type: 'boltz', ws_url: 'wss://api.boltz.exchange/ws' })).toBe('wss://api.boltz.exchange/v2/ws');
+  });
+
   it('subscribes to swap.update and normalizes provider updates', () => {
     FakeSocket.instances.length = 0;
     const onUpdate = vi.fn();
@@ -37,6 +44,7 @@ describe('Boltz websocket updates', () => {
       WebSocketImpl: FakeSocket
     });
     const socket = FakeSocket.instances[0];
+    expect(socket.url).toBe('wss://api.boltz.exchange/v2/ws');
 
     socket.emit('open');
     expect(JSON.parse(socket.sent[0])).toEqual({

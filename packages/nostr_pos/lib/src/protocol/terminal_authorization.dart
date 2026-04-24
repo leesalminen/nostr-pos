@@ -53,7 +53,7 @@ class TerminalAuthorization {
         'id': 'boltz-mainnet',
         'type': 'boltz',
         'api_base': 'https://api.boltz.exchange',
-        'ws_url': 'wss://api.boltz.exchange/ws',
+        'ws_url': 'wss://api.boltz.exchange/v2/ws',
         'supports_covenants': true,
       },
     ],

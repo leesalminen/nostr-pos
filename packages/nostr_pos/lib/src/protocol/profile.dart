@@ -47,7 +47,7 @@ class PosProfile {
         'id': 'boltz-mainnet',
         'type': 'boltz',
         'api_base': 'https://api.boltz.exchange',
-        'ws_url': 'wss://api.boltz.exchange/ws',
+        'ws_url': 'wss://api.boltz.exchange/v2/ws',
       },
     ],
     'fiat_provider': {

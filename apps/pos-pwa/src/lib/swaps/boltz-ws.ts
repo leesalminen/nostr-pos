@@ -11,6 +11,12 @@ export type SwapUpdateSubscription = {
   close(): void;
 };
 
+export type BoltzWebSocketProvider = {
+  type?: string;
+  api_base?: string;
+  ws_url?: string;
+};
+
 type WebSocketLike = {
   send(data: string): void;
   close(): void;
@@ -49,6 +55,21 @@ function parseMessage(message: unknown): BoltzSwapUpdate[] {
   });
 }
 
+export function normalizeBoltzWebSocketUrl(rawUrl: string): string {
+  const url = new URL(rawUrl);
+  if (url.protocol === 'https:') url.protocol = 'wss:';
+  if (url.protocol === 'http:') url.protocol = 'ws:';
+  if (url.pathname === '/' || url.pathname === '/ws') url.pathname = '/v2/ws';
+  return url.toString();
+}
+
+export function boltzWebSocketUrl(provider?: BoltzWebSocketProvider): string | undefined {
+  if (!provider || provider.type !== 'boltz') return undefined;
+  if (provider.ws_url) return normalizeBoltzWebSocketUrl(provider.ws_url);
+  if (provider.api_base) return normalizeBoltzWebSocketUrl(provider.api_base);
+  return undefined;
+}
+
 export function subscribeBoltzSwapUpdates(input: {
   wsUrl: string;
   swapIds: string[];
@@ -56,7 +77,7 @@ export function subscribeBoltzSwapUpdates(input: {
   WebSocketImpl?: WebSocketCtor;
 }): SwapUpdateSubscription {
   const WebSocketImpl = input.WebSocketImpl ?? WebSocket;
-  const socket = new WebSocketImpl(input.wsUrl);
+  const socket = new WebSocketImpl(normalizeBoltzWebSocketUrl(input.wsUrl));
   const swapIds = Array.from(new Set(input.swapIds.filter(Boolean)));
   socket.addEventListener('open', () => {
     socket.send(JSON.stringify({ op: 'subscribe', channel: 'swap.update', args: swapIds }));

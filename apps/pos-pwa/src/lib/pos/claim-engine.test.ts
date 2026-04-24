@@ -302,6 +302,27 @@ describe('prepared claim broadcaster', () => {
   it('marks broadcast claims confirmed when the backend confirms the claim tx', async () => {
     const { fetchTransactionStatus } = await import('../liquid/esplora');
     const { reconcileClaimBroadcasts } = await import('./claim-engine');
+    sales.set('sale5', {
+      id: 'sale5',
+      receiptNumber: 'R-5',
+      posRef: 'pos',
+      terminalId: 'term1',
+      amountFiat: '8500',
+      fiatCurrency: 'CRC',
+      amountSat: 25000,
+      status: 'payment_detected',
+      activePaymentAttemptId: 'attempt5',
+      createdAt: 0,
+      updatedAt: 0
+    });
+    attempts.set('attempt5', {
+      id: 'attempt5',
+      saleId: 'sale5',
+      method: 'lightning_swap',
+      status: 'detected',
+      createdAt: 0,
+      updatedAt: 0
+    });
     recoveries.set('swap5', {
       saleId: 'sale5',
       paymentAttemptId: 'attempt5',
@@ -319,6 +340,9 @@ describe('prepared claim broadcaster', () => {
 
     await expect(reconcileClaimBroadcasts(config, { now: 200 })).resolves.toEqual([{ swapId: 'swap5', status: 'confirmed' }]);
     expect(recoveries.get('swap5')).toMatchObject({ claimConfirmedAt: 200, claimNeedsFeeBump: false });
+    expect(sales.get('sale5')?.status).toBe('receipt_ready');
+    expect(attempts.get('attempt5')).toMatchObject({ status: 'settled', settlementTxid: 'claimtxid' });
+    expect(Array.from(receipts.values())).toHaveLength(1);
   });
 
   it('flags stale unconfirmed broadcast claims for fee bump', async () => {

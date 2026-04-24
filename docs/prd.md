@@ -1174,7 +1174,7 @@ Content:
     { "id": "boltz-mainnet",
       "type": "boltz",
       "api_base": "https://api.boltz.exchange",
-      "ws_url": "wss://api.boltz.exchange/ws" }
+      "ws_url": "wss://api.boltz.exchange/v2/ws" }
   ],
   "fiat_provider": {
     "type": "bull_bitcoin",
@@ -1238,7 +1238,7 @@ Encrypted content (NIP-44 v2) to terminal:
     { "id": "boltz-mainnet",
       "type": "boltz",
       "api_base": "https://api.boltz.exchange",
-      "ws_url": "wss://api.boltz.exchange/ws",
+      "ws_url": "wss://api.boltz.exchange/v2/ws",
       "supports_covenants": true }
   ],
   "liquid_backends": [
@@ -3451,10 +3451,10 @@ verification evidence stay close to the source of truth.
   events must be signed by that profile's merchant controller key in addition to
   targeting the terminal pubkey.
 - Added live Boltz websocket updates on the payment screen. When an authorized
-  provider exposes `ws_url`, the terminal subscribes to `swap.update`, applies
-  normalized provider statuses through the same reconciliation helper used by
-  polling, queues encrypted status/receipt records, and keeps polling as the
-  offline fallback.
+  provider exposes `ws_url`, the terminal subscribes to `swap.update` on the
+  Boltz v2 websocket endpoint, applies normalized provider statuses through the
+  same reconciliation helper used by polling, queues encrypted status/receipt
+  records, and keeps polling as the offline fallback.
 - Added terminal recovery state transitions for Lightning swaps: when provider
   polling or websocket updates report lockup progress, the matching local
   recovery record is marked `claimable`; when a claimed update is observed, the

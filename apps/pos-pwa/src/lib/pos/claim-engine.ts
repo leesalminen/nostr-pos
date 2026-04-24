@@ -57,7 +57,8 @@ function nextClaimFeeRate(record: SwapRecoveryRecord): number {
 async function settleRecoveredClaim(record: SwapRecoveryRecord, txid: string, settledAt = Date.now()): Promise<void> {
   const sale = await getSale(record.saleId);
   const attempt = await getAttempt(record.paymentAttemptId);
-  if (!sale || !attempt || attempt.status === 'settled') return;
+  if (!sale || !attempt) return;
+  if (attempt.status === 'settled' && (sale.status === 'receipt_ready' || sale.status === 'settled')) return;
   await settleAttempt({ sale, attempt, txid, settledAt });
 }
 
@@ -216,6 +217,7 @@ export async function reconcileClaimBroadcasts(
   const results: ClaimConfirmationResult[] = [];
   for (const record of records) {
     try {
+      await settleRecoveredClaim(record, record.claimTxid as string, record.claimBroadcastAt ?? now);
       const status = await fetchTransactionStatus(backend.url, record.claimTxid as string, options.fetcher);
       if (status.confirmed) {
         await markSwapClaimConfirmed({ swapId: record.swapId, now });
