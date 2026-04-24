@@ -73,6 +73,27 @@ vi.mock('lwk_wasm', () => {
           inputs: () => []
         },
         {
+          txid: () => ({ toString: () => 'receivetx' }),
+          outputs: () => [
+            {
+              get: () => ({
+                wildcardIndex: () => 7,
+                address: () => new Address('lq1qqconfidential'),
+                outpoint: () => ({
+                  txid: () => ({ toString: () => 'receivetx' }),
+                  vout: () => 1
+                }),
+                height: () => undefined,
+                unblinded: () => ({
+                  asset: () => ({ toString: () => 'policy-asset' }),
+                  value: () => BigInt(25_000)
+                })
+              })
+            }
+          ],
+          inputs: () => []
+        },
+        {
           txid: () => ({ toString: () => 'spendtx' }),
           outputs: () => [],
           inputs: () => [
@@ -270,6 +291,42 @@ describe('Liquid Esplora adapter', () => {
       receivedSat: 25_000,
       txid: 'receivetx'
     });
+    expect(fetcher).toHaveBeenCalledWith('https://example.test/api/tx/spendtx/hex');
+  });
+
+  it('fetches matching prevout txs before checking confidential spends', async () => {
+    const fetcher = vi.fn(async () => ({
+      ok: true,
+      text: async () => '02000000'
+    }));
+
+    await expect(
+      verifyConfidentialAddressPayment(
+        [
+          {
+            txid: 'spendtx',
+            status: { confirmed: true, block_time: 200 },
+            vin: [{ txid: 'receivetx', vout: 1, prevout: { scriptpubkey_address: 'ex1qtarget', valuecommitment: '08receive' } }],
+            vout: [{ scriptpubkey_address: 'ex1qchange', valuecommitment: '08change' }]
+          }
+        ],
+        'lq1qqconfidential',
+        25_000,
+        {
+          apiBase: 'https://example.test/api',
+          descriptor: 'ct(slip77(00),elwpkh(xpub-demo/0/*))',
+          addressIndex: 7,
+          fetcher: fetcher as unknown as typeof fetch,
+          minCreatedAt: 150_000
+        }
+      )
+    ).resolves.toEqual({
+      detected: true,
+      confirmed: true,
+      receivedSat: 25_000,
+      txid: 'receivetx'
+    });
+    expect(fetcher).toHaveBeenCalledWith('https://example.test/api/tx/receivetx/hex');
     expect(fetcher).toHaveBeenCalledWith('https://example.test/api/tx/spendtx/hex');
   });
 

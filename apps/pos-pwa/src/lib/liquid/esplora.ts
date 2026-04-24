@@ -1,6 +1,17 @@
 export type EsploraTx = {
   txid: string;
   status?: { confirmed?: boolean; block_height?: number; block_time?: number };
+  vin?: Array<{
+    txid?: string;
+    vout?: number;
+    prevout?: {
+      scriptpubkey_address?: string;
+      value?: number;
+      valuecommitment?: string;
+      asset?: string;
+      assetcommitment?: string;
+    };
+  }>;
   vout: Array<{
     scriptpubkey_address?: string;
     value?: number;
@@ -85,6 +96,12 @@ function outputAddressMatches(outputAddress: { toString(): string; toUnconfident
   return outputAddress.toString() === address || outputAddress.toUnconfidential().toString() === unconfidential;
 }
 
+function debugConfidentialVerification(message: string, details: Record<string, unknown> = {}): void {
+  if (import.meta.env.DEV && import.meta.env.MODE !== 'test') {
+    console.debug('[nostr-pos] confidential liquid verification', message, details);
+  }
+}
+
 export function verifyAddressPayment(
   transactions: EsploraTx[],
   address: string,
@@ -142,18 +159,25 @@ export async function verifyConfidentialAddressPayment(
   let confirmed = false;
   let txid: string | undefined;
   const countedOutpoints = new Set<string>();
-  for (const tx of transactions) {
-    if (!txIsRecentEnough(tx, options.minCreatedAt)) continue;
-    let walletTx;
+  const appliedTxids = new Set<string>();
+
+  async function applyTx(txidToApply: string): Promise<boolean> {
+    if (appliedTxids.has(txidToApply)) return true;
     try {
-      const txHex = await fetchTransactionHex(options.apiBase, tx.txid, options.fetcher ?? fetch);
-      const transaction = Transaction.fromString(txHex);
-      wallet.applyTransaction(transaction);
-      walletTx = wallet.transactions().find((candidate) => candidate.txid().toString() === tx.txid);
-    } catch {
-      continue;
+      const txHex = await fetchTransactionHex(options.apiBase, txidToApply, options.fetcher ?? fetch);
+      wallet.applyTransaction(Transaction.fromString(txHex));
+      appliedTxids.add(txidToApply);
+      return true;
+    } catch (err) {
+      debugConfidentialVerification('could not apply tx', {
+        txid: txidToApply,
+        reason: err instanceof Error ? err.message : String(err)
+      });
+      return false;
     }
-    if (!walletTx) continue;
+  }
+
+  function countWalletTx(walletTx: ReturnType<typeof wallet.transactions>[number], fallbackConfirmed: boolean): void {
     for (const output of [...walletTx.outputs(), ...walletTx.inputs()]) {
       const walletOutput = output.get();
       if (!walletOutput) continue;
@@ -168,9 +192,44 @@ export async function verifyConfidentialAddressPayment(
       countedOutpoints.add(outpointKey);
       receivedSat += Number(unblinded.value());
       txid ??= outpoint.txid().toString();
-      confirmed ||= Boolean(tx.status?.confirmed) || walletOutput.height() !== undefined;
+      confirmed ||= fallbackConfirmed || walletOutput.height() !== undefined;
+      debugConfidentialVerification('counted wallet output', {
+        outpoint: outpointKey,
+        receivedSat,
+        confirmed
+      });
     }
   }
+
+  for (const tx of transactions) {
+    if (!txIsRecentEnough(tx, options.minCreatedAt)) {
+      debugConfidentialVerification('skipped old tx', { txid: tx.txid });
+      continue;
+    }
+    const prevoutTxids = new Set(
+      (tx.vin ?? [])
+        .filter((input) => input.txid && input.prevout?.scriptpubkey_address === targetUnconfidential)
+        .map((input) => input.txid as string)
+    );
+
+    for (const prevoutTxid of prevoutTxids) {
+      if (!(await applyTx(prevoutTxid))) continue;
+      const prevoutWalletTx = wallet.transactions().find((candidate) => candidate.txid().toString() === prevoutTxid);
+      if (prevoutWalletTx) countWalletTx(prevoutWalletTx, Boolean(tx.status?.confirmed));
+    }
+
+    if (!(await applyTx(tx.txid))) continue;
+    const walletTx = wallet.transactions().find((candidate) => candidate.txid().toString() === tx.txid);
+    if (!walletTx) continue;
+    countWalletTx(walletTx, Boolean(tx.status?.confirmed));
+  }
+
+  debugConfidentialVerification('finished', {
+    detected: receivedSat >= expectedSat,
+    expectedSat,
+    receivedSat,
+    txid
+  });
 
   return {
     detected: receivedSat >= expectedSat,

@@ -3496,6 +3496,10 @@ verification evidence stay close to the source of truth.
   receive output has already been spent. Matching wallet-owned inputs are
   unblinded and counted by original outpoint, with outpoint de-duplication so a
   receive tx plus a later spend cannot double-count the same payment.
+- If Esplora returns only the spending transaction for a confidential address
+  hit, the terminal fetches and applies matching `vin.prevout` transaction hexes
+  first so LWK can recover the original receive output amount. Dev builds emit
+  scoped console diagnostics for skipped/applied confidential candidates.
 - Removed the early UI placeholder Lightning payload path. The payment screen
   now renders Lightning QR data only when a checksummed Bolt11 invoice exists,
   and live dev pilots use the configured Boltz provider instead of the mock
