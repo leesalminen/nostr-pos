@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { ArrowLeft, Printer, Share2 } from 'lucide-svelte';
+  import { ArrowLeft, Printer, RotateCw, Share2, Wrench } from 'lucide-svelte';
   import BullFooter from '../lib/ui/BullFooter.svelte';
   import Button from '../lib/ui/Button.svelte';
   import ReceiptView from '../lib/ui/ReceiptView.svelte';
@@ -15,6 +15,8 @@
   let sale = $state<Sale | undefined>();
   let attempt = $state<PaymentAttempt | undefined>();
   const isPaid = $derived(sale?.status === 'receipt_ready' || sale?.status === 'settled');
+  const canResume = $derived(sale && !isPaid && !['expired', 'failed', 'cancelled'].includes(sale.status));
+  const needsRecovery = $derived(sale?.status === 'needs_recovery' || attempt?.status === 'needs_recovery' || attempt?.status === 'failed');
 
   onMount(async () => {
     await loadTerminal();
@@ -46,8 +48,16 @@
       Back
     </button>
     <div class="flex gap-2">
-      <Button variant="secondary" disabled={!isPaid} onclick={printReceipt}><Printer size={18} />Print</Button>
-      <Button variant="ghost" disabled={!isPaid} onclick={shareReceipt}><Share2 size={18} />Share</Button>
+      {#if isPaid}
+        <Button variant="secondary" onclick={printReceipt}><Printer size={18} />Print</Button>
+        <Button variant="ghost" onclick={shareReceipt}><Share2 size={18} />Share</Button>
+      {:else if canResume}
+        <Button href={`#/pos/${sale?.id}`} variant="secondary"><RotateCw size={18} />Resume</Button>
+      {:else if needsRecovery}
+        <Button href="#/settings/advanced" variant="secondary"><Wrench size={18} />Recover</Button>
+      {:else}
+        <Button href="#/" variant="secondary"><RotateCw size={18} />New sale</Button>
+      {/if}
     </div>
   </div>
 
@@ -60,7 +70,17 @@
         }`}
       >
         <p class="font-display text-5xl uppercase tracking-display leading-none">{isPaid ? 'Paid' : statusLabel(sale.status)}</p>
-        <p class="mt-1 text-sm">{isPaid ? 'Receipt ready.' : 'Payment is not complete yet.'}</p>
+        <p class="mt-1 text-sm">
+          {#if isPaid}
+            Receipt ready.
+          {:else if canResume}
+            Payment is not complete yet.
+          {:else if needsRecovery}
+            Payment needs recovery.
+          {:else}
+            Start a new sale.
+          {/if}
+        </p>
       </div>
     </div>
   {:else}
