@@ -3245,6 +3245,12 @@ verification evidence stay close to the source of truth.
   replacement claim at a higher fee rate, the replacement `claim_tx_hex` is
   persisted before broadcast, and the replaced claim txid stays in audit state
   so the old transaction can still be observed if it confirms first.
+- Added the Dart controller recovery bridge: the SDK now decrypts the PWA's
+  terminal AES-GCM recovery blobs using the terminal id from kind-9381 tags, and
+  exposes a controller recovery executor that polls Boltz status, resolves the
+  Liquid lockup transaction, calls a claim-builder boundary, and broadcasts the
+  resulting claim tx through Esplora. The remaining controller-side hard gap is
+  filling that claim-builder boundary with a Dart Liquid/Boltz implementation.
 - Added local protocol outbox events for sale-created, payment-status, and
   receipt records, plus startup reconciliation that expires stale open attempts
   and records the status update. This is the IndexedDB side of the PRD's

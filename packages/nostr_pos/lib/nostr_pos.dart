@@ -13,3 +13,4 @@ export 'src/protocol/nip19.dart';
 export 'src/protocol/profile.dart';
 export 'src/protocol/terminal_authorization.dart';
 export 'src/recovery/swap_recovery.dart';
+export 'src/recovery/claim_recovery.dart';
