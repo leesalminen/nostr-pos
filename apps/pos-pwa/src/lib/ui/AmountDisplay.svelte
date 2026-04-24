@@ -5,9 +5,9 @@
   const display = $derived(formatFiat(Number(amount || '0'), currency));
 </script>
 
-<div class="min-h-[112px] text-right">
+<div class="text-right">
   <div class="text-xs font-medium uppercase tracking-[0.12em] text-[#776b5a] dark:text-[#b9aa91]">Total</div>
-  <div class="mt-2 break-words font-black tabular-nums text-[clamp(3rem,12vw,6.8rem)] leading-none text-[#211f1a] dark:text-[#fff6e8]">
+  <div class="mt-2 whitespace-nowrap font-black tabular-nums text-[clamp(2rem,8vw,6.8rem)] leading-none text-[#211f1a] dark:text-[#fff6e8]">
     {display}
   </div>
 </div>
