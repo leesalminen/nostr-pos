@@ -21,7 +21,6 @@ export type LocalProtocolEvent = {
 function saleTags(sale: Sale, extra: string[][] = []): string[][] {
   return [
     ['proto', 'nostr-pos', '0.2'],
-    ['sale', sale.id],
     ['terminal', sale.terminalId],
     ...(sale.posRef ? [['a', sale.posRef]] : []),
     ...extra

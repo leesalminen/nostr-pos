@@ -502,7 +502,6 @@ Future<void> _recordSale(List<String> args) async {
     pubkey: terminalPubkey,
     kind: NostrPosKinds.saleCreated,
     tags: [
-      ['sale', saleId],
       ['terminal', terminalPubkey],
     ],
     content: {
@@ -522,9 +521,7 @@ Future<void> _recordSale(List<String> args) async {
     pubkey: terminalPubkey,
     kind: NostrPosKinds.paymentStatus,
     tags: [
-      ['sale', saleId],
       ['terminal', terminalPubkey],
-      ['status', parsed['status'] as String],
     ],
     content: {
       'sale_id': saleId,
@@ -538,7 +535,6 @@ Future<void> _recordSale(List<String> args) async {
     pubkey: terminalPubkey,
     kind: NostrPosKinds.receipt,
     tags: [
-      ['sale', saleId],
       ['terminal', terminalPubkey],
     ],
     content: {'receipt_id': 'R-$saleId', 'sale_id': saleId, 'created_at': now},

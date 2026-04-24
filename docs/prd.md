@@ -1309,9 +1309,7 @@ Tags:
 [
   ["proto", "nostr-pos", "0.2"],
   ["a", "30380:<merchant-controller-pubkey>:<pos_id>"],
-  ["sale", "<sale_id>"],
-  ["terminal", "<terminal_pubkey>"],
-  ["method", "lightning_via_swap"]
+  ["terminal", "<terminal_pubkey>"]
 ]
 ```
 
@@ -1413,9 +1411,7 @@ Tags:
 [
   ["proto", "nostr-pos", "0.2"],
   ["a", "30380:<merchant-controller-pubkey>:<pos_id>"],
-  ["sale", "<sale_id>"],
-  ["terminal", "<terminal_pubkey>"],
-  ["status", "settled"]
+  ["terminal", "<terminal_pubkey>"]
 ]
 ```
 
@@ -1472,11 +1468,12 @@ Privacy TODO before production pilot:
   payment records refuse plaintext publication when the merchant recovery key is
   missing.
 - Re-review public tags on encrypted events. Even with encrypted content, tags
-  like `sale`, `terminal`, `swap`, timestamps, and POS `a` refs can leak sales
-  cadence, terminal activity, or business volume patterns.
-- Status and method are now kept inside encrypted content for payment/receipt
-  records rather than relay-visible tags; keep that invariant in the UI copy
-  grep/protocol review before pilot.
+  like `terminal`, `swap`, timestamps, and POS `a` refs can leak sales cadence,
+  terminal activity, or business volume patterns. Public `sale`, `status`, and
+  `method` tags have been removed from sale/status/receipt events.
+- Status, method, and sale IDs are now kept inside encrypted content for
+  payment/receipt records rather than relay-visible tags; keep that invariant
+  in the UI copy grep/protocol review before pilot.
 - Audit other relay-visible records for public leakage before pilot: kind-30380 POS profiles, kind-30382 revocations, kind-30383 pairing announcements, kind-9380 sale-created tags, and kind-9381 recovery-backup tags/wrappers.
 - Document the public-receipt variant as explicit merchant opt-in only, with a minimal field set and no notes, discounts, terminal identifiers, or settlement details unless deliberately enabled.
 
@@ -3385,6 +3382,10 @@ verification evidence stay close to the source of truth.
 - Reduced public metadata on terminal payment-status records by removing the
   relay-visible `status` tag from kind-9382; status remains inside encrypted
   content for controller history.
+- Reduced public metadata on terminal sale/status/receipt records further by
+  removing relay-visible `sale` IDs from kind-9380/9382/9383 tags; sale IDs now
+  live only in encrypted content, while terminal reconciliation still uses the
+  terminal tag.
 - Added local print tracking for receipts: pressing Print marks the receipt row
   with `printedAt`, and CSV exports now include a `printed_at` column.
 - Added Dart NIP-44 v2 approval encryption via `ndk`'s NIP-44 adapter, kept
