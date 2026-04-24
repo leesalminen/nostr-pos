@@ -3,6 +3,7 @@ import { nip59, type Event } from 'nostr-tools';
 import { createTerminalKeypair, hexToBytes } from '../security/keys';
 import type { OutboxItem, TerminalConfig } from '../pos/types';
 import { merchantRecoveryPubkey, outboxItemToTemplate, publishOutboxItem, recoveryGiftWrapEvents } from './outbox';
+import { decryptContent } from './encryption';
 
 const saved: OutboxItem[] = [];
 
@@ -15,6 +16,16 @@ vi.mock('../db/repositories/ledger', () => ({
 afterEach(() => {
   vi.unstubAllEnvs();
 });
+
+function privateItem(id: string, type: OutboxItem['type'], kind: number, tag: string, content: Record<string, unknown>): OutboxItem {
+  return {
+    id,
+    type,
+    payload: { kind, tags: [[tag, String(content[tag === 'sale' ? 'sale_id' : 'swap_id'])]], content },
+    createdAt: 1000,
+    okFrom: []
+  };
+}
 
 describe('signed outbox publisher', () => {
   it('converts local protocol payloads to event templates', () => {
@@ -97,17 +108,51 @@ describe('signed outbox publisher', () => {
       maxInvoiceSat: 100000,
       syncServers: ['wss://one']
     };
-    const item: OutboxItem = {
-      id: 'status1',
-      type: 'payment_status',
-      payload: { kind: 9382, tags: [['sale', 'sale1']], content: { sale_id: 'sale1' } },
-      createdAt: 1000,
-      okFrom: []
-    };
+    const privateItems: OutboxItem[] = [
+      privateItem('sale1', 'sale_created', 9380, 'sale', { sale_id: 'sale1' }),
+      privateItem('status1', 'payment_status', 9382, 'sale', { sale_id: 'sale1' }),
+      privateItem('receipt1', 'receipt', 9383, 'sale', { sale_id: 'sale1' }),
+      privateItem('backup1', 'payment_backup', 9381, 'swap', { swap_id: 'swap1' })
+    ];
 
-    await expect(publishOutboxItem(config, item, vi.fn())).rejects.toThrow(
-      'Merchant recovery key is required'
-    );
+    for (const item of privateItems) {
+      await expect(publishOutboxItem(config, item, vi.fn())).rejects.toThrow(
+        'Merchant recovery key is required'
+      );
+    }
+  });
+
+  it('encrypts private sale, status, and receipt records to the merchant recovery key', async () => {
+    vi.stubEnv('PROD', true);
+    const terminal = createTerminalKeypair();
+    const merchant = createTerminalKeypair();
+    const config: TerminalConfig = {
+      merchantName: 'Seguras Butcher',
+      posName: 'Counter 1',
+      currency: 'CRC',
+      terminalId: terminal.publicKey.slice(-8),
+      terminalPubkey: terminal.publicKey,
+      terminalPrivkeyEnc: terminal.privateKey,
+      pairingCode: 'TEST-TEST',
+      maxInvoiceSat: 100000,
+      syncServers: ['wss://one'],
+      authorization: { merchant_recovery_pubkey: merchant.publicKey }
+    };
+    const privateItems: OutboxItem[] = [
+      privateItem('sale1', 'sale_created', 9380, 'sale', { sale_id: 'sale1' }),
+      privateItem('status1', 'payment_status', 9382, 'sale', { sale_id: 'sale1' }),
+      privateItem('receipt1', 'receipt', 9383, 'sale', { sale_id: 'sale1' })
+    ];
+
+    for (const item of privateItems) {
+      const publish = vi.fn(async (_relays: string[], event: Event) => {
+        expect(event.content).not.toContain('sale1');
+        expect(decryptContent(event.content, merchant.privateKey, terminal.publicKey)).toEqual({ sale_id: 'sale1' });
+        return [{ relay: 'wss://one', ok: true }];
+      });
+
+      await expect(publishOutboxItem(config, item, publish)).resolves.toMatchObject({ okCount: 1 });
+    }
   });
 
   it('gift-wraps recovery backups to merchant and terminal recipients', async () => {

@@ -3404,6 +3404,10 @@ verification evidence stay close to the source of truth.
   publish sale-created, payment-status, receipt, or recovery-backup records
   unless the merchant recovery key is available, keeping plaintext accounting
   compatibility limited to dev/test flows.
+- Expanded the production privacy tests so all private payment record types
+  fail closed without a merchant recovery key, and sale/status/receipt publish
+  paths prove their relay content decrypts only through the merchant recovery
+  conversation.
 - Added the LWK WASM dependency to the PWA address path: production builds now
   require an authorized `ct_descriptor` and derive Liquid receive addresses
   through `WolletDescriptor`/`Wollet`; the deterministic `tex1q...` address
