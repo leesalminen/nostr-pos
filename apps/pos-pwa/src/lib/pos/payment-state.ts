@@ -1,0 +1,126 @@
+import confetti from 'canvas-confetti';
+import type { PaymentAttempt, PaymentMethod, Receipt, Sale, SaleStatus, TerminalConfig } from './types';
+import { encryptJson } from '../db/crypto';
+import { putAttempt, putOutbox, putReceipt, putRecovery, putSale } from '../db/repositories/ledger';
+import { getBullBitcoinRate, fiatToSats } from '../fx/bull-bitcoin';
+import { ulid } from '../util/ulid';
+
+export function statusAfterDetection(method: PaymentMethod): SaleStatus {
+  return method === 'liquid' ? 'settled' : 'settling';
+}
+
+export function paymentPayload(method: PaymentMethod, amountSat: number, saleId: string): string {
+  if (method === 'liquid') return `liquid:tex1q${saleId.toLowerCase()}?amount=${amountSat}`;
+  if (method === 'bolt_card') return `lnbc${amountSat}n1p${saleId.toLowerCase()}boltcard`;
+  return `lnbc${amountSat}n1p${saleId.toLowerCase()}lightning`;
+}
+
+export async function createSale(config: TerminalConfig, fiatAmount: string, method: PaymentMethod, note?: string) {
+  const rate = await getBullBitcoinRate(config.currency);
+  const amountSat = fiatToSats(Number(fiatAmount), rate);
+  if (amountSat > config.maxInvoiceSat) {
+    throw new Error('Amount is above this terminal limit.');
+  }
+
+  const now = Date.now();
+  const sale: Sale = {
+    id: ulid(now),
+    receiptNumber: `R-${String(now).slice(-8)}`,
+    posRef: 'pilot-seguras-butcher',
+    terminalId: config.terminalId,
+    amountFiat: fiatAmount,
+    fiatCurrency: config.currency,
+    amountSat,
+    note,
+    status: 'payment_preparing',
+    createdAt: now,
+    updatedAt: now
+  };
+
+  const attempt: PaymentAttempt = {
+    id: ulid(now + 1),
+    saleId: sale.id,
+    method,
+    status: 'created',
+    paymentData: paymentPayload(method, amountSat, sale.id),
+    createdAt: now,
+    updatedAt: now,
+    expiresAt: now + 15 * 60_000
+  };
+  sale.activePaymentAttemptId = attempt.id;
+
+  await putSale(sale);
+  await putAttempt(attempt);
+
+  if (method !== 'liquid') {
+    const okFrom = config.syncServers.slice(0, 2);
+    if (okFrom.length < 2) {
+      throw new Error('Could not safely prepare Lightning payment. Try again.');
+    }
+    const swapId = `swap_${sale.id.toLowerCase()}`;
+    const recoveryPayload = {
+      protocol: 'nostr-pos',
+      version: 2,
+      type: 'swap_recovery',
+      sale_id: sale.id,
+      payment_attempt_id: attempt.id,
+      swap_id: swapId,
+      amount: {
+        invoice_sat: amountSat,
+        fiat_currency: config.currency,
+        fiat_amount: fiatAmount
+      },
+      claim: {
+        mode: 'standard',
+        preimage_revealed: false,
+        claim_tx_hex: null,
+        claim_txid: null
+      }
+    };
+    const encryptedLocalBlob = await encryptJson(recoveryPayload, config.terminalId);
+    await putRecovery({
+      saleId: sale.id,
+      paymentAttemptId: attempt.id,
+      swapId,
+      encryptedLocalBlob,
+      localSavedAt: Date.now(),
+      relaySavedAt: Date.now(),
+      okFrom,
+      expiresAt: attempt.expiresAt!,
+      status: 'pending'
+    });
+    await putOutbox({
+      id: `recovery_${swapId}`,
+      type: 'payment_backup',
+      payload: { saleId: sale.id, swapId },
+      createdAt: Date.now(),
+      okFrom
+    });
+  }
+
+  return { sale, attempt, rate };
+}
+
+export async function markReady(sale: Sale, attempt: PaymentAttempt): Promise<void> {
+  const now = Date.now();
+  await putSale({ ...sale, status: 'payment_ready', updatedAt: now });
+  await putAttempt({ ...attempt, status: 'waiting', updatedAt: now });
+}
+
+export async function simulateSettlement(sale: Sale, attempt: PaymentAttempt): Promise<Receipt> {
+  const detectedAt = Date.now();
+  await putSale({ ...sale, status: statusAfterDetection(attempt.method), updatedAt: detectedAt });
+  await putAttempt({ ...attempt, status: 'detected', updatedAt: detectedAt });
+
+  await new Promise((resolve) => setTimeout(resolve, attempt.method === 'liquid' ? 500 : 1400));
+  const settledAt = Date.now();
+  const txid = crypto.randomUUID().replaceAll('-', '');
+  await putSale({ ...sale, status: 'receipt_ready', updatedAt: settledAt });
+  await putAttempt({ ...attempt, status: 'settled', settlementTxid: txid, updatedAt: settledAt });
+  const receipt = { id: ulid(settledAt), saleId: sale.id, createdAt: settledAt };
+  await putReceipt(receipt);
+
+  navigator.vibrate?.(80);
+  void confetti({ particleCount: 90, spread: 70, origin: { y: 0.78 } });
+  return receipt;
+}

@@ -1,0 +1,37 @@
+{
+  "name": "@nostr-pos/pos-pwa",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "check": "svelte-check --tsconfig ./tsconfig.json",
+    "test": "vitest run --config vitest.config.ts"
+  },
+  "dependencies": {
+    "canvas-confetti": "^1.9.3",
+    "idb": "^8.0.3",
+    "lucide-svelte": "^0.468.0",
+    "qrcode": "^1.5.4",
+    "svelte": "^5.0.0",
+    "svelte-spa-router": "^4.0.1",
+    "vite-plugin-pwa": "^0.21.1"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^5.0.0",
+    "@tsconfig/svelte": "^5.0.4",
+    "@types/canvas-confetti": "^1.9.0",
+    "@types/qrcode": "^1.5.5",
+    "autoprefixer": "^10.4.20",
+    "jsdom": "^25.0.1",
+    "postcss": "^8.4.49",
+    "svelte-check": "^4.0.8",
+    "tailwindcss": "^3.4.17",
+    "tslib": "^2.8.1",
+    "typescript": "^5.9.3",
+    "vite": "^6.0.0",
+    "vitest": "^2.1.8"
+  }
+}
