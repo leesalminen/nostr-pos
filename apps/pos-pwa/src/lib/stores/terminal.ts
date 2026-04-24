@@ -1,5 +1,6 @@
 import { writable } from 'svelte/store';
 import type { TerminalConfig } from '../pos/types';
+import { configWithTerminalAuthorization } from '../activation/authorization';
 import { defaultTerminalConfig, getTerminalConfig, saveTerminalConfig } from '../db/repositories/terminal';
 
 export const terminal = writable<TerminalConfig | undefined>(undefined);
@@ -20,4 +21,12 @@ export async function activateTerminal(): Promise<TerminalConfig> {
   await saveTerminalConfig(activated);
   terminal.set(activated);
   return activated;
+}
+
+export async function applyTerminalApproval(raw: string): Promise<TerminalConfig> {
+  const config = await loadTerminal();
+  const approved = configWithTerminalAuthorization(config, raw);
+  await saveTerminalConfig(approved);
+  terminal.set(approved);
+  return approved;
 }

@@ -3228,3 +3228,19 @@ verification evidence stay close to the source of truth.
 - Added protocol schema validation in CI using JSON Schema test vectors for the
   POS profile, terminal authorization, sale-created, payment-status, receipt,
   and swap-recovery payloads.
+- Added a pilot activation import path: the PWA can paste the controller/CLI
+  approval JSON, verify it matches the displayed pairing code and terminal key,
+  then store terminal limits, Liquid backends, and the authorization payload.
+
+### Known follow-ups
+
+- **Create sale record on Charge click, not on Pos mount.** Today the Keypad
+  encodes `charge:${amount}:${note}` into the route and `Pos.svelte` calls
+  `createSale` in `onMount`. That means a refresh of the Pos screen mints a
+  *new* sale + attempt + boltz swap for the same intent, duplicating records
+  and payment-data. The fix is: Charge click persists the sale (`createSale` +
+  `markReady`, including swap creation), navigates to `#/pos/:saleId`, and
+  `Pos.svelte` loads by id. Requires a "preparing" state on the keypad while
+  the async swap/rate work happens, and a route shape change from
+  `/pos/:link` → `/pos/:saleId`. Deferred so it doesn't collide with the
+  in-flight reconciler/NFC work on Pos.svelte.
