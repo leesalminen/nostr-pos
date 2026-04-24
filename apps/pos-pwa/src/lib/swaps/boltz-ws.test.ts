@@ -59,14 +59,14 @@ describe('Boltz websocket updates', () => {
         data: JSON.stringify({
           event: 'update',
           channel: 'swap.update',
-          args: [{ id: 'swap1', status: 'transaction.mempool', transaction: { id: 'tx1', hex: '00' } }]
+          args: [{ id: 'swap1', status: 'invoice.settled', transaction: { id: 'tx1', hex: '00' } }]
         })
       })
     );
 
     expect(onUpdate).toHaveBeenCalledWith({
       id: 'swap1',
-      status: 'transaction.mempool',
+      status: 'transaction.claimed',
       txid: 'tx1',
       transactionHex: '00'
     });

@@ -83,13 +83,13 @@ describe('Boltz reverse swap adapter', () => {
     const provider = new BoltzReverseSwapProvider({
       apiBase: 'https://api.boltz.exchange',
       fetcher: vi.fn(async () =>
-        new Response(JSON.stringify({ status: 'transaction.mempool', transaction: { id: 'tx1', hex: '00' } }), { status: 200 })
+        new Response(JSON.stringify({ status: 'invoice.settled', transaction: { id: 'tx1', hex: '00' } }), { status: 200 })
       ) as unknown as typeof fetch
     });
 
-    await expect(provider.getSwapStatus('swap1')).resolves.toBe('transaction.mempool');
+    await expect(provider.getSwapStatus('swap1')).resolves.toBe('transaction.claimed');
     await expect(provider.getSwapStatusDetails('swap1')).resolves.toEqual({
-      status: 'transaction.mempool',
+      status: 'transaction.claimed',
       txid: 'tx1',
       transactionHex: '00'
     });
