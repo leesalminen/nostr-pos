@@ -8,7 +8,7 @@ import { deriveLiquidAddress, liquidBip21 } from '../liquid/address';
 import { MockBoltzReverseSwapProvider } from '../swaps/mock-boltz';
 import { ulid } from '../util/ulid';
 import { paymentStatusEvent, saleCreatedEvent, swapRecoveryEvent } from '../nostr/events';
-import { publishOutboxItem, type OutboxPublishReport } from '../nostr/outbox';
+import { merchantRecoveryPubkey, publishOutboxItem, type OutboxPublishReport } from '../nostr/outbox';
 import { settleAttempt } from './settlement';
 import type { OutboxItem, SwapRecoveryRecord } from './types';
 
@@ -160,7 +160,8 @@ export async function createSale(
         swapId,
         terminalId: config.terminalId,
         encryptedLocalBlob,
-        expiresAt: attempt.expiresAt!
+        expiresAt: attempt.expiresAt!,
+        recoveryPubkey: merchantRecoveryPubkey(config)
       }),
       createdAt: Date.now(),
       okFrom: []

@@ -107,9 +107,24 @@ Future<void> _exportSales(List<String> args) async {
 Future<void> _recoverSwaps(List<String> args) async {
   final parser = ArgParser()
     ..addOption('store', defaultsTo: '.nostr-pos/events.jsonl')
+    ..addOption(
+      'relays',
+      help: 'Comma-separated relays to scan for recovery backups.',
+    )
+    ..addOption('merchant-recovery-pubkey')
     ..addFlag('plan', defaultsTo: true);
   final parsed = parser.parse(args);
-  final events = await LocalEventStore(parsed['store'] as String).readAll();
+  final events = <NostrPosEvent>[
+    ...await LocalEventStore(parsed['store'] as String).readAll(),
+  ];
+  if (parsed['relays'] != null) {
+    events.addAll(
+      await fetchSwapRecoveryBackups(
+        relays: _parseRelays(parsed['relays'] as String),
+        recoveryPubkey: parsed['merchant-recovery-pubkey'] as String?,
+      ),
+    );
+  }
   final recoveries = swapRecoveriesFromEvents(events);
   final output = parsed['plan'] == true
       ? recoveryClaimPlan(recoveries)

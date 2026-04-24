@@ -3256,6 +3256,9 @@ verification evidence stay close to the source of truth.
 - Added terminal revocation sync: on cashier startup the PWA checks the
   configured backup servers for matching owner-removal events and locks the
   terminal before any new sale can be created.
+- Added controller recovery relay fetch: recovery-backup events are tagged for
+  the merchant recovery key when available, and `nostr_pos_cli recover-swaps`
+  can merge local records with recovery records fetched from configured relays.
 
 ### Known follow-ups
 

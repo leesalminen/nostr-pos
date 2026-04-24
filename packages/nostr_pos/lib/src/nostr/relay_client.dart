@@ -80,3 +80,37 @@ Future<NostrPosEvent?> findPairingAnnouncement({
         ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
   return valid.isEmpty ? null : valid.first;
 }
+
+Future<List<NostrPosEvent>> fetchSwapRecoveryBackups({
+  required List<String> relays,
+  String? recoveryPubkey,
+  NostrRelayClient? client,
+}) async {
+  final relayClient = client ?? NostrRelayClient();
+  final filter = <String, Object?>{
+    'kinds': [NostrPosKinds.swapRecoveryBackup],
+    'limit': 100,
+  };
+  if (recoveryPubkey != null && recoveryPubkey.isNotEmpty) {
+    filter['#p'] = [recoveryPubkey];
+  }
+
+  final events = <NostrPosEvent>[];
+  for (final relay in relays) {
+    try {
+      events.addAll(await relayClient.query(relay, filter));
+    } catch (_) {
+      // Recovery can continue as long as one configured relay responds.
+    }
+  }
+  final byId = <String, NostrPosEvent>{};
+  for (final event in events) {
+    if (event.kind == NostrPosKinds.swapRecoveryBackup &&
+        event.hasProtocolTag &&
+        event.idMatches) {
+      byId[event.id] = event;
+    }
+  }
+  return byId.values.toList()
+    ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+}

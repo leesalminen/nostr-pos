@@ -118,15 +118,18 @@ export function swapRecoveryEvent(input: {
   terminalId: string;
   encryptedLocalBlob: string;
   expiresAt: number;
+  recoveryPubkey?: string;
 }): LocalProtocolEvent {
+  const tags = [
+    ['proto', 'nostr-pos', '0.2'],
+    ['sale', input.saleId],
+    ['terminal', input.terminalId],
+    ['swap', input.swapId]
+  ];
+  if (input.recoveryPubkey) tags.push(['p', input.recoveryPubkey]);
   return {
     kind: KINDS.swapRecovery,
-    tags: [
-      ['proto', 'nostr-pos', '0.2'],
-      ['sale', input.saleId],
-      ['terminal', input.terminalId],
-      ['swap', input.swapId]
-    ],
+    tags,
     content: {
       sale_id: input.saleId,
       payment_attempt_id: input.paymentAttemptId,
