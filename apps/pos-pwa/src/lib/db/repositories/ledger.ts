@@ -1,24 +1,25 @@
 import type { OutboxItem, PaymentAttempt, Receipt, Sale, SwapRecoveryRecord, TransactionRow } from '../../pos/types';
+import { toPlainJson } from '../plain';
 import { getDb } from '../schema';
 
 export async function putSale(sale: Sale): Promise<void> {
-  await (await getDb()).put('sales', sale);
+  await (await getDb()).put('sales', toPlainJson(sale));
 }
 
 export async function putAttempt(attempt: PaymentAttempt): Promise<void> {
-  await (await getDb()).put('payment_attempts', attempt);
+  await (await getDb()).put('payment_attempts', toPlainJson(attempt));
 }
 
 export async function putReceipt(receipt: Receipt): Promise<void> {
-  await (await getDb()).put('receipts', receipt);
+  await (await getDb()).put('receipts', toPlainJson(receipt));
 }
 
 export async function putRecovery(record: SwapRecoveryRecord): Promise<void> {
-  await (await getDb()).put('swap_recovery_records', record);
+  await (await getDb()).put('swap_recovery_records', toPlainJson(record));
 }
 
 export async function putOutbox(item: OutboxItem): Promise<void> {
-  await (await getDb()).put('outbox', item);
+  await (await getDb()).put('outbox', toPlainJson(item));
 }
 
 export async function outboxItems(): Promise<OutboxItem[]> {

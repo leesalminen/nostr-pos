@@ -1,5 +1,6 @@
 import type { TerminalConfig } from '../../pos/types';
 import { createTerminalKeypair, pairingCodeFromPubkey } from '../../security/keys';
+import { toPlainJson } from '../plain';
 import { getDb } from '../schema';
 
 const terminalKey = 'active';
@@ -10,7 +11,7 @@ export async function getTerminalConfig(): Promise<TerminalConfig | undefined> {
 }
 
 export async function saveTerminalConfig(config: TerminalConfig): Promise<void> {
-  await (await getDb()).put('terminal_config', config, terminalKey);
+  await (await getDb()).put('terminal_config', toPlainJson(config), terminalKey);
 }
 
 export async function reserveAddressIndex(): Promise<number> {
