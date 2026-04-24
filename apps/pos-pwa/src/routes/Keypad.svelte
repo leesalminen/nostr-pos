@@ -3,6 +3,7 @@
   import { History, Settings } from 'lucide-svelte';
   import AmountDisplay from '../lib/ui/AmountDisplay.svelte';
   import BullFooter from '../lib/ui/BullFooter.svelte';
+  import BullSpinner from '../lib/ui/BullSpinner.svelte';
   import Button from '../lib/ui/Button.svelte';
   import Keypad from '../lib/ui/Keypad.svelte';
   import { terminal, loadTerminal } from '../lib/stores/terminal';
@@ -15,36 +16,42 @@
   let error = $state('');
   let lockedMessage = $state('');
   let tabReadOnly = $state(false);
+  let booting = $state(true);
   let tabLock: TerminalTabLock | undefined;
 
   onMount(async () => {
-    const config = await loadTerminal();
-    tabLock = createTerminalTabLock(config.terminalPubkey, (state) => {
-      tabReadOnly = state.readonly;
-    });
-    const [{ syncTerminalRevocation }, { reconcileOpenPayments }, { reconcileClaimBroadcasts, resumePreparedClaims }, { syncTerminalRecoveryBackups }, { mergePaymentHistory }] =
-      await Promise.all([
-        import('../lib/activation/revocation-sync'),
-        import('../lib/pos/reconciler'),
-        import('../lib/pos/claim-engine'),
-        import('../lib/pos/recovery-sync'),
-        import('../lib/pos/payment-history')
-      ]);
-    const revoked = await syncTerminalRevocation(config);
-    if (revoked) {
-      lockedMessage = 'This terminal was removed by the owner.';
-      return;
+    try {
+      const config = await loadTerminal();
+      if (!config.activatedAt) {
+        location.hash = '#/activate';
+        return;
+      }
+      tabLock = createTerminalTabLock(config.terminalPubkey, (state) => {
+        tabReadOnly = state.readonly;
+      });
+      const [{ syncTerminalRevocation }, { reconcileOpenPayments }, { reconcileClaimBroadcasts, resumePreparedClaims }, { syncTerminalRecoveryBackups }, { mergePaymentHistory }] =
+        await Promise.all([
+          import('../lib/activation/revocation-sync'),
+          import('../lib/pos/reconciler'),
+          import('../lib/pos/claim-engine'),
+          import('../lib/pos/recovery-sync'),
+          import('../lib/pos/payment-history')
+        ]);
+      const revoked = await syncTerminalRevocation(config);
+      if (revoked) {
+        lockedMessage = 'This terminal was removed by the owner.';
+        return;
+      }
+      booting = false;
+      await syncTerminalRecoveryBackups(config);
+      await reconcileOpenPayments();
+      await resumePreparedClaims(config);
+      await reconcileClaimBroadcasts(config);
+      await mergePaymentHistory(config);
+      await refreshTransactions();
+    } finally {
+      booting = false;
     }
-    if (!config.activatedAt) {
-      location.hash = '#/activate';
-      return;
-    }
-    await syncTerminalRecoveryBackups(config);
-    await reconcileOpenPayments();
-    await resumePreparedClaims(config);
-    await reconcileClaimBroadcasts(config);
-    await mergePaymentHistory(config);
-    await refreshTransactions();
   });
 
   onDestroy(() => {
@@ -87,6 +94,11 @@
 </script>
 
 <main class="min-h-[100dvh] bg-[#f5f0e8] text-[#211f1a] dark:bg-[#161512] dark:text-[#fff6e8]">
+  {#if booting}
+    <div class="grid min-h-[100dvh] place-items-center">
+      <BullSpinner size={72} />
+    </div>
+  {:else}
   <div class="mx-auto flex min-h-[100dvh] max-w-4xl flex-col">
     <section class="flex min-h-[100dvh] flex-1 flex-col px-5 py-4 sm:px-8 sm:py-6">
       <header class="mb-4 flex items-center justify-between gap-4 sm:mb-6">
@@ -140,4 +152,5 @@
       </div>
     </section>
   </div>
+  {/if}
 </main>
