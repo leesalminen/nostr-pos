@@ -15,6 +15,7 @@ void main(List<String> args) async {
     ..addCommand('create-pos')
     ..addCommand('pairing-code')
     ..addCommand('fetch-pairing')
+    ..addCommand('pos-url')
     ..addCommand('announce-terminal')
     ..addCommand('auth-terminal')
     ..addCommand('revoke-terminal')
@@ -27,7 +28,7 @@ void main(List<String> args) async {
     ..addCommand('quote');
 
   if (args.isEmpty) {
-    stdout.writeln('Commands: create-pos, pairing-code, quote');
+    stdout.writeln('Commands: create-pos, pos-url, pairing-code, quote');
     exitCode = 64;
     return;
   }
@@ -41,6 +42,8 @@ void main(List<String> args) async {
       _pairingCode(rest);
     case 'fetch-pairing':
       await _fetchPairing(rest);
+    case 'pos-url':
+      _posUrl(rest);
     case 'announce-terminal':
       await _announceTerminal(rest);
     case 'auth-terminal':
@@ -198,6 +201,28 @@ Future<void> _createPos(List<String> args) async {
   final signed = _maybeSign(event, merchantPrivkey);
   await LocalEventStore(parsed['store'] as String).append(signed);
   stdout.writeln(const JsonEncoder.withIndent('  ').convert(signed.toJson()));
+}
+
+void _posUrl(List<String> args) {
+  final parser = ArgParser()
+    ..addOption('pos-id', defaultsTo: 'seguras-butcher')
+    ..addOption('merchant-pubkey', defaultsTo: 'a' * 64)
+    ..addOption('merchant-privkey')
+    ..addOption('relays', defaultsTo: defaultRelays.join(','))
+    ..addOption('base-url', defaultsTo: 'https://pay.bullbitcoin.com/#/pos');
+  final parsed = parser.parse(args);
+  final merchantPrivkey = parsed['merchant-privkey'] as String?;
+  final merchantPubkey = merchantPrivkey == null
+      ? parsed['merchant-pubkey'] as String
+      : publicKeyFromPrivateKey(merchantPrivkey);
+  stdout.writeln(
+    posProfileUrl(
+      baseUrl: parsed['base-url'] as String,
+      identifier: parsed['pos-id'] as String,
+      pubkey: merchantPubkey,
+      relays: _parseRelays(parsed['relays'] as String),
+    ),
+  );
 }
 
 void _pairingCode(List<String> args) {

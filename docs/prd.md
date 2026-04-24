@@ -3274,6 +3274,9 @@ verification evidence stay close to the source of truth.
   `30380:<merchant-pubkey>:<pos-id>` coordinate resolves the public profile from
   relays, applies merchant name, POS name, fiat currency, relay list, and Liquid
   backend configuration locally, then continues to activation or the keypad.
+- Added Dart NIP-19 POS-link support: the SDK now encodes/decodes `naddr`
+  profile pointers against `nostr-tools` vectors, and `nostr_pos_cli pos-url`
+  prints a ready-to-open `#/pos/naddr...` link for controller setup.
 - CI now runs `dart analyze` for the Dart SDK as well as the CLI so relay,
   signing, and recovery SDK code gets static checks on every push.
 - README now documents the current smoke commands and the live relay-backed
