@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/nostr-pos/swap-recovery.schema.json",
+  "title": "Swap Recovery Backup Inner Content",
+  "type": "object",
+  "required": ["protocol", "version", "type", "sale_id", "payment_attempt_id", "swap_id", "amount", "settlement", "swap", "claim"],
+  "properties": {
+    "protocol": { "const": "nostr-pos" },
+    "version": { "const": 2 },
+    "type": { "const": "swap_recovery" },
+    "sale_id": { "type": "string" },
+    "payment_attempt_id": { "type": "string" },
+    "swap_id": { "type": "string" },
+    "amount": {
+      "type": "object",
+      "required": ["invoice_sat", "fiat_currency", "fiat_amount"],
+      "properties": {
+        "invoice_sat": { "type": "integer", "minimum": 1 },
+        "settlement_amount_sat": { "type": "integer", "minimum": 0 },
+        "fiat_currency": { "enum": ["USD", "CAD", "EUR", "CRC", "MXN", "ARS", "COP"] },
+        "fiat_amount": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "settlement": {
+      "type": "object",
+      "required": ["terminal_branch", "address_index", "address"],
+      "properties": {
+        "terminal_branch": { "type": "integer", "minimum": 0 },
+        "address_index": { "type": "integer", "minimum": 0 },
+        "address": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "swap": { "type": "object" },
+    "claim": {
+      "type": "object",
+      "required": ["mode", "preimage_revealed", "claim_tx_hex", "claim_txid"],
+      "properties": {
+        "mode": { "enum": ["standard", "covenant"] },
+        "preimage_revealed": { "type": "boolean" },
+        "claim_tx_hex": { "type": ["string", "null"] },
+        "claim_txid": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": true
+}

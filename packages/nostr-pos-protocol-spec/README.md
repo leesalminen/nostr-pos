@@ -6,6 +6,15 @@ The schemas in `schemas/` describe the public event envelopes and encrypted
 content payloads used by v1. The test vectors in `test-vectors/` are consumed by
 both the TypeScript terminal and Dart controller test suites.
 
+Schema files:
+
+- `pos-profile.schema.json`
+- `terminal-authorization.schema.json`
+- `sale-created.schema.json`
+- `payment-status.schema.json`
+- `receipt.schema.json`
+- `swap-recovery.schema.json`
+
 Current event kinds:
 
 - `30380` POS Profile

@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/nostr-pos/receipt.schema.json",
+  "title": "Receipt Content",
+  "type": "object",
+  "required": ["receipt_id", "sale_id", "created_at", "amount", "method", "status"],
+  "properties": {
+    "receipt_id": { "type": "string", "minLength": 1 },
+    "sale_id": { "type": "string", "minLength": 1 },
+    "created_at": { "type": "integer" },
+    "merchant_name": { "type": "string" },
+    "pos_name": { "type": "string" },
+    "amount": {
+      "type": "object",
+      "required": ["fiat_currency", "fiat_amount", "sat_amount"],
+      "properties": {
+        "fiat_currency": { "enum": ["USD", "CAD", "EUR", "CRC", "MXN", "ARS", "COP"] },
+        "fiat_amount": { "type": "string" },
+        "sat_amount": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "method": { "enum": ["liquid", "lightning_swap", "bolt_card", "lightning_via_swap"] },
+    "status": { "type": "string" },
+    "settlement_txid": { "type": ["string", "null"] },
+    "note": { "type": ["string", "null"] },
+    "discount_fiat": { "type": ["string", "null"] }
+  },
+  "additionalProperties": false
+}

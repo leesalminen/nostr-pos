@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/nostr-pos/payment-status.schema.json",
+  "title": "Payment Status Content",
+  "type": "object",
+  "required": ["sale_id", "status", "method", "updated_at", "payment"],
+  "properties": {
+    "sale_id": { "type": "string", "minLength": 1 },
+    "status": {
+      "enum": ["created", "waiting", "detected", "settling", "settled", "expired", "failed", "needs_recovery"]
+    },
+    "method": { "enum": ["liquid", "lightning_swap", "bolt_card", "lightning_via_swap"] },
+    "updated_at": { "type": "integer" },
+    "payment": {
+      "type": "object",
+      "properties": {
+        "settlement_txid": { "type": ["string", "null"] },
+        "settlement_vout": { "type": ["integer", "null"], "minimum": 0 },
+        "boltz_swap_id": { "type": ["string", "null"] },
+        "liquid_address": { "type": ["string", "null"] },
+        "address_index": { "type": ["integer", "null"], "minimum": 0 },
+        "terminal_branch": { "type": ["integer", "null"], "minimum": 0 }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

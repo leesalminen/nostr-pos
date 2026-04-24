@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/nostr-pos/sale-created.schema.json",
+  "title": "Sale Created Content",
+  "type": "object",
+  "required": ["sale_id", "created_at", "amount", "status"],
+  "properties": {
+    "sale_id": { "type": "string", "minLength": 1 },
+    "created_at": { "type": "integer" },
+    "amount": {
+      "type": "object",
+      "required": ["fiat_currency", "fiat_amount", "sat_amount"],
+      "properties": {
+        "fiat_currency": { "enum": ["USD", "CAD", "EUR", "CRC", "MXN", "ARS", "COP"] },
+        "fiat_amount": { "type": "string" },
+        "sat_amount": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "note": { "type": ["string", "null"] },
+    "discount_fiat": { "type": ["string", "null"] },
+    "status": { "const": "created" }
+  },
+  "additionalProperties": false
+}
