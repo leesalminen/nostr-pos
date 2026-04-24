@@ -4,10 +4,13 @@ import { fetchAddressTransactions, verifyAddressPayment } from '../liquid/esplor
 import { paymentStatusEvent } from '../nostr/events';
 import type { PaymentAttempt, Sale } from './types';
 import { settleAttempt } from './settlement';
+import { swapProviderForConfig } from './payment-state';
+import type { SwapProvider } from '../swaps/provider';
 
 export type ReconcileOptions = {
   now?: number;
   fetcher?: typeof fetch;
+  swapProvider?: SwapProvider;
 };
 
 function saleStatusForAttempt(attempt: PaymentAttempt): Sale['status'] {
@@ -22,7 +25,7 @@ function saleStatusForAttempt(attempt: PaymentAttempt): Sale['status'] {
 
 function normalizeOptions(input: number | ReconcileOptions | undefined): Required<Pick<ReconcileOptions, 'now'>> & ReconcileOptions {
   if (typeof input === 'number') return { now: input };
-  return { now: input?.now ?? Date.now(), fetcher: input?.fetcher };
+  return { now: input?.now ?? Date.now(), fetcher: input?.fetcher, swapProvider: input?.swapProvider };
 }
 
 async function verifyLiquidAttempt(
@@ -49,6 +52,43 @@ async function verifyLiquidAttempt(
   } catch {
     return { changed: false, terminal: false };
   }
+}
+
+async function reconcileSwapAttempt(
+  sale: Sale,
+  attempt: PaymentAttempt,
+  options: ReconcileOptions
+): Promise<{ changed: boolean; terminal: boolean }> {
+  if (attempt.method === 'liquid' || !attempt.swapId) return { changed: false, terminal: false };
+  const config = await getTerminalConfig();
+  if (!config) return { changed: false, terminal: false };
+  let status;
+  try {
+    const provider = options.swapProvider ?? swapProviderForConfig(config);
+    status = await provider.getSwapStatus(attempt.swapId);
+  } catch {
+    return { changed: false, terminal: false };
+  }
+  const now = options.now ?? Date.now();
+  const nextStatus =
+    status === 'expired' || status === 'failed'
+      ? status
+      : status === 'invoice.paid' || status === 'transaction.mempool' || status === 'transaction.confirmed'
+        ? 'detected'
+        : undefined;
+  if (!nextStatus || nextStatus === attempt.status) return { changed: false, terminal: false };
+  const nextAttempt: PaymentAttempt = { ...attempt, status: nextStatus, updatedAt: now };
+  const nextSale: Sale = { ...sale, status: saleStatusForAttempt(nextAttempt), updatedAt: now };
+  await putAttempt(nextAttempt);
+  await putSale(nextSale);
+  await putOutbox({
+    id: `status_${nextAttempt.id}_${now}`,
+    type: 'payment_status',
+    payload: paymentStatusEvent(nextSale, nextAttempt),
+    createdAt: now,
+    okFrom: []
+  });
+  return { changed: true, terminal: true };
 }
 
 export async function reconcileOpenPayments(input?: number | ReconcileOptions): Promise<number> {
@@ -81,6 +121,12 @@ export async function reconcileOpenPayments(input?: number | ReconcileOptions): 
 
     const verified = await verifyLiquidAttempt(sale, attempt, options);
     if (verified.terminal) {
+      changed += 1;
+      continue;
+    }
+
+    const swap = await reconcileSwapAttempt(sale, attempt, options);
+    if (swap.terminal) {
       changed += 1;
     }
   }

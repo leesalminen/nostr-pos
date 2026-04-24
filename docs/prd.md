@@ -3343,6 +3343,10 @@ verification evidence stay close to the source of truth.
   production authorizations with a Boltz provider create BTC Lightning →
   L-BTC swaps with locally generated preimages and claim keys before the
   recovery durability rule exposes the invoice.
+- Persisted Boltz swap ids on Lightning/Bolt Card attempts and added startup
+  reconciliation against the configured swap provider, so refresh after invoice
+  display can detect provider-side lockup progress and queue encrypted status
+  updates instead of relying only on local button-driven settlement.
 - CI now runs `dart analyze` for the Dart SDK as well as the CLI so relay,
   signing, and recovery SDK code gets static checks on every push.
 - README now documents the current smoke commands and the live relay-backed

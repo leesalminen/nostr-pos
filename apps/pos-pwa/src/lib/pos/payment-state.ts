@@ -116,6 +116,7 @@ export async function createSale(
     liquidAddress: liquid.address,
     addressIndex: liquid.addressIndex,
     terminalBranch: liquid.terminalBranch,
+    swapId: method === 'liquid' ? undefined : swap.id,
     createdAt: now,
     updatedAt: now,
     expiresAt: now + 15 * 60_000

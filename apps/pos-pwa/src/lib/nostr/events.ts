@@ -78,6 +78,7 @@ export function paymentStatusEvent(sale: Sale, attempt: PaymentAttempt): LocalPr
       method: attempt.method,
       updated_at: Math.floor(attempt.updatedAt / 1000),
       payment: {
+        boltz_swap_id: attempt.swapId ?? null,
         settlement_txid: attempt.settlementTxid ?? null,
         liquid_address: attempt.liquidAddress ?? null,
         address_index: attempt.addressIndex ?? null,

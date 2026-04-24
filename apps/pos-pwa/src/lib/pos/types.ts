@@ -54,6 +54,7 @@ export type PaymentAttempt = {
   liquidAddress?: string;
   addressIndex?: number;
   terminalBranch?: number;
+  swapId?: string;
   settlementTxid?: string;
   createdAt: number;
   updatedAt: number;

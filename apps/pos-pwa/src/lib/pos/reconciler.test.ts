@@ -121,6 +121,61 @@ describe('startup reconciliation', () => {
     expect(outbox).toHaveLength(2);
   });
 
+  it('marks Lightning swaps detected by the provider after refresh', async () => {
+    const { reconcileOpenPayments } = await import('./reconciler');
+    config = {
+      merchantName: 'Merchant',
+      posName: 'Counter',
+      currency: 'CRC',
+      terminalId: 'term1',
+      terminalPubkey: 'pub',
+      pairingCode: 'ABCD-EFGH',
+      maxInvoiceSat: 100000,
+      syncServers: []
+    };
+    sales.set('sale4', {
+      id: 'sale4',
+      receiptNumber: 'R-4',
+      posRef: 'pos',
+      terminalId: 'term1',
+      amountFiat: '8500',
+      fiatCurrency: 'CRC',
+      amountSat: 25000,
+      status: 'payment_ready',
+      createdAt: 0,
+      updatedAt: 0
+    });
+    attempts.set('attempt4', {
+      id: 'attempt4',
+      saleId: 'sale4',
+      method: 'lightning_swap',
+      status: 'waiting',
+      swapId: 'swap4',
+      createdAt: 0,
+      updatedAt: 0,
+      expiresAt: 100
+    });
+
+    await expect(
+      reconcileOpenPayments({
+        now: 12,
+        swapProvider: {
+          id: 'test',
+          getLimits: async () => ({ minSat: 1000, maxSat: 100000 }),
+          createReverseSwap: async () => {
+            throw new Error('not used');
+          },
+          getSwapStatus: async () => 'transaction.mempool',
+          verifySwap: () => ({ ok: true }),
+          supportsClaimCovenants: () => false
+        }
+      })
+    ).resolves.toBe(1);
+    expect(attempts.get('attempt4')?.status).toBe('detected');
+    expect(sales.get('sale4')?.status).toBe('payment_detected');
+    expect(outbox).toHaveLength(1);
+  });
+
   it('resumes an existing sale without creating a new attempt', async () => {
     const { resumeSale } = await import('./reconciler');
     sales.set('sale3', {
