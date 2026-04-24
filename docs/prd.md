@@ -3222,8 +3222,8 @@ verification evidence stay close to the source of truth.
   material, uses `boltz-core` + `liquidjs-lib` + `secp256k1-zkp` to construct a
   cooperative claim transaction, requests Boltz's partial signature, persists
   `claim_tx_hex` before broadcast, then broadcasts through the configured
-  Esplora backend. Remaining hardening gap: fee bump/RBF policy and
-  non-cooperative script-path fallback.
+  Esplora backend. Remaining hardening gap: non-cooperative script-path
+  fallback.
 - Extended startup polling reconciliation to use detailed Boltz status responses
   too, so reload/offline recovery can fetch the lockup transaction id/hex and run
   the same claim path even when no WebSocket update is active.
@@ -3239,8 +3239,12 @@ verification evidence stay close to the source of truth.
 - The terminal now reconciles broadcast claim txids against the Liquid backend:
   confirmed claims are stamped with `claim_confirmed_at`, while unconfirmed
   claims older than the 30 minute RBF window are flagged in the recovery center
-  as needing a fee bump. Actual replacement-tx construction remains the next
-  hardening step.
+  as needing a fee bump.
+- Added terminal-side claim fee bumping for stuck Boltz claims: lockup txid/hex
+  is retained in the recovery record, Advanced → Recovery center can rebuild a
+  replacement claim at a higher fee rate, the replacement `claim_tx_hex` is
+  persisted before broadcast, and the replaced claim txid stays in audit state
+  so the old transaction can still be observed if it confirms first.
 - Added local protocol outbox events for sale-created, payment-status, and
   receipt records, plus startup reconciliation that expires stale open attempts
   and records the status update. This is the IndexedDB side of the PRD's

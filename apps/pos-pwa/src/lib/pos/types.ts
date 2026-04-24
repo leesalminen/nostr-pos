@@ -77,8 +77,11 @@ export type SwapRecoveryRecord = {
   relaySavedAt?: number;
   okFrom: string[];
   expiresAt: number;
+  lockupTxid?: string;
+  lockupTxHex?: string;
   claimTxHex?: string;
   claimTxid?: string;
+  replacedClaimTxids?: string[];
   claimPreparedAt?: number;
   claimLastTriedAt?: number;
   claimBroadcastAttempts?: number;

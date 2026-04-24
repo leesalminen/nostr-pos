@@ -7,7 +7,7 @@
   import { clearAdminPin, loadTerminal, setAdminPin, terminal } from '../../../lib/stores/terminal';
   import { outboxItems, recentTransactions, recoveryRecords } from '../../../lib/db/repositories/ledger';
   import { recoveryBackupsJson, transactionsCsv } from '../../../lib/pos/export';
-  import { broadcastPreparedClaims } from '../../../lib/pos/claim-engine';
+  import { broadcastPreparedClaims, bumpFeeDueClaims } from '../../../lib/pos/claim-engine';
   import { publishPendingOutbox } from '../../../lib/nostr/outbox';
   import { clearAdminUnlock, isAdminUnlocked, markAdminUnlocked, verifyAdminPin } from '../../../lib/security/admin-pin';
   import type { SwapRecoveryRecord } from '../../../lib/pos/types';
@@ -111,6 +111,26 @@
       else syncMessage = `${broadcast} claims broadcast.`;
     } catch (err) {
       syncMessage = err instanceof Error ? err.message : 'Could not finish claims.';
+    } finally {
+      claimBusy = false;
+    }
+  }
+
+  async function bumpStaleClaims() {
+    if (!$terminal || claimBusy) return;
+    claimBusy = true;
+    syncMessage = '';
+    try {
+      const results = await bumpFeeDueClaims($terminal);
+      await loadCounts();
+      const broadcast = results.filter((result) => result.status === 'broadcast').length;
+      const failed = results.filter((result) => result.status === 'failed').length;
+      const skipped = results.filter((result) => result.status === 'skipped').length;
+      if (results.length === 0) syncMessage = 'No claims need a fee bump.';
+      else if (failed || skipped) syncMessage = `${broadcast} fee bumps broadcast. ${failed + skipped} need attention.`;
+      else syncMessage = `${broadcast} fee bumps broadcast.`;
+    } catch (err) {
+      syncMessage = err instanceof Error ? err.message : 'Could not bump claim fees.';
     } finally {
       claimBusy = false;
     }
@@ -299,6 +319,9 @@
           <Button variant="secondary" onclick={syncNow}>Sync now</Button>
           <Button variant="secondary" disabled={claimBusy || preparedClaimCount() === 0} onclick={finishPreparedClaims}>
             <RotateCw size={18} />Finish claims
+          </Button>
+          <Button variant="secondary" disabled={claimBusy || feeBumpDueCount() === 0} onclick={bumpStaleClaims}>
+            <RotateCw size={18} />Bump fees
           </Button>
           <Button variant="secondary" onclick={exportRecoveryBackups}><Download size={18} />Export backups</Button>
           {#if syncMessage}

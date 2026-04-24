@@ -8,6 +8,9 @@ import {
   markSwapClaimBroadcastFailed,
   markSwapClaimConfirmed,
   markSwapClaimNeedsFeeBump,
+  markSwapClaimReplacementFailed,
+  markSwapClaimReplacementPrepared,
+  markSwapLockupSeen,
   markSwapRecoveryFinished
 } from './recovery-state';
 import { settleAttempt } from './settlement';
@@ -27,6 +30,10 @@ export type ClaimConfirmationResult = {
   reason?: string;
 };
 
+export type ClaimFeeBumpResult = PreparedClaimResult & {
+  feeSatPerVbyte?: number;
+};
+
 function primaryLiquidBackend(config: TerminalConfig): LiquidBackend | undefined {
   return config.authorization?.liquid_backends?.find((backend) => backend.type === 'esplora' && backend.url);
 }
@@ -37,6 +44,11 @@ function primaryBoltzApiBase(config: TerminalConfig): string | undefined {
 
 function preparedClaimRows(records: SwapRecoveryRecord[]): SwapRecoveryRecord[] {
   return records.filter((record) => ['claimable', 'failed'].includes(record.status) && Boolean(record.claimTxHex));
+}
+
+function nextClaimFeeRate(record: SwapRecoveryRecord): number {
+  const current = record.claimFeeSatPerVbyte ?? 0.1;
+  return Math.max(Number((current * 1.5).toFixed(2)), Number((current + 0.1).toFixed(2)));
 }
 
 async function settleRecoveredClaim(record: SwapRecoveryRecord, txid: string, settledAt = Date.now()): Promise<void> {
@@ -97,6 +109,9 @@ export async function claimLiquidReverseSwap(
 
   const existing = await getRecoveryBySwap(input.swapId);
   if (!existing) return { swapId: input.swapId, status: 'skipped', reason: 'No recovery record found.' };
+  if (input.lockupTxHex || input.lockupTxid) {
+    await markSwapLockupSeen({ swapId: input.swapId, lockupTxHex: input.lockupTxHex, lockupTxid: input.lockupTxid });
+  }
   if (existing.claimTxHex) {
     const [result] = await broadcastPreparedClaims(config, { fetcher: input.fetcher, records: [existing], now: input.now });
     return result ?? { swapId: input.swapId, status: 'skipped', reason: 'No prepared claim transaction is ready.' };
@@ -108,6 +123,7 @@ export async function claimLiquidReverseSwap(
   try {
     const lockupTxHex = input.lockupTxHex ?? (input.lockupTxid ? await fetchTransactionHex(backend.url, input.lockupTxid, input.fetcher) : undefined);
     if (!lockupTxHex) return { swapId: input.swapId, status: 'skipped', reason: 'No Liquid lockup transaction available.' };
+    await markSwapLockupSeen({ swapId: input.swapId, lockupTxHex, lockupTxid: input.lockupTxid });
     const payload = await decryptJson<RecoveryPayload>(existing.encryptedLocalBlob, config.terminalId);
     if (!payload.swap) return { swapId: input.swapId, status: 'failed', reason: 'Recovery record does not contain swap material.' };
     const destinationAddress = payload.settlement?.address ?? payload.swap.claimAddress;
@@ -174,6 +190,73 @@ export async function reconcileClaimBroadcasts(
         status: 'failed',
         reason: err instanceof Error ? err.message : 'Could not verify claim transaction.'
       });
+    }
+  }
+  return results;
+}
+
+export async function bumpFeeDueClaims(
+  config: TerminalConfig,
+  options: { fetcher?: typeof fetch; now?: number; records?: SwapRecoveryRecord[] } = {}
+): Promise<ClaimFeeBumpResult[]> {
+  const backend = primaryLiquidBackend(config);
+  const apiBase = primaryBoltzApiBase(config);
+  const records = (options.records ?? (await recoveryRecords())).filter(
+    (record) => record.claimNeedsFeeBump && record.claimTxid && !record.claimConfirmedAt
+  );
+  if (!backend) {
+    return records.map((record) => ({ swapId: record.swapId, status: 'skipped', reason: 'No Liquid backend configured.' }));
+  }
+  if (!apiBase) {
+    return records.map((record) => ({ swapId: record.swapId, status: 'skipped', reason: 'No Boltz provider configured.' }));
+  }
+
+  const now = options.now ?? Date.now();
+  const results: ClaimFeeBumpResult[] = [];
+  for (const record of records) {
+    const nextFee = nextClaimFeeRate(record);
+    try {
+      const lockupTxHex =
+        record.lockupTxHex ?? (record.lockupTxid ? await fetchTransactionHex(backend.url, record.lockupTxid, options.fetcher) : undefined);
+      if (!lockupTxHex) {
+        results.push({ swapId: record.swapId, status: 'skipped', reason: 'No Liquid lockup transaction available.' });
+        continue;
+      }
+      if (!record.lockupTxHex) {
+        await markSwapLockupSeen({ swapId: record.swapId, lockupTxHex, lockupTxid: record.lockupTxid });
+      }
+
+      const payload = await decryptJson<RecoveryPayload>(record.encryptedLocalBlob, config.terminalId);
+      if (!payload.swap) {
+        await markSwapClaimReplacementFailed({ swapId: record.swapId, error: 'Recovery record does not contain swap material.', now });
+        results.push({ swapId: record.swapId, status: 'failed', reason: 'Recovery record does not contain swap material.' });
+        continue;
+      }
+      const destinationAddress = payload.settlement?.address ?? payload.swap.claimAddress;
+      const claimTxHex = await buildBoltzLiquidReverseClaim({
+        apiBase,
+        swap: payload.swap,
+        lockupTxHex,
+        destinationAddress,
+        feeSatPerVbyte: nextFee,
+        fetcher: options.fetcher
+      });
+      const prepared = await markSwapClaimReplacementPrepared({
+        swapId: record.swapId,
+        claimTxHex,
+        feeSatPerVbyte: nextFee,
+        now
+      });
+      if (!prepared) {
+        results.push({ swapId: record.swapId, status: 'skipped', reason: 'No recovery record found.' });
+        continue;
+      }
+      const [broadcast] = await broadcastPreparedClaims(config, { fetcher: options.fetcher, records: [prepared], now });
+      results.push({ ...(broadcast ?? { swapId: record.swapId, status: 'skipped' as const }), feeSatPerVbyte: nextFee });
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : 'Could not bump claim fee.';
+      await markSwapClaimReplacementFailed({ swapId: record.swapId, error: reason, now });
+      results.push({ swapId: record.swapId, status: 'failed', reason, feeSatPerVbyte: nextFee });
     }
   }
   return results;

@@ -66,6 +66,43 @@ describe('swap recovery state', () => {
     });
   });
 
+  it('stores the lockup transaction and prepares replacement claims without losing old tx audit', async () => {
+    const { markSwapClaimReplacementPrepared, markSwapLockupSeen, markSwapRecoveryFinished } = await import('./recovery-state');
+
+    await markSwapLockupSeen({ swapId: 'swap1', lockupTxid: 'lockup1', lockupTxHex: 'lockuphex' });
+    await markSwapRecoveryFinished({ swapId: 'swap1', claimTxHex: 'oldhex', claimTxid: 'oldtx', now: 70 });
+    await markSwapClaimReplacementPrepared({ swapId: 'swap1', claimTxHex: 'newhex', feeSatPerVbyte: 0.3, now: 250 });
+
+    expect(recoveries.get('swap1')).toMatchObject({
+      status: 'claimable',
+      lockupTxid: 'lockup1',
+      lockupTxHex: 'lockuphex',
+      claimTxHex: 'newhex',
+      claimTxid: 'oldtx',
+      replacedClaimTxids: ['oldtx'],
+      claimPreparedAt: 250,
+      claimFeeSatPerVbyte: 0.3,
+      claimRbfCount: 1,
+      claimNeedsFeeBump: false
+    });
+  });
+
+  it('keeps the old claim observable when a replacement broadcast fails', async () => {
+    const { markSwapClaimBroadcastFailed, markSwapClaimReplacementPrepared, markSwapRecoveryFinished } = await import('./recovery-state');
+
+    await markSwapRecoveryFinished({ swapId: 'swap1', claimTxHex: 'oldhex', claimTxid: 'oldtx', now: 70 });
+    await markSwapClaimReplacementPrepared({ swapId: 'swap1', claimTxHex: 'newhex', feeSatPerVbyte: 0.3, now: 250 });
+    await markSwapClaimBroadcastFailed({ swapId: 'swap1', error: 'rejected replacement', now: 251 });
+
+    expect(recoveries.get('swap1')).toMatchObject({
+      status: 'claimed',
+      claimTxid: 'oldtx',
+      claimTxHex: 'newhex',
+      claimNeedsFeeBump: true,
+      claimLastError: 'rejected replacement'
+    });
+  });
+
   it('flags stale unconfirmed claims for fee bump and clears flag on confirmation', async () => {
     const { markSwapClaimNeedsFeeBump, markSwapClaimConfirmed, markSwapRecoveryFinished } = await import('./recovery-state');
 

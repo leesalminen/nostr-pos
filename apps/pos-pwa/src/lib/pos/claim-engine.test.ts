@@ -222,6 +222,7 @@ describe('prepared claim broadcaster', () => {
     });
     expect(recoveries.get('swap3')).toMatchObject({
       status: 'claimed',
+      lockupTxHex: 'lockuphex',
       claimTxHex: 'claimhex',
       claimTxid: 'claimtxid',
       claimBroadcastAttempts: 1,
@@ -257,6 +258,7 @@ describe('prepared claim broadcaster', () => {
     });
     expect(fetchTransactionHex).toHaveBeenCalledWith('https://liquid.example/api/', 'lockuptxid', undefined);
     expect(buildBoltzLiquidReverseClaim).toHaveBeenCalledWith(expect.objectContaining({ lockupTxHex: 'lockuphex' }));
+    expect(recoveries.get('swap4')).toMatchObject({ lockupTxHex: 'lockuphex', lockupTxid: 'lockuptxid' });
   });
 
   it('marks broadcast claims confirmed when the backend confirms the claim tx', async () => {
@@ -303,5 +305,103 @@ describe('prepared claim broadcaster', () => {
       { swapId: 'swap6', status: 'fee_bump_due' }
     ]);
     expect(recoveries.get('swap6')).toMatchObject({ claimNeedsFeeBump: true });
+  });
+
+  it('rebuilds and broadcasts fee-bumped claims while preserving the replaced txid', async () => {
+    const { decryptJson } = await import('../db/crypto');
+    const { broadcastLiquidTransaction } = await import('../liquid/esplora');
+    const { buildBoltzLiquidReverseClaim } = await import('../swaps/boltz-claim');
+    const { bumpFeeDueClaims } = await import('./claim-engine');
+    recoveries.set('swap7', {
+      saleId: 'sale7',
+      paymentAttemptId: 'attempt7',
+      swapId: 'swap7',
+      encryptedLocalBlob: 'ciphertext',
+      localSavedAt: 0,
+      okFrom: [],
+      expiresAt: 1000,
+      lockupTxHex: 'lockuphex',
+      claimTxHex: 'oldclaimhex',
+      claimTxid: 'oldclaimtxid',
+      claimFeeSatPerVbyte: 0.2,
+      claimNeedsFeeBump: true,
+      status: 'claimed'
+    });
+    vi.mocked(decryptJson).mockResolvedValue({
+      settlement: { address: 'lq1destination' },
+      swap: {
+        id: 'swap7',
+        invoice: 'lnbc1',
+        preimageHash: '22'.repeat(32),
+        timeoutBlockHeight: 500,
+        claimAddress: 'lq1destination',
+        expectedAmountSat: 1000
+      }
+    });
+    vi.mocked(buildBoltzLiquidReverseClaim).mockResolvedValue('newclaimhex');
+    vi.mocked(broadcastLiquidTransaction).mockImplementation(async () => {
+      expect(recoveries.get('swap7')).toMatchObject({
+        status: 'claimable',
+        claimTxHex: 'newclaimhex',
+        claimTxid: 'oldclaimtxid',
+        replacedClaimTxids: ['oldclaimtxid'],
+        claimRbfCount: 1
+      });
+      return 'newclaimtxid';
+    });
+
+    await expect(bumpFeeDueClaims(config, { now: 500 })).resolves.toEqual([
+      { swapId: 'swap7', status: 'broadcast', txid: 'newclaimtxid', feeSatPerVbyte: 0.3 }
+    ]);
+    expect(buildBoltzLiquidReverseClaim).toHaveBeenCalledWith(
+      expect.objectContaining({ lockupTxHex: 'lockuphex', feeSatPerVbyte: 0.3 })
+    );
+    expect(recoveries.get('swap7')).toMatchObject({
+      status: 'claimed',
+      claimTxHex: 'newclaimhex',
+      claimTxid: 'newclaimtxid',
+      replacedClaimTxids: ['oldclaimtxid'],
+      claimFeeSatPerVbyte: 0.3,
+      claimNeedsFeeBump: false,
+      claimBroadcastAttempts: 1,
+      claimBroadcastAt: 500
+    });
+  });
+
+  it('fetches stored lockup txids before fee-bumping claims', async () => {
+    const { decryptJson } = await import('../db/crypto');
+    const { broadcastLiquidTransaction, fetchTransactionHex } = await import('../liquid/esplora');
+    const { buildBoltzLiquidReverseClaim } = await import('../swaps/boltz-claim');
+    const { bumpFeeDueClaims } = await import('./claim-engine');
+    recoveries.set('swap8', {
+      saleId: 'sale8',
+      paymentAttemptId: 'attempt8',
+      swapId: 'swap8',
+      encryptedLocalBlob: 'ciphertext',
+      localSavedAt: 0,
+      okFrom: [],
+      expiresAt: 1000,
+      lockupTxid: 'lockuptxid',
+      claimTxid: 'oldclaimtxid',
+      claimNeedsFeeBump: true,
+      status: 'claimed'
+    });
+    vi.mocked(fetchTransactionHex).mockResolvedValue('lockuphex');
+    vi.mocked(decryptJson).mockResolvedValue({
+      swap: {
+        id: 'swap8',
+        invoice: 'lnbc1',
+        preimageHash: '22'.repeat(32),
+        timeoutBlockHeight: 500,
+        claimAddress: 'lq1destination',
+        expectedAmountSat: 1000
+      }
+    });
+    vi.mocked(buildBoltzLiquidReverseClaim).mockResolvedValue('newclaimhex');
+    vi.mocked(broadcastLiquidTransaction).mockResolvedValue('newclaimtxid');
+
+    await expect(bumpFeeDueClaims(config, { now: 700 })).resolves.toMatchObject([{ status: 'broadcast' }]);
+    expect(fetchTransactionHex).toHaveBeenCalledWith('https://liquid.example/api/', 'lockuptxid', undefined);
+    expect(recoveries.get('swap8')).toMatchObject({ lockupTxHex: 'lockuphex' });
   });
 });

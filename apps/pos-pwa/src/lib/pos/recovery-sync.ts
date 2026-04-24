@@ -55,8 +55,20 @@ export async function applyTerminalRecoveryBackup(config: TerminalConfig, event:
     relaySavedAt: existing?.relaySavedAt ?? now,
     okFrom: existing?.okFrom ?? [],
     expiresAt: parsed.expiresAt,
+    lockupTxHex: existing?.lockupTxHex,
+    lockupTxid: existing?.lockupTxid,
     claimTxHex: existing?.claimTxHex,
     claimTxid: existing?.claimTxid,
+    replacedClaimTxids: existing?.replacedClaimTxids,
+    claimPreparedAt: existing?.claimPreparedAt,
+    claimLastTriedAt: existing?.claimLastTriedAt,
+    claimBroadcastAttempts: existing?.claimBroadcastAttempts,
+    claimLastError: existing?.claimLastError,
+    claimFeeSatPerVbyte: existing?.claimFeeSatPerVbyte,
+    claimRbfCount: existing?.claimRbfCount,
+    claimBroadcastAt: existing?.claimBroadcastAt,
+    claimConfirmedAt: existing?.claimConfirmedAt,
+    claimNeedsFeeBump: existing?.claimNeedsFeeBump,
     status: existing?.status ?? 'pending'
   };
   await putRecovery(next);
