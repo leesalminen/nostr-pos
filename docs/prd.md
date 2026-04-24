@@ -1254,7 +1254,10 @@ Notes:
 - `limits.max_invoice_sat` default is **100,000 sats** (~$79 USD at scoping). This is the primary mitigation for the §15 standard-swap theft vector. Merchants may raise but should document risk.
 - `pairing_code_hint` lets the terminal sanity-check that the authorization matches the code it displayed.
 - `claim_mode` defaults to the POS profile value. Reserved for per-terminal override in v1.1.
-- TODO before production pilot: the Dart controller SDK/CLI must encrypt kind-30381 content with NIP-44 v2 to the terminal pubkey before relay publish. The current TypeScript terminal can decrypt NIP-44 v2 authorization events, but pilot plaintext compatibility must remain dev-only and must not be accepted in production builds.
+- Production pilot status: Dart `auth-terminal` encrypts kind-30381 content with
+  NIP-44 v2 to the terminal pubkey when signed with the merchant private key.
+  The TypeScript terminal decrypts those approvals, while plaintext approval
+  compatibility remains dev/test only and is rejected in production builds.
 
 ### 9.4 Terminal Revocation Event
 
@@ -1468,8 +1471,12 @@ Privacy TODO before production pilot:
 - Reconfirm with a production build smoke test that kind-9380/9382/9383
   payment records refuse plaintext publication when the merchant recovery key is
   missing.
-- Re-review public tags on encrypted events. Even with encrypted content, tags like `sale`, `terminal`, `status`, `method`, `swap`, timestamps, and POS `a` refs can leak sales cadence, terminal activity, payment outcomes, or business volume patterns.
-- Decide whether `status` and `method` belong in public tags for v1 or should move into encrypted content only, with less-specific routing tags left public.
+- Re-review public tags on encrypted events. Even with encrypted content, tags
+  like `sale`, `terminal`, `swap`, timestamps, and POS `a` refs can leak sales
+  cadence, terminal activity, or business volume patterns.
+- Status and method are now kept inside encrypted content for payment/receipt
+  records rather than relay-visible tags; keep that invariant in the UI copy
+  grep/protocol review before pilot.
 - Audit other relay-visible records for public leakage before pilot: kind-30380 POS profiles, kind-30382 revocations, kind-30383 pairing announcements, kind-9380 sale-created tags, and kind-9381 recovery-backup tags/wrappers.
 - Document the public-receipt variant as explicit merchant opt-in only, with a minimal field set and no notes, discounts, terminal identifiers, or settlement details unless deliberately enabled.
 
