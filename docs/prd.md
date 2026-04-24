@@ -3215,3 +3215,6 @@ verification evidence stay close to the source of truth.
   now real secp256k1 secret/public key pairs, events can be signed and verified,
   and publish results expose per-server OK counts for the recovery durability
   rule.
+- Added signed outbox publishing, publishable recovery-backup records, queued
+  pairing announcements from the activation flow, controller `recover-swaps`
+  planning, and a Web NFC Bolt Card read loop wired to the LNURL-withdraw helper.
