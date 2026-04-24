@@ -3255,7 +3255,9 @@ verification evidence stay close to the source of truth.
   claim engine to queue an updated recovery backup after `claim_tx_hex` is
   prepared and again after a claim txid is known. The Dart controller now parses
   those fields and can broadcast a prepared claim tx directly from relay
-  recovery data, covering the crash window after terminal-side claim preparation.
+  recovery data, covering the crash window after terminal-side claim
+  preparation. `nostr_pos_cli recover-swaps --broadcast-prepared --liquid-api
+  <esplora>` exposes that controller path.
 - Added local protocol outbox events for sale-created, payment-status, and
   receipt records, plus startup reconciliation that expires stale open attempts
   and records the status update. This is the IndexedDB side of the PRD's

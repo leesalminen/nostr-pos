@@ -174,6 +174,23 @@ Future<void> _recoverSwaps(List<String> args) async {
       'merchant-recovery-privkey',
       help: 'Private key used to unwrap NIP-59 recovery backups.',
     )
+    ..addOption(
+      'terminal-id',
+      help: 'Terminal id to use when decrypting recovery blobs without tags.',
+    )
+    ..addOption(
+      'boltz-api',
+      help: 'Boltz API base URL used to check swap status before recovery.',
+    )
+    ..addOption(
+      'liquid-api',
+      help: 'Liquid Esplora API base URL used to broadcast prepared claims.',
+    )
+    ..addFlag(
+      'broadcast-prepared',
+      defaultsTo: false,
+      help: 'Broadcast prepared claim_tx_hex values found in recovery records.',
+    )
     ..addFlag('plan', defaultsTo: true);
   final parsed = parser.parse(args);
   final recoveryPrivkey = parsed['merchant-recovery-privkey'] as String?;
@@ -195,10 +212,44 @@ Future<void> _recoverSwaps(List<String> args) async {
     );
   }
   final recoveries = swapRecoveriesFromEvents(events);
+  if (parsed['broadcast-prepared'] == true) {
+    final liquidApi = parsed['liquid-api'] as String?;
+    if (liquidApi == null || liquidApi.isEmpty) {
+      stderr.writeln('--liquid-api is required with --broadcast-prepared.');
+      exitCode = 64;
+      return;
+    }
+    final boltzApi = parsed['boltz-api'] as String?;
+    final executor = ControllerRecoveryExecutor(
+      swapStatusClient: boltzApi == null || boltzApi.isEmpty
+          ? _StaticSwapStatusClient()
+          : BoltzSwapStatusClient(apiBase: boltzApi),
+      liquidClient: LiquidTransactionClient(apiBase: liquidApi),
+      claimBuilder: (_) async => throw UnsupportedError(
+        'Dart claim transaction construction is not wired yet.',
+      ),
+    );
+    final results = await executor.recoverClaims(
+      recoveries,
+      terminalId: parsed['terminal-id'] as String?,
+    );
+    stdout.writeln(
+      const JsonEncoder.withIndent(
+        '  ',
+      ).convert(results.map((result) => result.toJson()).toList()),
+    );
+    return;
+  }
   final output = parsed['plan'] == true
       ? recoveryClaimPlan(recoveries)
       : recoveries.map((recovery) => recovery.toJson()).toList();
   stdout.writeln(const JsonEncoder.withIndent('  ').convert(output));
+}
+
+class _StaticSwapStatusClient implements SwapStatusClient {
+  @override
+  Future<SwapStatusDetails> getSwapStatusDetails(String swapId) async =>
+      SwapStatusDetails(status: 'created');
 }
 
 Future<void> _publishEvents(List<String> args) async {
