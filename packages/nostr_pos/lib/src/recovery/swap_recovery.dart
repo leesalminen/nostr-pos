@@ -36,8 +36,9 @@ List<SwapRecoverySummary> swapRecoveriesFromEvents(List<NostrPosEvent> events) {
   for (final event in events) {
     if (event.kind != NostrPosKinds.swapRecoveryBackup ||
         !event.hasProtocolTag ||
-        !event.idMatches)
+        !event.idMatches) {
       continue;
+    }
     final content = jsonDecode(event.content) as Map<String, Object?>;
     final swapId = content['swap_id'] as String?;
     if (swapId == null) continue;

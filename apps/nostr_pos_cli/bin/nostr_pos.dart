@@ -73,6 +73,11 @@ List<String> _parseRelays(String value) {
       .toList();
 }
 
+NostrPosEvent _maybeSign(NostrPosEvent event, String? privateKeyHex) {
+  if (privateKeyHex == null || privateKeyHex.isEmpty) return event;
+  return signNostrPosEvent(event, privateKeyHex);
+}
+
 Future<void> _listSales(List<String> args) async {
   final parser = ArgParser()
     ..addOption('store', defaultsTo: '.nostr-pos/events.jsonl');
@@ -139,8 +144,13 @@ Future<void> _createPos(List<String> args) async {
     ..addOption('currency', defaultsTo: 'CRC')
     ..addOption('pos-id', defaultsTo: 'seguras-butcher')
     ..addOption('merchant-pubkey', defaultsTo: 'a' * 64)
+    ..addOption('merchant-privkey')
     ..addOption('store', defaultsTo: '.nostr-pos/events.jsonl');
   final parsed = parser.parse(args);
+  final merchantPrivkey = parsed['merchant-privkey'] as String?;
+  final merchantPubkey = merchantPrivkey == null
+      ? parsed['merchant-pubkey'] as String
+      : publicKeyFromPrivateKey(merchantPrivkey);
   final profile = PosProfile(
     name: parsed['name'] as String,
     merchantName: parsed['merchant'] as String,
@@ -148,12 +158,13 @@ Future<void> _createPos(List<String> args) async {
     description: 'Retail counter',
   );
   final event = buildPosProfileEvent(
-    merchantPubkey: parsed['merchant-pubkey'] as String,
+    merchantPubkey: merchantPubkey,
     posId: parsed['pos-id'] as String,
     profile: profile,
   );
-  await LocalEventStore(parsed['store'] as String).append(event);
-  stdout.writeln(const JsonEncoder.withIndent('  ').convert(event.toJson()));
+  final signed = _maybeSign(event, merchantPrivkey);
+  await LocalEventStore(parsed['store'] as String).append(signed);
+  stdout.writeln(const JsonEncoder.withIndent('  ').convert(signed.toJson()));
 }
 
 void _pairingCode(List<String> args) {
@@ -184,13 +195,17 @@ Future<void> _fetchPairing(List<String> args) async {
 Future<void> _announceTerminal(List<String> args) async {
   final parser = ArgParser()
     ..addOption('terminal-pubkey', mandatory: true)
+    ..addOption('terminal-privkey')
     ..addOption('store', defaultsTo: '.nostr-pos/events.jsonl');
   final parsed = parser.parse(args);
-  final event = buildPairingAnnouncement(
-    terminalPubkey: parsed['terminal-pubkey'] as String,
-  );
-  await LocalEventStore(parsed['store'] as String).append(event);
-  stdout.writeln(const JsonEncoder.withIndent('  ').convert(event.toJson()));
+  final terminalPrivkey = parsed['terminal-privkey'] as String?;
+  final terminalPubkey = terminalPrivkey == null
+      ? parsed['terminal-pubkey'] as String
+      : publicKeyFromPrivateKey(terminalPrivkey);
+  final event = buildPairingAnnouncement(terminalPubkey: terminalPubkey);
+  final signed = _maybeSign(event, terminalPrivkey);
+  await LocalEventStore(parsed['store'] as String).append(signed);
+  stdout.writeln(const JsonEncoder.withIndent('  ').convert(signed.toJson()));
 }
 
 Future<void> _authTerminal(List<String> args) async {
@@ -198,6 +213,7 @@ Future<void> _authTerminal(List<String> args) async {
     ..addOption('pairing-code', mandatory: true)
     ..addOption('pos-id', defaultsTo: 'seguras-butcher')
     ..addOption('merchant-pubkey', defaultsTo: 'a' * 64)
+    ..addOption('merchant-privkey')
     ..addOption('merchant-recovery-pubkey', defaultsTo: 'b' * 64)
     ..addOption('terminal-name', defaultsTo: 'Counter 1')
     ..addOption(
@@ -213,6 +229,10 @@ Future<void> _authTerminal(List<String> args) async {
     )
     ..addOption('store', defaultsTo: '.nostr-pos/events.jsonl');
   final parsed = parser.parse(args);
+  final merchantPrivkey = parsed['merchant-privkey'] as String?;
+  final merchantPubkey = merchantPrivkey == null
+      ? parsed['merchant-pubkey'] as String
+      : publicKeyFromPrivateKey(merchantPrivkey);
   final store = LocalEventStore(parsed['store'] as String);
   final pairing =
       await store.latestByTag(
@@ -235,7 +255,7 @@ Future<void> _authTerminal(List<String> args) async {
   final terminalPubkey = pairing.tags.firstWhere((tag) => tag[0] == 'p')[1];
   final authorization = TerminalAuthorization(
     posRef: posRef(
-      merchantPubkey: parsed['merchant-pubkey'] as String,
+      merchantPubkey: merchantPubkey,
       posId: parsed['pos-id'] as String,
     ),
     terminalPubkey: terminalPubkey,
@@ -250,12 +270,13 @@ Future<void> _authTerminal(List<String> args) async {
         1000,
   );
   final event = buildTerminalAuthorizationEvent(
-    merchantPubkey: parsed['merchant-pubkey'] as String,
+    merchantPubkey: merchantPubkey,
     posId: parsed['pos-id'] as String,
     authorization: authorization,
   );
-  await store.append(event);
-  stdout.writeln(const JsonEncoder.withIndent('  ').convert(event.toJson()));
+  final signed = _maybeSign(event, merchantPrivkey);
+  await store.append(signed);
+  stdout.writeln(const JsonEncoder.withIndent('  ').convert(signed.toJson()));
 }
 
 Future<void> _revokeTerminal(List<String> args) async {
@@ -263,21 +284,28 @@ Future<void> _revokeTerminal(List<String> args) async {
     ..addOption('terminal-pubkey', mandatory: true)
     ..addOption('pos-id', defaultsTo: 'seguras-butcher')
     ..addOption('merchant-pubkey', defaultsTo: 'a' * 64)
+    ..addOption('merchant-privkey')
     ..addOption('store', defaultsTo: '.nostr-pos/events.jsonl');
   final parsed = parser.parse(args);
+  final merchantPrivkey = parsed['merchant-privkey'] as String?;
+  final merchantPubkey = merchantPrivkey == null
+      ? parsed['merchant-pubkey'] as String
+      : publicKeyFromPrivateKey(merchantPrivkey);
   final event = buildTerminalRevocationEvent(
-    merchantPubkey: parsed['merchant-pubkey'] as String,
+    merchantPubkey: merchantPubkey,
     posId: parsed['pos-id'] as String,
     terminalPubkey: parsed['terminal-pubkey'] as String,
   );
-  await LocalEventStore(parsed['store'] as String).append(event);
-  stdout.writeln(const JsonEncoder.withIndent('  ').convert(event.toJson()));
+  final signed = _maybeSign(event, merchantPrivkey);
+  await LocalEventStore(parsed['store'] as String).append(signed);
+  stdout.writeln(const JsonEncoder.withIndent('  ').convert(signed.toJson()));
 }
 
 Future<void> _recordSale(List<String> args) async {
   final parser = ArgParser()
     ..addOption('store', defaultsTo: '.nostr-pos/events.jsonl')
     ..addOption('terminal-pubkey', defaultsTo: 'c' * 64)
+    ..addOption('terminal-privkey')
     ..addOption('sale-id', defaultsTo: 'sale-demo')
     ..addOption('currency', defaultsTo: 'CRC')
     ..addOption('amount', defaultsTo: '8500')
@@ -286,15 +314,19 @@ Future<void> _recordSale(List<String> args) async {
     ..addOption('status', defaultsTo: 'settled')
     ..addOption('txid', defaultsTo: 'demo-txid');
   final parsed = parser.parse(args);
+  final terminalPrivkey = parsed['terminal-privkey'] as String?;
+  final terminalPubkey = terminalPrivkey == null
+      ? parsed['terminal-pubkey'] as String
+      : publicKeyFromPrivateKey(terminalPrivkey);
   final store = LocalEventStore(parsed['store'] as String);
   final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
   final saleId = parsed['sale-id'] as String;
   final sale = buildUnsignedEvent(
-    pubkey: parsed['terminal-pubkey'] as String,
+    pubkey: terminalPubkey,
     kind: NostrPosKinds.saleCreated,
     tags: [
       ['sale', saleId],
-      ['terminal', parsed['terminal-pubkey'] as String],
+      ['terminal', terminalPubkey],
     ],
     content: {
       'sale_id': saleId,
@@ -310,11 +342,11 @@ Future<void> _recordSale(List<String> args) async {
     },
   );
   final status = buildUnsignedEvent(
-    pubkey: parsed['terminal-pubkey'] as String,
+    pubkey: terminalPubkey,
     kind: NostrPosKinds.paymentStatus,
     tags: [
       ['sale', saleId],
-      ['terminal', parsed['terminal-pubkey'] as String],
+      ['terminal', terminalPubkey],
       ['status', parsed['status'] as String],
     ],
     content: {
@@ -326,21 +358,26 @@ Future<void> _recordSale(List<String> args) async {
     },
   );
   final receipt = buildUnsignedEvent(
-    pubkey: parsed['terminal-pubkey'] as String,
+    pubkey: terminalPubkey,
     kind: NostrPosKinds.receipt,
     tags: [
       ['sale', saleId],
-      ['terminal', parsed['terminal-pubkey'] as String],
+      ['terminal', terminalPubkey],
     ],
     content: {'receipt_id': 'R-$saleId', 'sale_id': saleId, 'created_at': now},
   );
-  await store.append(sale);
-  await store.append(status);
-  await store.append(receipt);
+  final events = [
+    _maybeSign(sale, terminalPrivkey),
+    _maybeSign(status, terminalPrivkey),
+    _maybeSign(receipt, terminalPrivkey),
+  ];
+  for (final event in events) {
+    await store.append(event);
+  }
   stdout.writeln(
     const JsonEncoder.withIndent(
       '  ',
-    ).convert([sale.toJson(), status.toJson(), receipt.toJson()]),
+    ).convert(events.map((event) => event.toJson()).toList()),
   );
 }
 

@@ -3259,6 +3259,9 @@ verification evidence stay close to the source of truth.
 - Added controller recovery relay fetch: recovery-backup events are tagged for
   the merchant recovery key when available, and `nostr_pos_cli recover-swaps`
   can merge local records with recovery records fetched from configured relays.
+- Added real BIP-340 Schnorr signing/verification primitives to the Dart SDK so
+  controller-generated events can move from placeholder local envelopes toward
+  relay-acceptable signed events.
 
 ### Known follow-ups
 

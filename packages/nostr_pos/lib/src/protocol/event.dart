@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'dart:math';
 
+import 'package:bip340/bip340.dart' as bip340;
 import 'package:crypto/crypto.dart';
 
 import 'kinds.dart';
@@ -98,6 +100,38 @@ NostrPosEvent buildUnsignedEvent({
     content: contentJson,
     sig: 'unsigned:$id',
   );
+}
+
+NostrPosEvent signNostrPosEvent(NostrPosEvent event, String privateKeyHex) {
+  final publicKey = bip340.getPublicKey(privateKeyHex);
+  if (publicKey != event.pubkey) {
+    throw ArgumentError('private key does not match event pubkey');
+  }
+  final signature = bip340.sign(privateKeyHex, event.id, randomAuxHex());
+  return NostrPosEvent(
+    id: event.id,
+    pubkey: event.pubkey,
+    createdAt: event.createdAt,
+    kind: event.kind,
+    tags: event.tags,
+    content: event.content,
+    sig: signature,
+  );
+}
+
+bool verifyNostrPosEventSignature(NostrPosEvent event) {
+  if (!RegExp(r'^[0-9a-f]{128}$').hasMatch(event.sig)) return false;
+  return bip340.verify(event.pubkey, event.id, event.sig);
+}
+
+String publicKeyFromPrivateKey(String privateKeyHex) {
+  return bip340.getPublicKey(privateKeyHex);
+}
+
+String randomAuxHex() {
+  final random = Random.secure();
+  final bytes = List<int>.generate(32, (_) => random.nextInt(256));
+  return bytes.map((byte) => byte.toRadixString(16).padLeft(2, '0')).join();
 }
 
 String eventId({

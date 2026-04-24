@@ -46,4 +46,23 @@ void main() {
       isTrue,
     );
   });
+
+  test('signs and verifies events with BIP340 Schnorr signatures', () {
+    final privateKey =
+        '0000000000000000000000000000000000000000000000000000000000000001';
+    final publicKey = publicKeyFromPrivateKey(privateKey);
+    final event = buildUnsignedEvent(
+      pubkey: publicKey,
+      kind: NostrPosKinds.paymentStatus,
+      tags: [
+        ['sale', 'sale1'],
+      ],
+      content: {'sale_id': 'sale1'},
+      createdAt: 1000,
+    );
+
+    final signed = signNostrPosEvent(event, privateKey);
+    expect(signed.sig, hasLength(128));
+    expect(verifyNostrPosEventSignature(signed), isTrue);
+  });
 }
