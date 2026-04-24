@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Event } from 'nostr-tools';
 import { createTerminalKeypair } from '../security/keys';
 import type { OutboxItem, TerminalConfig } from '../pos/types';
-import { outboxItemToTemplate, publishOutboxItem } from './outbox';
+import { merchantRecoveryPubkey, outboxItemToTemplate, publishOutboxItem } from './outbox';
 
 const saved: OutboxItem[] = [];
 
@@ -28,6 +28,22 @@ describe('signed outbox publisher', () => {
       content: '{"sale_id":"sale1"}',
       created_at: 1
     });
+  });
+
+  it('detects merchant recovery keys from authorization payloads', () => {
+    expect(
+      merchantRecoveryPubkey({
+        merchantName: 'Seguras Butcher',
+        posName: 'Counter 1',
+        currency: 'CRC',
+        terminalId: 'term1',
+        terminalPubkey: 'a'.repeat(64),
+        pairingCode: 'TEST-TEST',
+        maxInvoiceSat: 100000,
+        syncServers: [],
+        authorization: { merchant_recovery_pubkey: 'b'.repeat(64) }
+      })
+    ).toBe('b'.repeat(64));
   });
 
   it('signs and records relay OKs', async () => {
