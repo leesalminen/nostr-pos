@@ -11,7 +11,57 @@ This repository is organized as a small monorepo:
 - `apps/pos-pwa`: static Svelte 5 + Vite cashier PWA.
 - `infra`: local relay/Liquid/swap development scaffolding.
 
-The first implementation pass ships deterministic local adapters for development
-and tests. Production adapters for Liquid, Boltz, and relay networking live behind
-interfaces so they can replace the pilot adapters without changing the cashier
-surface.
+## Current Smoke Commands
+
+```bash
+npm run protocol:check
+npm run check
+npm run test -w apps/pos-pwa
+npm run build -w apps/pos-pwa
+cd packages/nostr_pos && dart analyze && dart test
+cd apps/nostr_pos_cli && dart analyze
+```
+
+Relay smoke:
+
+```bash
+npm run relay:smoke
+```
+
+Controller publish smoke:
+
+```bash
+cd apps/nostr_pos_cli
+tmp=$(mktemp -d)
+dart run bin/nostr_pos.dart create-pos \
+  --merchant-privkey 0000000000000000000000000000000000000000000000000000000000000001 \
+  --pos-id smoke-$(date +%s) \
+  --store "$tmp/events.jsonl"
+dart run bin/nostr_pos.dart publish-events --store "$tmp/events.jsonl" --limit 1
+```
+
+## Pilot Activation Flow
+
+1. Start the PWA and open the activation screen.
+2. The terminal displays a pairing code and publishes an approval request to the configured backup servers.
+3. The controller can discover that request:
+
+```bash
+cd apps/nostr_pos_cli
+dart run bin/nostr_pos.dart fetch-pairing --pairing-code 4F7G-YJDP
+```
+
+4. The controller authorizes the terminal and signs the approval:
+
+```bash
+dart run bin/nostr_pos.dart auth-terminal \
+  --pairing-code 4F7G-YJDP \
+  --relays wss://no.str.cr,wss://relay.primal.net,wss://nos.lol \
+  --merchant-privkey <merchant-private-key-hex>
+```
+
+5. Paste the approval JSON into the PWA, or publish it with:
+
+```bash
+dart run bin/nostr_pos.dart publish-events --kind 30381
+```
