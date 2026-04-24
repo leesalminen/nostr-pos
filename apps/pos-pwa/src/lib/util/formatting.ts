@@ -13,6 +13,18 @@ export function formatSats(sats: number): string {
   return new Intl.NumberFormat().format(sats) + ' sats';
 }
 
+export function formatBtcFromSats(sats: number): string {
+  return `${(sats / 100_000_000).toFixed(8)} BTC`;
+}
+
+export function formatExchangeRate(rate: number, currency: string): string {
+  return `${new Intl.NumberFormat(undefined, {
+    style: 'currency',
+    currency,
+    maximumFractionDigits: currency === 'CRC' ? 0 : 2
+  }).format(rate)} / BTC`;
+}
+
 export function methodLabel(method?: PaymentMethod): string {
   if (method === 'liquid') return 'Liquid';
   if (method === 'bolt_card') return 'Bolt Card';

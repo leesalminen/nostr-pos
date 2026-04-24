@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { CreditCard, FileText, Settings } from 'lucide-svelte';
+  import { Settings } from 'lucide-svelte';
   import AmountDisplay from '../lib/ui/AmountDisplay.svelte';
   import Button from '../lib/ui/Button.svelte';
   import Keypad from '../lib/ui/Keypad.svelte';
@@ -26,7 +26,7 @@
 </script>
 
 <main class="min-h-screen bg-[#f5f0e8] text-[#211f1a] dark:bg-[#161512] dark:text-[#fff6e8]">
-  <div class="mx-auto grid min-h-screen max-w-6xl grid-rows-[1fr_auto] lg:grid-cols-[minmax(0,1fr)_390px] lg:grid-rows-1">
+  <div class="mx-auto grid min-h-screen max-w-4xl grid-rows-1 pb-24">
     <section class="flex flex-col px-5 py-5 sm:px-8">
       <header class="mb-8 flex items-center justify-between gap-4">
         <div>
@@ -47,25 +47,11 @@
           placeholder="Add note"
           rows="2"
         ></textarea>
-        <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <Button disabled={!canCharge} href={`#/pos/${encodeURIComponent(`liquid:${displayAmount}:${note}`)}`}>
-            <FileText size={19} />
-            Liquid
-          </Button>
-          <Button variant="secondary" disabled={!canCharge} href={`#/pos/${encodeURIComponent(`lightning:${displayAmount}:${note}`)}`}>
-            <CreditCard size={19} />
-            Lightning
-          </Button>
-          <Button variant="secondary" disabled={!canCharge} href={`#/pos/${encodeURIComponent(`card:${displayAmount}:${note}`)}`}>
-            <CreditCard size={19} />
-            Tap Card
-          </Button>
-        </div>
+        <Button disabled={!canCharge} href={`#/pos/${encodeURIComponent(`charge:${displayAmount}:${note}`)}`}>
+          Charge
+        </Button>
       </div>
     </section>
-
-    <aside class="lg:flex lg:min-h-screen lg:items-end">
-      <TransactionSheet rows={$transactions} />
-    </aside>
   </div>
+  <TransactionSheet rows={$transactions} />
 </main>

@@ -2,7 +2,7 @@
   import { formatFiat } from '../util/formatting';
 
   let { amount, currency }: { amount: string; currency: string } = $props();
-  const display = $derived(formatFiat(Number(amount || '0') / 100, currency));
+  const display = $derived(formatFiat(Number(amount || '0'), currency));
 </script>
 
 <div class="min-h-[112px] text-right">

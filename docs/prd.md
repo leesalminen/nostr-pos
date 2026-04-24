@@ -3182,3 +3182,8 @@ verification evidence stay close to the source of truth.
 - Production network adapters still to replace deterministic pilot adapters:
   live relay pool + signing/encryption, LWK address derivation and Liquid
   watcher, Boltz reverse swap creation/claim/broadcast, and real Web NFC reads.
+- Adjusted the cashier flow to match BTCPay-style keypad POS behavior:
+  keypad → single Charge action → payment screen with Lightning QR selected by
+  default, Liquid and Bolt Card as alternate tabs, and visible fiat amount, BTC
+  amount, sats, and exchange rate. Recent transactions now open from a bottom
+  button into a slide-up sheet instead of occupying the screen.
