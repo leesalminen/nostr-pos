@@ -43,6 +43,10 @@ dart run bin/nostr_pos.dart publish-events --store "$tmp/events.jsonl" --limit 1
 
 ## Pilot Activation Flow
 
+For the full mainnet pilot runbook, including browser setup, CLI controller
+commands, Liquid payment testing, Lightning/Boltz testing, and recovery checks,
+see [`docs/mainnet-e2e-test.md`](docs/mainnet-e2e-test.md).
+
 1. Start the PWA and open the activation screen.
 2. The terminal displays a pairing code and publishes an approval request to the configured backup servers.
 3. The controller can discover that request:
