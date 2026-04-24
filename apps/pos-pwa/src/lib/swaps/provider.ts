@@ -28,6 +28,7 @@ export type ReverseSwapResponse = {
 export type SwapStatus =
   | 'created'
   | 'invoice.paid'
+  | 'invoice.settled'
   | 'transaction.mempool'
   | 'transaction.confirmed'
   | 'transaction.claimed'

@@ -388,6 +388,74 @@ describe('startup reconciliation', () => {
     expect(Array.from(receipts.values())).toHaveLength(1);
   });
 
+  it('retries local Liquid claim broadcast on Boltz invoice settled without marking paid first', async () => {
+    const { claimLiquidReverseSwap } = await import('./claim-engine');
+    const { reconcileOpenPayments } = await import('./reconciler');
+    vi.mocked(claimLiquidReverseSwap).mockResolvedValue({ swapId: 'swap6', status: 'skipped', reason: 'No prepared claim transaction is ready.' });
+    config = {
+      merchantName: 'Merchant',
+      posName: 'Counter',
+      currency: 'CRC',
+      terminalId: 'term1',
+      terminalPubkey: 'pub',
+      pairingCode: 'ABCD-EFGH',
+      maxInvoiceSat: 100000,
+      syncServers: [],
+      authorization: {
+        liquid_backends: [{ type: 'esplora', url: 'https://liquid.example/api' }]
+      }
+    };
+    sales.set('sale6', {
+      id: 'sale6',
+      receiptNumber: 'R-6',
+      posRef: 'pos',
+      terminalId: 'term1',
+      amountFiat: '8500',
+      fiatCurrency: 'CRC',
+      amountSat: 25000,
+      status: 'payment_ready',
+      createdAt: 0,
+      updatedAt: 0
+    });
+    attempts.set('attempt6', {
+      id: 'attempt6',
+      saleId: 'sale6',
+      method: 'lightning_swap',
+      status: 'waiting',
+      swapId: 'swap6',
+      createdAt: 0,
+      updatedAt: 0,
+      expiresAt: 100
+    });
+
+    await expect(
+      reconcileOpenPayments({
+        now: 12,
+        swapProvider: {
+          id: 'test',
+          getLimits: async () => ({ minSat: 1000, maxSat: 100000 }),
+          createReverseSwap: async () => {
+            throw new Error('not used');
+          },
+          getSwapStatus: async () => 'created',
+          getSwapStatusDetails: async () => ({ status: 'invoice.settled' }),
+          verifySwap: () => ({ ok: true }),
+          supportsClaimCovenants: () => false
+        }
+      })
+    ).resolves.toBe(1);
+    expect(claimLiquidReverseSwap).toHaveBeenCalledWith(config, {
+      swapId: 'swap6',
+      lockupTxHex: undefined,
+      lockupTxid: undefined,
+      fetcher: undefined
+    });
+    expect(attempts.get('attempt6')).toMatchObject({ status: 'detected' });
+    expect(attempts.get('attempt6')?.settlementTxid).toBeUndefined();
+    expect(sales.get('sale6')?.status).toBe('payment_detected');
+    expect(Array.from(receipts.values())).toHaveLength(0);
+  });
+
   it('resumes an existing sale without creating a new attempt', async () => {
     const { resumeSale } = await import('./reconciler');
     sales.set('sale3', {

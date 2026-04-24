@@ -165,9 +165,10 @@ export async function claimLiquidReverseSwap(
   if (!apiBase) return { swapId: input.swapId, status: 'skipped', reason: 'No Boltz provider configured.' };
 
   try {
-    const lockupTxHex = input.lockupTxHex ?? (input.lockupTxid ? await fetchTransactionHex(backend.url, input.lockupTxid, input.fetcher) : undefined);
+    const lockupTxid = input.lockupTxid ?? existing.lockupTxid;
+    const lockupTxHex = input.lockupTxHex ?? existing.lockupTxHex ?? (lockupTxid ? await fetchTransactionHex(backend.url, lockupTxid, input.fetcher) : undefined);
     if (!lockupTxHex) return { swapId: input.swapId, status: 'skipped', reason: 'No Liquid lockup transaction available.' };
-    await markSwapLockupSeen({ swapId: input.swapId, lockupTxHex, lockupTxid: input.lockupTxid });
+    await markSwapLockupSeen({ swapId: input.swapId, lockupTxHex, lockupTxid });
     const payload = await decryptJson<RecoveryPayload>(existing.encryptedLocalBlob, config.terminalId);
     if (!payload.swap) return { swapId: input.swapId, status: 'failed', reason: 'Recovery record does not contain swap material.' };
     const destinationAddress = payload.settlement?.address ?? payload.swap.claimAddress;

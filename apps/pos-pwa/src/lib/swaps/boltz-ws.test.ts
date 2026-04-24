@@ -66,7 +66,7 @@ describe('Boltz websocket updates', () => {
 
     expect(onUpdate).toHaveBeenCalledWith({
       id: 'swap1',
-      status: 'transaction.claimed',
+      status: 'invoice.settled',
       txid: 'tx1',
       transactionHex: '00'
     });

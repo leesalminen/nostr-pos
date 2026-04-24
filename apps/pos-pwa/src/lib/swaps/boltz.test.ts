@@ -87,9 +87,9 @@ describe('Boltz reverse swap adapter', () => {
       ) as unknown as typeof fetch
     });
 
-    await expect(provider.getSwapStatus('swap1')).resolves.toBe('transaction.claimed');
+    await expect(provider.getSwapStatus('swap1')).resolves.toBe('invoice.settled');
     await expect(provider.getSwapStatusDetails('swap1')).resolves.toEqual({
-      status: 'transaction.claimed',
+      status: 'invoice.settled',
       txid: 'tx1',
       transactionHex: '00'
     });

@@ -3459,9 +3459,10 @@ verification evidence stay close to the source of truth.
   polling or websocket updates report lockup progress, the matching local
   recovery record is marked `claimable`; when a claimed update is observed, the
   recovery record moves to `claimed` alongside receipt settlement.
-- Boltz reverse swap `invoice.settled` is treated as the terminal successful
-  state, because in the v2 reverse-swap lifecycle it means the client supplied
-  the preimage during claim signing and Boltz settled the hold invoice.
+- Boltz reverse swap `invoice.settled` is treated as a signal to resume or
+  retry the locally prepared Liquid claim broadcast. It does not by itself mark
+  a sale paid, because Boltz does not track whether the browser's Liquid claim
+  transaction reached the merchant wallet.
 - Expanded Settings → Advanced into a practical terminal recovery center with
   visible pending, claimable, expiring-soon, failed, queued, and recent recovery
   record state instead of only exposing raw backup/export counts.

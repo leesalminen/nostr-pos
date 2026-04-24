@@ -132,7 +132,7 @@
               if (stopped || update.id !== resumed.attempt.swapId || !sale || !attempt) return;
               if (tabReadOnly) return;
               const applied =
-                update.status === 'transaction.mempool' || update.status === 'transaction.confirmed'
+                update.status === 'transaction.mempool' || update.status === 'transaction.confirmed' || update.status === 'invoice.settled'
                   ? await claimLiquidReverseSwap(config, {
                       swapId: resumed.attempt.swapId,
                       lockupTxHex: update.transactionHex,

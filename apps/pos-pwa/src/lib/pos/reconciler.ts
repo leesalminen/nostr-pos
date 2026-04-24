@@ -125,7 +125,7 @@ async function reconcileSwapAttempt(
   } catch {
     return { changed: false, terminal: false };
   }
-  if (details.status === 'transaction.mempool' || details.status === 'transaction.confirmed') {
+  if (details.status === 'transaction.mempool' || details.status === 'transaction.confirmed' || details.status === 'invoice.settled') {
     const claim = await claimLiquidReverseSwap(config, {
       swapId: attempt.swapId,
       lockupTxHex: details.transactionHex,
@@ -160,7 +160,7 @@ export async function applySwapStatusUpdate(
   const nextStatus =
     status === 'expired' || status === 'failed'
       ? status
-      : status === 'invoice.paid' || status === 'transaction.mempool' || status === 'transaction.confirmed'
+      : status === 'invoice.paid' || status === 'invoice.settled' || status === 'transaction.mempool' || status === 'transaction.confirmed'
         ? 'detected'
         : undefined;
   if (!nextStatus || nextStatus === attempt.status) return { changed: false, terminal: false };

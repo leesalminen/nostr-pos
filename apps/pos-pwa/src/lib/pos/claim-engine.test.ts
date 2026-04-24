@@ -299,6 +299,39 @@ describe('prepared claim broadcaster', () => {
     expect(recoveries.get('swap4')).toMatchObject({ lockupTxHex: 'lockuphex', lockupTxid: 'lockuptxid' });
   });
 
+  it('uses a stored lockup transaction when retrying after invoice settlement', async () => {
+    const { decryptJson } = await import('../db/crypto');
+    const { broadcastLiquidTransaction, fetchTransactionHex } = await import('../liquid/esplora');
+    const { buildBoltzLiquidReverseClaim } = await import('../swaps/boltz-claim');
+    const { claimLiquidReverseSwap } = await import('./claim-engine');
+    recoveries.set('swap4b', {
+      saleId: 'sale4b',
+      paymentAttemptId: 'attempt4b',
+      swapId: 'swap4b',
+      encryptedLocalBlob: 'ciphertext',
+      localSavedAt: 0,
+      okFrom: ['wss://one', 'wss://two'],
+      expiresAt: 1000,
+      lockupTxHex: 'storedlockuphex',
+      lockupTxid: 'storedlockuptxid',
+      status: 'failed'
+    });
+    vi.mocked(decryptJson).mockResolvedValue({
+      settlement: { address: 'lq1destination' },
+      swap: { id: 'swap4b', invoice: 'lnbc1', preimageHash: '22'.repeat(32), timeoutBlockHeight: 500, claimAddress: 'lq1destination', expectedAmountSat: 1000 }
+    });
+    vi.mocked(buildBoltzLiquidReverseClaim).mockResolvedValue('claimhex');
+    vi.mocked(broadcastLiquidTransaction).mockResolvedValue('claimtxid');
+
+    await expect(claimLiquidReverseSwap(config, { swapId: 'swap4b' })).resolves.toMatchObject({
+      status: 'broadcast',
+      txid: 'claimtxid'
+    });
+    expect(fetchTransactionHex).not.toHaveBeenCalled();
+    expect(buildBoltzLiquidReverseClaim).toHaveBeenCalledWith(expect.objectContaining({ lockupTxHex: 'storedlockuphex' }));
+    expect(recoveries.get('swap4b')).toMatchObject({ status: 'claimed', claimTxid: 'claimtxid' });
+  });
+
   it('marks broadcast claims confirmed when the backend confirms the claim tx', async () => {
     const { fetchTransactionStatus } = await import('../liquid/esplora');
     const { reconcileClaimBroadcasts } = await import('./claim-engine');

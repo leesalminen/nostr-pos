@@ -26,7 +26,7 @@ type WebSocketLike = {
 type WebSocketCtor = new (url: string) => WebSocketLike;
 
 function normalizeStatus(status: unknown): SwapStatus | undefined {
-  if (status === 'invoice.settled') return 'transaction.claimed';
+  if (status === 'invoice.settled') return 'invoice.settled';
   if (status === 'transaction.mempool' || status === 'transaction.server.mempool') return 'transaction.mempool';
   if (status === 'transaction.confirmed' || status === 'transaction.server.confirmed') return 'transaction.confirmed';
   if (status === 'transaction.claimed') return 'transaction.claimed';
