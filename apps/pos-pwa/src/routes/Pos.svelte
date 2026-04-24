@@ -67,7 +67,7 @@
     attempt = { ...selectedAttempt, status: 'settled', updatedAt: Date.now() };
     await refreshTransactions();
     settling = false;
-    location.hash = `#/receipt/${receipt.saleId}`;
+    location.replace(`#/receipt/${receipt.saleId}`);
   }
 
   async function selectMethod(method: PaymentMethod) {
