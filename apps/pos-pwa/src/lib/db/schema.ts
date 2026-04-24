@@ -1,5 +1,5 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
-import type { PaymentAttempt, Receipt, Sale, SwapRecoveryRecord, TerminalConfig } from '../pos/types';
+import type { OutboxItem, PaymentAttempt, Receipt, Sale, SwapRecoveryRecord, TerminalConfig } from '../pos/types';
 
 interface PosDb extends DBSchema {
   terminal_config: {
@@ -28,7 +28,7 @@ interface PosDb extends DBSchema {
   };
   outbox: {
     key: string;
-    value: { id: string; type: string; payload: unknown; createdAt: number; okFrom: string[] };
+    value: OutboxItem;
   };
 }
 

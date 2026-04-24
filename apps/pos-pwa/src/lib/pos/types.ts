@@ -93,3 +93,14 @@ export type TransactionRow = {
   attempt?: PaymentAttempt;
   receipt?: Receipt;
 };
+
+export type OutboxItem = {
+  id: string;
+  type: string;
+  payload: unknown;
+  createdAt: number;
+  okFrom: string[];
+  attempts?: number;
+  lastTriedAt?: number;
+  lastError?: string;
+};

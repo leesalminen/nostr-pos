@@ -1,4 +1,4 @@
-import type { PaymentAttempt, Receipt, Sale, SwapRecoveryRecord, TransactionRow } from '../../pos/types';
+import type { OutboxItem, PaymentAttempt, Receipt, Sale, SwapRecoveryRecord, TransactionRow } from '../../pos/types';
 import { getDb } from '../schema';
 
 export async function putSale(sale: Sale): Promise<void> {
@@ -17,12 +17,16 @@ export async function putRecovery(record: SwapRecoveryRecord): Promise<void> {
   await (await getDb()).put('swap_recovery_records', record);
 }
 
-export async function putOutbox(item: { id: string; type: string; payload: unknown; createdAt: number; okFrom: string[] }): Promise<void> {
+export async function putOutbox(item: OutboxItem): Promise<void> {
   await (await getDb()).put('outbox', item);
 }
 
-export async function outboxItems(): Promise<Array<{ id: string; type: string; payload: unknown; createdAt: number; okFrom: string[] }>> {
+export async function outboxItems(): Promise<OutboxItem[]> {
   return (await getDb()).getAll('outbox');
+}
+
+export async function getOutboxItem(id: string): Promise<OutboxItem | undefined> {
+  return (await getDb()).get('outbox', id);
 }
 
 export async function recoveryRecords(): Promise<SwapRecoveryRecord[]> {

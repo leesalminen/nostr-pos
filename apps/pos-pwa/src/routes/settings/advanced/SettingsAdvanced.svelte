@@ -6,10 +6,12 @@
   import { loadTerminal, terminal } from '../../../lib/stores/terminal';
   import { outboxItems, recentTransactions, recoveryRecords } from '../../../lib/db/repositories/ledger';
   import { transactionsCsv } from '../../../lib/pos/export';
+  import { publishPendingOutbox } from '../../../lib/nostr/outbox';
 
   let exportCount = $state(0);
   let outboxCount = $state(0);
   let recoveryCount = $state(0);
+  let syncMessage = $state('');
   onMount(async () => {
     await loadTerminal();
     outboxCount = (await outboxItems()).length;
@@ -36,6 +38,14 @@
     const rows = await recentTransactions(500);
     exportCount = rows.length;
     downloadFile('pos-export.csv', 'text/csv', transactionsCsv(rows));
+  }
+
+  async function syncNow() {
+    if (!$terminal) return;
+    const reports = await publishPendingOutbox($terminal);
+    outboxCount = (await outboxItems()).filter((item) => item.okFrom.length < 2).length;
+    const ok = reports.reduce((sum, report) => sum + report.okCount, 0);
+    syncMessage = reports.length === 0 ? 'Everything is already synced.' : `${ok} backup server confirmations recorded.`;
   }
 </script>
 
@@ -66,6 +76,12 @@
             <dd class="font-bold">{outboxCount}</dd>
           </div>
         </dl>
+        <div class="mt-4 flex flex-wrap items-center gap-3">
+          <Button variant="secondary" onclick={syncNow}>Sync now</Button>
+          {#if syncMessage}
+            <p class="text-sm text-[#776b5a] dark:text-[#b9aa91]">{syncMessage}</p>
+          {/if}
+        </div>
       </div>
       <div class="rounded-md border border-[#d7c8b4] bg-[#fffaf0] p-4 dark:border-[#3a342a] dark:bg-[#211f1a]">
         <h2 class="text-lg font-black">Export</h2>
