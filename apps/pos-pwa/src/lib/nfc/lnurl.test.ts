@@ -1,9 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
-import { invoiceAmountMsat, normalizeLnurlPayload, requestLnurlWithdraw } from './lnurl';
+import { decodeLnurl, invoiceAmountMsat, normalizeLnurlPayload, requestLnurlWithdraw } from './lnurl';
 
 describe('LNURL withdraw', () => {
   it('normalizes lightning-prefixed payloads', () => {
     expect(normalizeLnurlPayload('lightning:https://card.example/lnurl')).toBe('https://card.example/lnurl');
+  });
+
+  it('decodes bech32 LNURL payloads', () => {
+    const encoded = 'LNURL1DP68GURN8GHJ7CMPWFJZUETCV9KHQMR99AKXUATJDSWU6C3Z';
+    expect(decodeLnurl(encoded)).toBe('https://card.example/lnurl');
+    expect(normalizeLnurlPayload(`lightning:${encoded}`)).toBe('https://card.example/lnurl');
   });
 
   it('decodes invoice amount prefixes', () => {

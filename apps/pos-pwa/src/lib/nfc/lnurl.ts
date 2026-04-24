@@ -1,3 +1,5 @@
+import { bech32 } from 'bech32';
+
 export type LnurlWithdrawInfo = {
   callback: string;
   k1: string;
@@ -8,8 +10,19 @@ export type LnurlWithdrawInfo = {
 
 export function normalizeLnurlPayload(payload: string): string {
   const trimmed = payload.trim();
-  if (trimmed.toLowerCase().startsWith('lightning:')) return trimmed.slice('lightning:'.length);
-  return trimmed;
+  const withoutScheme = trimmed.toLowerCase().startsWith('lightning:') ? trimmed.slice('lightning:'.length) : trimmed;
+  if (withoutScheme.toLowerCase().startsWith('lnurl')) return decodeLnurl(withoutScheme);
+  return withoutScheme;
+}
+
+export function decodeLnurl(value: string): string {
+  try {
+    const decoded = bech32.decode(value, 2000);
+    if (decoded.prefix.toLowerCase() !== 'lnurl') throw new Error('Wrong prefix.');
+    return new TextDecoder().decode(new Uint8Array(bech32.fromWords(decoded.words)));
+  } catch {
+    throw new Error("This card isn't supported. Try another payment method.");
+  }
 }
 
 export function isLikelyLnurlWithdrawInfo(value: unknown): value is LnurlWithdrawInfo {

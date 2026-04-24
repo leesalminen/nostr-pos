@@ -3274,6 +3274,9 @@ verification evidence stay close to the source of truth.
   `createSale(..., "liquid")` derives the Liquid address and persists the sale
   without creating a reverse swap, and the keypad falls back to a Liquid charge
   if Lightning preparation cannot complete.
+- Bolt Card LNURL handling now accepts bech32 `LNURL...` NFC payloads in
+  addition to direct `lightning:https://...` URL records, matching the v1 Web
+  NFC flow.
 - Added local protocol outbox events for sale-created, payment-status, and
   receipt records, plus startup reconciliation that expires stale open attempts
   and records the status update. This is the IndexedDB side of the PRD's
