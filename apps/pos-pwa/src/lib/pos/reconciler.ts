@@ -9,10 +9,11 @@ import { settleAttempt } from './settlement';
 import { swapProviderForConfig } from './payment-state';
 import type { SwapProvider, SwapStatus } from '../swaps/provider';
 import { markSwapClaimable, markSwapRecoveryFinished } from './recovery-state';
+import { type Fetcher } from '../net/fetch';
 
 export type ReconcileOptions = {
   now?: number;
-  fetcher?: typeof fetch;
+  fetcher?: Fetcher;
   swapProvider?: SwapProvider;
 };
 
@@ -56,7 +57,7 @@ async function verifyLiquidAttempt(
   }
 
   try {
-    const transactions = await fetchAddressTransactions(backend.url, attempt.liquidAddress, options.fetcher ?? fetch);
+    const transactions = await fetchAddressTransactions(backend.url, attempt.liquidAddress, options.fetcher);
     debugLiquidVerification('fetched address transactions', {
       attemptId: attempt.id,
       saleId: sale.id,

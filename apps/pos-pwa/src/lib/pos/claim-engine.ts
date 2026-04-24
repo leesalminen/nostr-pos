@@ -4,6 +4,7 @@ import { broadcastLiquidTransaction, fetchTransactionHex, fetchTransactionStatus
 import { swapRecoveryEvent } from '../nostr/events';
 import { merchantRecoveryPubkey } from '../nostr/outbox';
 import { buildBoltzLiquidReverseClaim } from '../swaps/boltz-claim';
+import type { Fetcher } from '../net/fetch';
 import {
   markSwapClaimable,
   markSwapClaimBroadcastAttempt,
@@ -90,7 +91,7 @@ async function queueRecoveryRecordUpdate(config: TerminalConfig, record: SwapRec
 
 export async function broadcastPreparedClaims(
   config: TerminalConfig,
-  options: { fetcher?: typeof fetch; records?: SwapRecoveryRecord[]; now?: number } = {}
+  options: { fetcher?: Fetcher; records?: SwapRecoveryRecord[]; now?: number } = {}
 ): Promise<PreparedClaimResult[]> {
   const backend = primaryLiquidBackend(config);
   const records = preparedClaimRows(options.records ?? (await recoveryRecords()));
@@ -129,7 +130,7 @@ export async function broadcastPreparedClaims(
 
 export async function resumePreparedClaims(
   config: TerminalConfig,
-  options: { fetcher?: typeof fetch; records?: SwapRecoveryRecord[]; now?: number } = {}
+  options: { fetcher?: Fetcher; records?: SwapRecoveryRecord[]; now?: number } = {}
 ): Promise<PreparedClaimResult[]> {
   const records = (options.records ?? (await recoveryRecords())).filter(
     (record) => record.status === 'claimable' && Boolean(record.claimTxHex)
@@ -144,7 +145,7 @@ type RecoveryPayload = {
 
 export async function claimLiquidReverseSwap(
   config: TerminalConfig,
-  input: { swapId: string; lockupTxHex?: string; lockupTxid?: string; fetcher?: typeof fetch; now?: number; feeSatPerVbyte?: number }
+  input: { swapId: string; lockupTxHex?: string; lockupTxid?: string; fetcher?: Fetcher; now?: number; feeSatPerVbyte?: number }
 ): Promise<PreparedClaimResult> {
   const backend = primaryLiquidBackend(config);
   if (!backend) return { swapId: input.swapId, status: 'skipped', reason: 'No Liquid backend configured.' };
@@ -200,7 +201,7 @@ export async function claimLiquidReverseSwap(
 
 export async function reconcileClaimBroadcasts(
   config: TerminalConfig,
-  options: { fetcher?: typeof fetch; now?: number; records?: SwapRecoveryRecord[]; rbfDelayMs?: number } = {}
+  options: { fetcher?: Fetcher; now?: number; records?: SwapRecoveryRecord[]; rbfDelayMs?: number } = {}
 ): Promise<ClaimConfirmationResult[]> {
   const backend = primaryLiquidBackend(config);
   const records = (options.records ?? (await recoveryRecords())).filter(
@@ -241,7 +242,7 @@ export async function reconcileClaimBroadcasts(
 
 export async function bumpFeeDueClaims(
   config: TerminalConfig,
-  options: { fetcher?: typeof fetch; now?: number; records?: SwapRecoveryRecord[] } = {}
+  options: { fetcher?: Fetcher; now?: number; records?: SwapRecoveryRecord[] } = {}
 ): Promise<ClaimFeeBumpResult[]> {
   const backend = primaryLiquidBackend(config);
   const apiBase = primaryBoltzApiBase(config);

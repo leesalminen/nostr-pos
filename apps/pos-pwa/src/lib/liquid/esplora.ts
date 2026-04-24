@@ -1,5 +1,6 @@
 import { Buffer } from 'buffer';
 import type { Secp256k1ZKP } from '@vulpemventures/secp256k1-zkp';
+import { browserFetch, type Fetcher } from '../net/fetch';
 
 export type EsploraTx = {
   txid: string;
@@ -45,7 +46,7 @@ export type ConfidentialPaymentVerificationOptions = PaymentVerificationOptions 
   apiBase: string;
   descriptor: string;
   addressIndex?: number;
-  fetcher?: typeof fetch;
+  fetcher?: Fetcher;
 };
 
 const LIQUID_DEBUG_STORAGE_KEY = 'nostr-pos:debug:liquid';
@@ -65,13 +66,13 @@ function ensureBufferGlobal() {
   (globalThis as BufferGlobal).Buffer ??= Buffer;
 }
 
-export async function fetchAddressTransactions(apiBase: string, address: string, fetcher: typeof fetch = fetch): Promise<EsploraTx[]> {
+export async function fetchAddressTransactions(apiBase: string, address: string, fetcher: Fetcher = browserFetch): Promise<EsploraTx[]> {
   const response = await fetcher(`${apiBase.replace(/\/$/, '')}/address/${address}/txs`);
   if (!response.ok) throw new Error("Can't verify Liquid payments right now.");
   return (await response.json()) as EsploraTx[];
 }
 
-export async function fetchTransactionHex(apiBase: string, txid: string, fetcher: typeof fetch = fetch): Promise<string> {
+export async function fetchTransactionHex(apiBase: string, txid: string, fetcher: Fetcher = browserFetch): Promise<string> {
   const response = await fetcher(`${apiBase.replace(/\/$/, '')}/tx/${encodeURIComponent(txid)}/hex`);
   if (!response.ok) throw new Error("Can't fetch the Liquid transaction right now.");
   const txHex = (await response.text()).trim();
@@ -79,7 +80,7 @@ export async function fetchTransactionHex(apiBase: string, txid: string, fetcher
   return txHex;
 }
 
-export async function fetchTransactionStatus(apiBase: string, txid: string, fetcher: typeof fetch = fetch): Promise<EsploraTransactionStatus> {
+export async function fetchTransactionStatus(apiBase: string, txid: string, fetcher: Fetcher = browserFetch): Promise<EsploraTransactionStatus> {
   const response = await fetcher(`${apiBase.replace(/\/$/, '')}/tx/${encodeURIComponent(txid)}`);
   if (!response.ok) throw new Error("Can't fetch the Liquid transaction right now.");
   const json = (await response.json()) as { txid?: string; status?: { confirmed?: boolean; block_height?: number } };
@@ -90,7 +91,7 @@ export async function fetchTransactionStatus(apiBase: string, txid: string, fetc
   };
 }
 
-export async function broadcastLiquidTransaction(apiBase: string, txHex: string, fetcher: typeof fetch = fetch): Promise<string> {
+export async function broadcastLiquidTransaction(apiBase: string, txHex: string, fetcher: Fetcher = browserFetch): Promise<string> {
   const response = await fetcher(`${apiBase.replace(/\/$/, '')}/tx`, {
     method: 'POST',
     headers: { 'content-type': 'text/plain' },
@@ -268,7 +269,7 @@ export async function verifyConfidentialAddressPayment(
   async function fetchTxHexCached(txidToFetch: string): Promise<string> {
     const cached = txHexCache.get(txidToFetch);
     if (cached) return cached;
-    const txHex = await fetchTransactionHex(options.apiBase, txidToFetch, options.fetcher ?? fetch);
+    const txHex = await fetchTransactionHex(options.apiBase, txidToFetch, options.fetcher);
     txHexCache.set(txidToFetch, txHex);
     return txHex;
   }

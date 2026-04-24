@@ -1,6 +1,7 @@
 import { Buffer } from 'buffer';
 import type { Secp256k1ZKP } from '@vulpemventures/secp256k1-zkp';
 import type { ReverseSwapResponse } from './provider';
+import { browserFetch, type Fetcher } from '../net/fetch';
 
 export type BoltzLiquidClaimRequest = {
   apiBase: string;
@@ -8,7 +9,7 @@ export type BoltzLiquidClaimRequest = {
   lockupTxHex: string;
   destinationAddress: string;
   feeSatPerVbyte?: number;
-  fetcher?: typeof fetch;
+  fetcher?: Fetcher;
 };
 
 type ClaimSignatureResponse = {
@@ -54,7 +55,7 @@ async function requestClaimSignature(input: {
   txHex: string;
   preimage: string;
   pubNonce: string;
-  fetcher: typeof fetch;
+  fetcher: Fetcher;
 }): Promise<ClaimSignatureResponse> {
   const response = await input.fetcher(`${input.apiBase.replace(/\/+$/, '')}/v2/swap/reverse/${encodeURIComponent(input.swapId)}/claim`, {
     method: 'POST',
@@ -146,7 +147,7 @@ export async function buildBoltzLiquidReverseClaim(input: BoltzLiquidClaimReques
     txHex: claimTx.toHex(),
     preimage,
     pubNonce: Buffer.from(signing.publicNonce).toString('hex'),
-    fetcher: input.fetcher ?? fetch
+    fetcher: input.fetcher ?? browserFetch
   });
   const signed = signing
     .aggregateNonces([[boltzPublicKey, bytesFromHex(boltzSignature.pubNonce, 'pubNonce')]])

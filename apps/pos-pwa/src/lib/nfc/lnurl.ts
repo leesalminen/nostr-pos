@@ -1,4 +1,5 @@
 import { bech32 } from 'bech32';
+import { browserFetch, type Fetcher } from '../net/fetch';
 
 export type LnurlWithdrawInfo = {
   callback: string;
@@ -35,7 +36,7 @@ export function isLikelyLnurlWithdrawInfo(value: unknown): value is LnurlWithdra
   );
 }
 
-export async function requestLnurlWithdraw(rawUrl: string, invoice: string, fetcher: typeof fetch = fetch): Promise<void> {
+export async function requestLnurlWithdraw(rawUrl: string, invoice: string, fetcher: Fetcher = browserFetch): Promise<void> {
   const url = normalizeLnurlPayload(rawUrl);
   if (!/^https?:\/\//i.test(url)) {
     throw new Error("This card isn't supported. Try another payment method.");

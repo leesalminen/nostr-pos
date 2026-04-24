@@ -10,8 +10,7 @@ import type {
   VerificationResult
 } from './provider';
 import { decodeBolt11Invoice } from '../lightning/bolt11';
-
-type Fetcher = typeof fetch;
+import { browserFetch, type Fetcher } from '../net/fetch';
 
 export type BoltzProviderOptions = {
   apiBase: string;
@@ -69,7 +68,7 @@ export class BoltzReverseSwapProvider implements SwapProvider {
 
   constructor(options: BoltzProviderOptions) {
     this.apiBase = options.apiBase.replace(/\/+$/, '');
-    this.fetcher = options.fetcher ?? fetch;
+    this.fetcher = options.fetcher ?? browserFetch;
     this.makeRandomBytes = options.randomBytes ?? randomBytes;
   }
 
