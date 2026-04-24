@@ -9,6 +9,8 @@ import {
   verifyAddressPayment
 } from './esplora';
 
+const txid = '1'.repeat(64);
+
 const liquidTestState = vi.hoisted(() => ({
   policyAsset: '6f0279e9ed041c3d710a9f57d0c02928416460c4b722ae3457a11eec381c526d',
   directUnblindValue: '563'
@@ -186,11 +188,11 @@ describe('Liquid Esplora adapter', () => {
   it('broadcasts a raw Liquid transaction', async () => {
     const fetcher = vi.fn(async () => ({
       ok: true,
-      text: async () => 'txid1\n'
+      text: async () => `${txid}\n`
     }));
 
     await expect(broadcastLiquidTransaction('https://example.test/api/', '02000000', fetcher as unknown as typeof fetch)).resolves.toBe(
-      'txid1'
+      txid
     );
     expect(fetcher).toHaveBeenCalledWith('https://example.test/api/tx', {
       method: 'POST',
@@ -205,22 +207,22 @@ describe('Liquid Esplora adapter', () => {
       text: async () => '02000000\n'
     }));
 
-    await expect(fetchTransactionHex('https://example.test/api/', 'txid1', fetcher as unknown as typeof fetch)).resolves.toBe('02000000');
-    expect(fetcher).toHaveBeenCalledWith('https://example.test/api/tx/txid1/hex');
+    await expect(fetchTransactionHex('https://example.test/api/', txid, fetcher as unknown as typeof fetch)).resolves.toBe('02000000');
+    expect(fetcher).toHaveBeenCalledWith(`https://example.test/api/tx/${txid}/hex`);
   });
 
   it('fetches transaction confirmation status', async () => {
     const fetcher = vi.fn(async () => ({
       ok: true,
-      json: async () => ({ txid: 'txid1', status: { confirmed: true, block_height: 100 } })
+      json: async () => ({ txid, status: { confirmed: true, block_height: 100 } })
     }));
 
-    await expect(fetchTransactionStatus('https://example.test/api/', 'txid1', fetcher as unknown as typeof fetch)).resolves.toEqual({
-      txid: 'txid1',
+    await expect(fetchTransactionStatus('https://example.test/api/', txid, fetcher as unknown as typeof fetch)).resolves.toEqual({
+      txid,
       confirmed: true,
       blockHeight: 100
     });
-    expect(fetcher).toHaveBeenCalledWith('https://example.test/api/tx/txid1');
+    expect(fetcher).toHaveBeenCalledWith(`https://example.test/api/tx/${txid}`);
   });
 
   it('surfaces failed broadcasts as retryable errors', async () => {

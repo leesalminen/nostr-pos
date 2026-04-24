@@ -6,6 +6,11 @@ const sales = new Map<string, Sale>();
 const attempts = new Map<string, PaymentAttempt>();
 const receipts = new Map<string, Receipt>();
 const outbox: unknown[] = [];
+const claimTxid1 = '1'.repeat(64);
+const claimTxid3 = '3'.repeat(64);
+const claimTxid = 'a'.repeat(64);
+const oldClaimTxid = 'b'.repeat(64);
+const newClaimTxid = 'c'.repeat(64);
 
 vi.mock('../db/repositories/ledger', () => ({
   recoveryRecords: vi.fn(() => Array.from(recoveries.values())),
@@ -81,17 +86,17 @@ describe('prepared claim broadcaster', () => {
   it('broadcasts only records with a prepared claim transaction and marks them claimed', async () => {
     const { broadcastLiquidTransaction } = await import('../liquid/esplora');
     const { broadcastPreparedClaims } = await import('./claim-engine');
-    vi.mocked(broadcastLiquidTransaction).mockResolvedValue('txid1');
+    vi.mocked(broadcastLiquidTransaction).mockResolvedValue(claimTxid1);
 
     await expect(broadcastPreparedClaims(config)).resolves.toEqual([
-      { swapId: 'swap1', status: 'broadcast', txid: 'txid1' }
+      { swapId: 'swap1', status: 'broadcast', txid: claimTxid1 }
     ]);
 
     expect(broadcastLiquidTransaction).toHaveBeenCalledWith('https://liquid.example/api/', '02000000', undefined);
     expect(recoveries.get('swap1')).toMatchObject({
       status: 'claimed',
       claimTxHex: '02000000',
-      claimTxid: 'txid1',
+      claimTxid: claimTxid1,
       claimBroadcastAttempts: 1
     });
     expect(recoveries.get('swap2')?.status).toBe('claimable');
@@ -122,11 +127,11 @@ describe('prepared claim broadcaster', () => {
       createdAt: 0,
       updatedAt: 0
     });
-    vi.mocked(broadcastLiquidTransaction).mockResolvedValue('txid1');
+    vi.mocked(broadcastLiquidTransaction).mockResolvedValue(claimTxid1);
 
     await expect(broadcastPreparedClaims(config)).resolves.toMatchObject([{ status: 'broadcast' }]);
     expect(sales.get('sale1')?.status).toBe('receipt_ready');
-    expect(attempts.get('attempt1')).toMatchObject({ status: 'settled', settlementTxid: 'txid1' });
+    expect(attempts.get('attempt1')).toMatchObject({ status: 'settled', settlementTxid: claimTxid1 });
     expect(receipts.size).toBe(1);
     expect(outbox).toHaveLength(4);
   });
@@ -152,10 +157,10 @@ describe('prepared claim broadcaster', () => {
     const { broadcastLiquidTransaction } = await import('../liquid/esplora');
     const { broadcastPreparedClaims } = await import('./claim-engine');
     recoveries.set('swap1', { ...recoveries.get('swap1')!, status: 'failed', claimLastError: 'previous failure' });
-    vi.mocked(broadcastLiquidTransaction).mockResolvedValue('txid1');
+    vi.mocked(broadcastLiquidTransaction).mockResolvedValue(claimTxid1);
 
     await expect(broadcastPreparedClaims(config, { now: 600 })).resolves.toEqual([
-      { swapId: 'swap1', status: 'broadcast', txid: 'txid1' }
+      { swapId: 'swap1', status: 'broadcast', txid: claimTxid1 }
     ]);
     expect(recoveries.get('swap1')).toMatchObject({
       status: 'claimed',
@@ -179,15 +184,15 @@ describe('prepared claim broadcaster', () => {
       claimTxHex: '03000000',
       status: 'claimable'
     });
-    vi.mocked(broadcastLiquidTransaction).mockResolvedValue('txid3');
+    vi.mocked(broadcastLiquidTransaction).mockResolvedValue(claimTxid3);
 
     await expect(resumePreparedClaims(config, { now: 700 })).resolves.toEqual([
-      { swapId: 'swap3', status: 'broadcast', txid: 'txid3' }
+      { swapId: 'swap3', status: 'broadcast', txid: claimTxid3 }
     ]);
     expect(broadcastLiquidTransaction).toHaveBeenCalledTimes(1);
     expect(broadcastLiquidTransaction).toHaveBeenCalledWith('https://liquid.example/api/', '03000000', undefined);
     expect(recoveries.get('swap1')).toMatchObject({ status: 'failed', claimLastError: 'previous failure' });
-    expect(recoveries.get('swap3')).toMatchObject({ status: 'claimed', claimTxid: 'txid3' });
+    expect(recoveries.get('swap3')).toMatchObject({ status: 'claimed', claimTxid: claimTxid3 });
   });
 
   it('reports prepared claims as skipped when no backend is configured', async () => {
@@ -230,13 +235,13 @@ describe('prepared claim broadcaster', () => {
     vi.mocked(buildBoltzLiquidReverseClaim).mockResolvedValue('claimhex');
     vi.mocked(broadcastLiquidTransaction).mockImplementation(async () => {
       expect(recoveries.get('swap3')).toMatchObject({ status: 'claimable', claimTxHex: 'claimhex' });
-      return 'claimtxid';
+      return claimTxid;
     });
 
     await expect(claimLiquidReverseSwap(config, { swapId: 'swap3', lockupTxHex: 'lockuphex' })).resolves.toEqual({
       swapId: 'swap3',
       status: 'broadcast',
-      txid: 'claimtxid'
+      txid: claimTxid
     });
     expect(buildBoltzLiquidReverseClaim).toHaveBeenCalledWith({
       apiBase: 'https://boltz.example/api',
@@ -250,7 +255,7 @@ describe('prepared claim broadcaster', () => {
       status: 'claimed',
       lockupTxHex: 'lockuphex',
       claimTxHex: 'claimhex',
-      claimTxid: 'claimtxid',
+      claimTxid,
       claimBroadcastAttempts: 1,
       claimLastError: undefined
     });
@@ -260,7 +265,7 @@ describe('prepared claim broadcaster', () => {
           type: 'payment_backup',
           payload: expect.objectContaining({
             content: expect.objectContaining({
-              claim: expect.objectContaining({ claim_tx_hex: 'claimhex', claim_txid: 'claimtxid' })
+              claim: expect.objectContaining({ claim_tx_hex: 'claimhex', claim_txid: claimTxid })
             })
           })
         })
@@ -289,7 +294,7 @@ describe('prepared claim broadcaster', () => {
       swap: { id: 'swap4', invoice: 'lnbc1', preimageHash: '22'.repeat(32), timeoutBlockHeight: 500, claimAddress: 'lq1destination', expectedAmountSat: 1000 }
     });
     vi.mocked(buildBoltzLiquidReverseClaim).mockResolvedValue('claimhex');
-    vi.mocked(broadcastLiquidTransaction).mockResolvedValue('claimtxid');
+    vi.mocked(broadcastLiquidTransaction).mockResolvedValue(claimTxid);
 
     await expect(claimLiquidReverseSwap(config, { swapId: 'swap4', lockupTxid: 'lockuptxid' })).resolves.toMatchObject({
       status: 'broadcast'
@@ -321,15 +326,15 @@ describe('prepared claim broadcaster', () => {
       swap: { id: 'swap4b', invoice: 'lnbc1', preimageHash: '22'.repeat(32), timeoutBlockHeight: 500, claimAddress: 'lq1destination', expectedAmountSat: 1000 }
     });
     vi.mocked(buildBoltzLiquidReverseClaim).mockResolvedValue('claimhex');
-    vi.mocked(broadcastLiquidTransaction).mockResolvedValue('claimtxid');
+    vi.mocked(broadcastLiquidTransaction).mockResolvedValue(claimTxid);
 
     await expect(claimLiquidReverseSwap(config, { swapId: 'swap4b' })).resolves.toMatchObject({
       status: 'broadcast',
-      txid: 'claimtxid'
+      txid: claimTxid
     });
     expect(fetchTransactionHex).not.toHaveBeenCalled();
     expect(buildBoltzLiquidReverseClaim).toHaveBeenCalledWith(expect.objectContaining({ lockupTxHex: 'storedlockuphex' }));
-    expect(recoveries.get('swap4b')).toMatchObject({ status: 'claimed', claimTxid: 'claimtxid' });
+    expect(recoveries.get('swap4b')).toMatchObject({ status: 'claimed', claimTxid });
   });
 
   it('marks broadcast claims confirmed when the backend confirms the claim tx', async () => {
@@ -365,16 +370,16 @@ describe('prepared claim broadcaster', () => {
       okFrom: [],
       expiresAt: 1000,
       claimTxHex: 'claimhex',
-      claimTxid: 'claimtxid',
+      claimTxid,
       claimBroadcastAt: 100,
       status: 'claimed'
     });
-    vi.mocked(fetchTransactionStatus).mockResolvedValue({ txid: 'claimtxid', confirmed: true, blockHeight: 101 });
+    vi.mocked(fetchTransactionStatus).mockResolvedValue({ txid: claimTxid, confirmed: true, blockHeight: 101 });
 
     await expect(reconcileClaimBroadcasts(config, { now: 200 })).resolves.toEqual([{ swapId: 'swap5', status: 'confirmed' }]);
     expect(recoveries.get('swap5')).toMatchObject({ claimConfirmedAt: 200, claimNeedsFeeBump: false });
     expect(sales.get('sale5')?.status).toBe('receipt_ready');
-    expect(attempts.get('attempt5')).toMatchObject({ status: 'settled', settlementTxid: 'claimtxid' });
+    expect(attempts.get('attempt5')).toMatchObject({ status: 'settled', settlementTxid: claimTxid });
     expect(Array.from(receipts.values())).toHaveLength(1);
   });
 
@@ -390,11 +395,11 @@ describe('prepared claim broadcaster', () => {
       okFrom: [],
       expiresAt: 1000,
       claimTxHex: 'claimhex',
-      claimTxid: 'claimtxid',
+      claimTxid,
       claimBroadcastAt: 100,
       status: 'claimed'
     });
-    vi.mocked(fetchTransactionStatus).mockResolvedValue({ txid: 'claimtxid', confirmed: false });
+    vi.mocked(fetchTransactionStatus).mockResolvedValue({ txid: claimTxid, confirmed: false });
 
     await expect(reconcileClaimBroadcasts(config, { now: 200, rbfDelayMs: 50 })).resolves.toEqual([
       { swapId: 'swap6', status: 'fee_bump_due' }
@@ -417,7 +422,7 @@ describe('prepared claim broadcaster', () => {
       expiresAt: 1000,
       lockupTxHex: 'lockuphex',
       claimTxHex: 'oldclaimhex',
-      claimTxid: 'oldclaimtxid',
+      claimTxid: oldClaimTxid,
       claimFeeSatPerVbyte: 0.2,
       claimNeedsFeeBump: true,
       status: 'claimed'
@@ -438,15 +443,15 @@ describe('prepared claim broadcaster', () => {
       expect(recoveries.get('swap7')).toMatchObject({
         status: 'claimable',
         claimTxHex: 'newclaimhex',
-        claimTxid: 'oldclaimtxid',
-        replacedClaimTxids: ['oldclaimtxid'],
+        claimTxid: oldClaimTxid,
+        replacedClaimTxids: [oldClaimTxid],
         claimRbfCount: 1
       });
-      return 'newclaimtxid';
+      return newClaimTxid;
     });
 
     await expect(bumpFeeDueClaims(config, { now: 500 })).resolves.toEqual([
-      { swapId: 'swap7', status: 'broadcast', txid: 'newclaimtxid', feeSatPerVbyte: 0.3 }
+      { swapId: 'swap7', status: 'broadcast', txid: newClaimTxid, feeSatPerVbyte: 0.3 }
     ]);
     expect(buildBoltzLiquidReverseClaim).toHaveBeenCalledWith(
       expect.objectContaining({ lockupTxHex: 'lockuphex', feeSatPerVbyte: 0.3 })
@@ -454,8 +459,8 @@ describe('prepared claim broadcaster', () => {
     expect(recoveries.get('swap7')).toMatchObject({
       status: 'claimed',
       claimTxHex: 'newclaimhex',
-      claimTxid: 'newclaimtxid',
-      replacedClaimTxids: ['oldclaimtxid'],
+      claimTxid: newClaimTxid,
+      replacedClaimTxids: [oldClaimTxid],
       claimFeeSatPerVbyte: 0.3,
       claimNeedsFeeBump: false,
       claimBroadcastAttempts: 1,
@@ -477,7 +482,7 @@ describe('prepared claim broadcaster', () => {
       okFrom: [],
       expiresAt: 1000,
       lockupTxid: 'lockuptxid',
-      claimTxid: 'oldclaimtxid',
+      claimTxid: oldClaimTxid,
       claimNeedsFeeBump: true,
       status: 'claimed'
     });
@@ -493,7 +498,7 @@ describe('prepared claim broadcaster', () => {
       }
     });
     vi.mocked(buildBoltzLiquidReverseClaim).mockResolvedValue('newclaimhex');
-    vi.mocked(broadcastLiquidTransaction).mockResolvedValue('newclaimtxid');
+    vi.mocked(broadcastLiquidTransaction).mockResolvedValue(newClaimTxid);
 
     await expect(bumpFeeDueClaims(config, { now: 700 })).resolves.toMatchObject([{ status: 'broadcast' }]);
     expect(fetchTransactionHex).toHaveBeenCalledWith('https://liquid.example/api/', 'lockuptxid', undefined);

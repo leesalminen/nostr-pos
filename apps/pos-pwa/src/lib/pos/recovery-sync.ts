@@ -3,6 +3,7 @@ import { getRecoveryBySwap, putRecovery } from '../db/repositories/ledger';
 import { KINDS } from '../nostr/events';
 import { isValidSignedEvent, querySignedEvents } from '../nostr/pool';
 import { hexToBytes } from '../security/keys';
+import { isDistinctLiquidClaimTxid } from '../liquid/txid';
 import type { SwapRecoveryRecord, TerminalConfig } from './types';
 
 type RecoveryRumor = {
@@ -36,7 +37,9 @@ function parseRecoveryContent(content: string): Partial<SwapRecoveryRecord> | un
       lockupTxHex: typeof parsed.lockup_tx_hex === 'string' ? parsed.lockup_tx_hex : undefined,
       lockupTxid: typeof parsed.lockup_txid === 'string' ? parsed.lockup_txid : undefined,
       claimTxHex: typeof claim.claim_tx_hex === 'string' ? claim.claim_tx_hex : undefined,
-      claimTxid: typeof claim.claim_txid === 'string' ? claim.claim_txid : undefined,
+      claimTxid: isDistinctLiquidClaimTxid(claim.claim_txid, typeof parsed.lockup_txid === 'string' ? parsed.lockup_txid : undefined)
+        ? claim.claim_txid
+        : undefined,
       replacedClaimTxids,
       claimPreparedAt: typeof claim.claim_prepared_at === 'number' ? claim.claim_prepared_at * 1000 : undefined,
       claimBroadcastAt: typeof claim.claim_broadcast_at === 'number' ? claim.claim_broadcast_at * 1000 : undefined,
@@ -53,7 +56,12 @@ function mergedRecoveryStatus(
   existing: SwapRecoveryRecord | undefined,
   parsed: Partial<SwapRecoveryRecord>
 ): SwapRecoveryRecord['status'] {
-  if ((existing?.status === 'claimed' && existing.claimTxid) || parsed.claimConfirmedAt || parsed.claimTxid) return 'claimed';
+  if (
+    (existing?.status === 'claimed' && isDistinctLiquidClaimTxid(existing.claimTxid, existing.lockupTxid ?? parsed.lockupTxid)) ||
+    isDistinctLiquidClaimTxid(parsed.claimTxid, parsed.lockupTxid ?? existing?.lockupTxid)
+  ) {
+    return 'claimed';
+  }
   if (existing?.status === 'failed') return 'failed';
   if (parsed.claimTxHex || (existing?.status === 'claimed' && !existing.claimTxid && existing.claimTxHex)) return 'claimable';
   return existing?.status ?? 'pending';

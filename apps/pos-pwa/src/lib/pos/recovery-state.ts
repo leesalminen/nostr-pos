@@ -1,4 +1,5 @@
 import { getRecoveryBySwap, putRecovery } from '../db/repositories/ledger';
+import { isDistinctLiquidClaimTxid } from '../liquid/txid';
 import type { SwapRecoveryRecord } from './types';
 
 export async function markSwapClaimable(input: {
@@ -142,6 +143,18 @@ export async function markSwapClaimConfirmed(input: {
 }): Promise<SwapRecoveryRecord | undefined> {
   const record = await getRecoveryBySwap(input.swapId);
   if (!record) return undefined;
+  if (!isDistinctLiquidClaimTxid(record.claimTxid, record.lockupTxid)) {
+    const next: SwapRecoveryRecord = {
+      ...record,
+      status: record.claimTxHex ? 'claimable' : 'failed',
+      claimConfirmedAt: undefined,
+      claimTxid: undefined,
+      claimNeedsFeeBump: false,
+      claimLastError: 'Claim confirmation is impossible without a distinct Liquid claim transaction id.'
+    };
+    await putRecovery(next);
+    return next;
+  }
   const next: SwapRecoveryRecord = {
     ...record,
     status: 'claimed',
@@ -161,8 +174,16 @@ export async function markSwapRecoveryFinished(input: {
 }): Promise<SwapRecoveryRecord | undefined> {
   const record = await getRecoveryBySwap(input.swapId);
   if (!record) return undefined;
-  const claimTxid = input.claimTxid ?? record.claimTxid;
+  const claimTxid = isDistinctLiquidClaimTxid(input.claimTxid, record.lockupTxid)
+    ? input.claimTxid
+    : isDistinctLiquidClaimTxid(record.claimTxid, record.lockupTxid)
+      ? record.claimTxid
+      : undefined;
   const claimTxHex = input.claimTxHex ?? record.claimTxHex;
+  const inputClaimMatchedLockup =
+    typeof input.claimTxid === 'string' &&
+    typeof record.lockupTxid === 'string' &&
+    input.claimTxid.toLowerCase() === record.lockupTxid.toLowerCase();
   const next: SwapRecoveryRecord = {
     ...record,
     status: claimTxid ? 'claimed' : claimTxHex ? 'claimable' : 'failed',
@@ -171,7 +192,11 @@ export async function markSwapRecoveryFinished(input: {
     claimLastTriedAt: input.now ?? Date.now(),
     claimBroadcastAt: claimTxid && input.claimTxid ? (input.now ?? Date.now()) : record.claimBroadcastAt,
     claimNeedsFeeBump: false,
-    claimLastError: claimTxid ? undefined : 'Claim broadcast did not return a Liquid transaction id.'
+    claimLastError: claimTxid
+      ? undefined
+      : inputClaimMatchedLockup
+        ? 'Claim broadcast returned the lockup transaction id, not the claim transaction id.'
+        : 'Claim broadcast did not return a Liquid transaction id.'
   };
   await putRecovery(next);
   return next;

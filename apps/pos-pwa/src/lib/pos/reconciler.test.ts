@@ -6,6 +6,7 @@ const attempts = new Map<string, PaymentAttempt>();
 const receipts = new Map<string, Receipt>();
 const recoveries = new Map<string, SwapRecoveryRecord>();
 const outbox: unknown[] = [];
+const claimTxid = 'd'.repeat(64);
 let config: TerminalConfig | undefined;
 
 vi.mock('../db/repositories/ledger', () => ({
@@ -324,7 +325,7 @@ describe('startup reconciliation', () => {
   it('claims Lightning swaps from detailed provider polling after refresh', async () => {
     const { claimLiquidReverseSwap } = await import('./claim-engine');
     const { reconcileOpenPayments } = await import('./reconciler');
-    vi.mocked(claimLiquidReverseSwap).mockResolvedValue({ swapId: 'swap5', status: 'broadcast', txid: 'claimtxid' });
+    vi.mocked(claimLiquidReverseSwap).mockResolvedValue({ swapId: 'swap5', status: 'broadcast', txid: claimTxid });
     config = {
       merchantName: 'Merchant',
       posName: 'Counter',
@@ -383,7 +384,7 @@ describe('startup reconciliation', () => {
       lockupTxid: 'lockuptxid',
       fetcher: undefined
     });
-    expect(attempts.get('attempt5')).toMatchObject({ status: 'settled', settlementTxid: 'claimtxid' });
+    expect(attempts.get('attempt5')).toMatchObject({ status: 'settled', settlementTxid: claimTxid });
     expect(sales.get('sale5')?.status).toBe('receipt_ready');
     expect(Array.from(receipts.values())).toHaveLength(1);
   });

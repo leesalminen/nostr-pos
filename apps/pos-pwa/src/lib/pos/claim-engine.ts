@@ -1,6 +1,7 @@
 import { decryptJson } from '../db/crypto';
 import { getAttempt, getRecoveryBySwap, getSale, putOutbox, recoveryRecords } from '../db/repositories/ledger';
 import { broadcastLiquidTransaction, fetchTransactionHex, fetchTransactionStatus } from '../liquid/esplora';
+import { isDistinctLiquidClaimTxid, isLiquidTxid } from '../liquid/txid';
 import { swapRecoveryEvent } from '../nostr/events';
 import { merchantRecoveryPubkey } from '../nostr/outbox';
 import { buildBoltzLiquidReverseClaim } from '../swaps/boltz-claim';
@@ -52,6 +53,26 @@ function preparedClaimRows(records: SwapRecoveryRecord[]): SwapRecoveryRecord[] 
 function nextClaimFeeRate(record: SwapRecoveryRecord): number {
   const current = record.claimFeeSatPerVbyte ?? 0.1;
   return Math.max(Number((current * 1.5).toFixed(2)), Number((current + 0.1).toFixed(2)));
+}
+
+async function parsedLiquidTxid(txHex: string): Promise<string | undefined> {
+  try {
+    const liquid = await import('liquidjs-lib');
+    return liquid.Transaction.fromHex(txHex).getId();
+  } catch {
+    return undefined;
+  }
+}
+
+async function assertClaimBroadcastTxid(claimTxHex: string, txid: string, lockupTxid?: string): Promise<void> {
+  if (!isLiquidTxid(txid)) throw new Error('Liquid backend did not return a valid claim transaction id.');
+  if (!isDistinctLiquidClaimTxid(txid, lockupTxid)) {
+    throw new Error('Liquid backend returned the lockup transaction id instead of the claim transaction id.');
+  }
+  const parsedTxid = await parsedLiquidTxid(claimTxHex);
+  if (parsedTxid && parsedTxid.toLowerCase() !== txid.toLowerCase()) {
+    throw new Error('Liquid backend returned a transaction id that does not match the claim transaction.');
+  }
 }
 
 async function settleRecoveredClaim(record: SwapRecoveryRecord, txid: string, settledAt = Date.now()): Promise<void> {
@@ -112,6 +133,7 @@ export async function broadcastPreparedClaims(
       await queueRecoveryRecordUpdate(config, record, now);
       await markSwapClaimBroadcastAttempt({ swapId: record.swapId, now, feeSatPerVbyte: record.claimFeeSatPerVbyte });
       const txid = await broadcastLiquidTransaction(backend.url, record.claimTxHex as string, options.fetcher);
+      await assertClaimBroadcastTxid(record.claimTxHex as string, txid, record.lockupTxid);
       const finished = await markSwapRecoveryFinished({ swapId: record.swapId, claimTxHex: record.claimTxHex, claimTxid: txid, now });
       if (finished) await queueRecoveryRecordUpdate(config, finished, now);
       await settleRecoveredClaim(record, txid, now);
@@ -186,6 +208,7 @@ export async function claimLiquidReverseSwap(
     if (claimable) await queueRecoveryRecordUpdate(config, claimable, now);
     await markSwapClaimBroadcastAttempt({ swapId: input.swapId, now, feeSatPerVbyte: input.feeSatPerVbyte });
     const txid = await broadcastLiquidTransaction(backend.url, claimTxHex, input.fetcher);
+    await assertClaimBroadcastTxid(claimTxHex, txid, lockupTxid);
     const finished = await markSwapRecoveryFinished({ swapId: input.swapId, claimTxHex, claimTxid: txid, now });
     if (finished) await queueRecoveryRecordUpdate(config, finished, now);
     await settleRecoveredClaim(existing, txid, now);

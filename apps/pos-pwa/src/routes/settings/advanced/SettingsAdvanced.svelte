@@ -303,6 +303,11 @@
                     {record.status}{record.claimBroadcastAttempts ? ` · ${record.claimBroadcastAttempts} tries` : ''}
                     {record.claimNeedsFeeBump ? ' · fee bump due' : ''}
                   </p>
+                  {#if record.claimTxid}
+                    <p class="truncate font-mono text-xs text-[#776b5a] dark:text-[#b9aa91]">tx {record.claimTxid}</p>
+                  {:else if record.status === 'claimed'}
+                    <p class="text-xs font-semibold text-[#8c2d28] dark:text-[#e8a49e]">missing claim txid</p>
+                  {/if}
                   {#if record.claimLastError}
                     <p class="truncate text-xs text-[#8c2d28] dark:text-[#e8a49e]">{record.claimLastError}</p>
                   {/if}

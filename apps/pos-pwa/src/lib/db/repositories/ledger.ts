@@ -1,18 +1,23 @@
 import type { OutboxItem, PaymentAttempt, Receipt, Sale, SwapRecoveryRecord, TransactionRow } from '../../pos/types';
+import { isDistinctLiquidClaimTxid, isSameLiquidTxid } from '../../liquid/txid';
 import { toPlainJson } from '../plain';
 import { getDb } from '../schema';
 
 export function normalizedRecoveryRecord(record: SwapRecoveryRecord): SwapRecoveryRecord {
-  if (record.status !== 'claimed' || record.claimTxid || record.claimConfirmedAt) return record;
+  if (record.status !== 'claimed' || isDistinctLiquidClaimTxid(record.claimTxid, record.lockupTxid)) return record;
+  const claimMatchesLockup = isSameLiquidTxid(record.claimTxid, record.lockupTxid);
+  const claimProblem = claimMatchesLockup ? 'Claim txid matches the lockup txid.' : 'Claim was marked without a Liquid transaction id.';
   return {
     ...record,
     status: record.claimTxHex ? 'claimable' : 'failed',
+    claimConfirmedAt: undefined,
+    claimTxid: undefined,
     claimNeedsFeeBump: false,
     claimLastError:
       record.claimLastError ??
       (record.claimTxHex
-        ? 'Claim was marked without a Liquid transaction id. Retry claim broadcast.'
-        : 'Claim was marked without a Liquid transaction id or prepared claim transaction.')
+        ? `${claimProblem} Retry claim broadcast.`
+        : `${claimProblem} No prepared claim transaction is available.`)
   };
 }
 

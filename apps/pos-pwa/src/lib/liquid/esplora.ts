@@ -1,6 +1,7 @@
 import { Buffer } from 'buffer';
 import type { Secp256k1ZKP } from '@vulpemventures/secp256k1-zkp';
 import { browserFetch, type Fetcher } from '../net/fetch';
+import { isLiquidTxid } from './txid';
 
 export type EsploraTx = {
   txid: string;
@@ -99,7 +100,7 @@ export async function broadcastLiquidTransaction(apiBase: string, txHex: string,
   });
   if (!response.ok) throw new Error("Can't broadcast the Liquid claim right now.");
   const txid = (await response.text()).trim();
-  if (!txid) throw new Error("Liquid backend did not return a transaction id.");
+  if (!isLiquidTxid(txid)) throw new Error("Liquid backend did not return a valid transaction id.");
   return txid;
 }
 

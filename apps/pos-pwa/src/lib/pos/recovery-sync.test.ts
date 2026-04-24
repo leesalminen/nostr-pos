@@ -5,6 +5,10 @@ import { outboxItemToTemplate } from '../nostr/outbox';
 import type { OutboxItem, SwapRecoveryRecord, TerminalConfig } from './types';
 
 const recoveries = new Map<string, SwapRecoveryRecord>();
+const claimTxid = 'b'.repeat(64);
+const oldClaimTxid = 'c'.repeat(64);
+const newClaimTxid = 'd'.repeat(64);
+const lockupTxid = 'e'.repeat(64);
 
 vi.mock('../db/repositories/ledger', () => ({
   getRecoveryBySwap: vi.fn((swapId: string) => recoveries.get(swapId)),
@@ -37,11 +41,11 @@ describe('terminal recovery backup sync', () => {
       swap_id: 'swap1',
       encrypted_local_blob: 'ciphertext',
       expires_at: 2,
-      lockup_txid: 'lockuptxid',
+      lockup_txid: lockupTxid,
       claim: {
         claim_tx_hex: 'claimhex',
-        claim_txid: 'claimtxid',
-        replaced_claim_txids: ['oldclaimtxid'],
+        claim_txid: claimTxid,
+        replaced_claim_txids: [oldClaimTxid],
         claim_prepared_at: 3,
         claim_broadcast_at: 4,
         claim_fee_sat_per_vbyte: 0.3,
@@ -63,10 +67,10 @@ describe('terminal recovery backup sync', () => {
       paymentAttemptId: 'attempt1',
       encryptedLocalBlob: 'ciphertext',
       expiresAt: 2000,
-      lockupTxid: 'lockuptxid',
+      lockupTxid,
       claimTxHex: 'claimhex',
-      claimTxid: 'claimtxid',
-      replacedClaimTxids: ['oldclaimtxid'],
+      claimTxid,
+      replacedClaimTxids: [oldClaimTxid],
       claimPreparedAt: 3000,
       claimBroadcastAt: 4000,
       claimFeeSatPerVbyte: 0.3,
@@ -120,7 +124,7 @@ describe('terminal recovery backup sync', () => {
       okFrom: [],
       expiresAt: 10_000,
       claimTxHex: 'newclaimhex',
-      claimTxid: 'newclaimtxid',
+      claimTxid: newClaimTxid,
       claimPreparedAt: 5000,
       claimBroadcastAt: 6000,
       status: 'claimed'
@@ -139,7 +143,7 @@ describe('terminal recovery backup sync', () => {
           expires_at: 10,
           claim: {
             claim_tx_hex: 'oldclaimhex',
-            claim_txid: 'oldclaimtxid',
+            claim_txid: oldClaimTxid,
             claim_prepared_at: 4,
             claim_broadcast_at: 5
           }
@@ -153,10 +157,47 @@ describe('terminal recovery backup sync', () => {
     await expect(syncTerminalRecoveryBackups(config, async () => [wrapped])).resolves.toBe(1);
     expect(recoveries.get('swap3')).toMatchObject({
       claimTxHex: 'newclaimhex',
-      claimTxid: 'newclaimtxid',
+      claimTxid: newClaimTxid,
       claimPreparedAt: 5000,
       claimBroadcastAt: 6000,
       status: 'claimed'
+    });
+  });
+
+  it('does not restore a claimed state when the relay claim txid equals the lockup txid', async () => {
+    const { syncTerminalRecoveryBackups } = await import('./recovery-sync');
+    const item: OutboxItem = {
+      id: 'recovery-bad-txid',
+      type: 'payment_backup',
+      payload: {
+        kind: 9381,
+        tags: [['proto', 'nostr-pos', '0.2'], ['swap', 'swap-bad']],
+        content: {
+          sale_id: 'sale-bad',
+          payment_attempt_id: 'attempt-bad',
+          swap_id: 'swap-bad',
+          encrypted_local_blob: 'ciphertext',
+          expires_at: 5,
+          lockup_txid: lockupTxid,
+          claim: {
+            claim_tx_hex: 'claimhex',
+            claim_txid: lockupTxid,
+            claim_prepared_at: 4,
+            claim_broadcast_at: 5,
+            claim_confirmed_at: 6
+          }
+        }
+      },
+      createdAt: 1000,
+      okFrom: []
+    };
+    const wrapped = nip59.wrapEvent(outboxItemToTemplate(item), hexToBytes(merchant.privateKey), terminal.publicKey);
+
+    await expect(syncTerminalRecoveryBackups(config, async () => [wrapped])).resolves.toBe(1);
+    expect(recoveries.get('swap-bad')).toMatchObject({
+      claimTxHex: 'claimhex',
+      claimTxid: undefined,
+      status: 'claimable'
     });
   });
 });
