@@ -332,7 +332,17 @@ Future<void> _authTerminal(List<String> args) async {
     posId: parsed['pos-id'] as String,
     authorization: authorization,
   );
-  final signed = _maybeSign(event, merchantPrivkey);
+  final encrypted = merchantPrivkey == null
+      ? event
+      : replaceEventContent(
+          event,
+          nip44EncryptToPubkey(
+            plaintext: event.content,
+            privateKeyHex: merchantPrivkey,
+            publicKeyHex: terminalPubkey,
+          ),
+        );
+  final signed = _maybeSign(encrypted, merchantPrivkey);
   await store.append(signed);
   stdout.writeln(const JsonEncoder.withIndent('  ').convert(signed.toJson()));
 }

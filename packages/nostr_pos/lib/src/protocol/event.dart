@@ -119,6 +119,25 @@ NostrPosEvent signNostrPosEvent(NostrPosEvent event, String privateKeyHex) {
   );
 }
 
+NostrPosEvent replaceEventContent(NostrPosEvent event, String content) {
+  final id = eventId(
+    pubkey: event.pubkey,
+    createdAt: event.createdAt,
+    kind: event.kind,
+    tags: event.tags,
+    content: content,
+  );
+  return NostrPosEvent(
+    id: id,
+    pubkey: event.pubkey,
+    createdAt: event.createdAt,
+    kind: event.kind,
+    tags: event.tags,
+    content: content,
+    sig: 'unsigned:$id',
+  );
+}
+
 bool verifyNostrPosEventSignature(NostrPosEvent event) {
   if (!RegExp(r'^[0-9a-f]{128}$').hasMatch(event.sig)) return false;
   return bip340.verify(event.pubkey, event.id, event.sig);

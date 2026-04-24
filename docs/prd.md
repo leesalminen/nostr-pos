@@ -3315,6 +3315,9 @@ verification evidence stay close to the source of truth.
   content for controller history.
 - Added local print tracking for receipts: pressing Print marks the receipt row
   with `printedAt`, and CSV exports now include a `printed_at` column.
+- Added Dart NIP-44 v2 encryption primitives against `nostr-tools` vectors and
+  switched signed `nostr_pos_cli auth-terminal` approvals to encrypt kind-30381
+  content to the terminal key before signing/publishing.
 - CI now runs `dart analyze` for the Dart SDK as well as the CLI so relay,
   signing, and recovery SDK code gets static checks on every push.
 - README now documents the current smoke commands and the live relay-backed
