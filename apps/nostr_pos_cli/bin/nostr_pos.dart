@@ -11,7 +11,10 @@ void main(List<String> args) async {
     ..addCommand('announce-terminal')
     ..addCommand('auth-terminal')
     ..addCommand('revoke-terminal')
+    ..addCommand('record-sale')
     ..addCommand('list-events')
+    ..addCommand('list-sales')
+    ..addCommand('export-sales')
     ..addCommand('quote');
 
   if (args.isEmpty) {
@@ -33,13 +36,50 @@ void main(List<String> args) async {
       await _authTerminal(rest);
     case 'revoke-terminal':
       await _revokeTerminal(rest);
+    case 'record-sale':
+      await _recordSale(rest);
     case 'list-events':
       await _listEvents(rest);
+    case 'list-sales':
+      await _listSales(rest);
+    case 'export-sales':
+      await _exportSales(rest);
     case 'quote':
       await _quote(rest);
     default:
       stdout.writeln(parser.usage);
       exitCode = 64;
+  }
+}
+
+Future<void> _listSales(List<String> args) async {
+  final parser = ArgParser()
+    ..addOption('store', defaultsTo: '.nostr-pos/events.jsonl');
+  final parsed = parser.parse(args);
+  final events = await LocalEventStore(parsed['store'] as String).readAll();
+  final rows = salesHistoryFromEvents(events);
+  stdout.writeln(
+    const JsonEncoder.withIndent(
+      '  ',
+    ).convert(rows.map((row) => row.toJson()).toList()),
+  );
+}
+
+Future<void> _exportSales(List<String> args) async {
+  final parser = ArgParser()
+    ..addOption('store', defaultsTo: '.nostr-pos/events.jsonl')
+    ..addOption('format', defaultsTo: 'csv', allowed: ['csv', 'json']);
+  final parsed = parser.parse(args);
+  final events = await LocalEventStore(parsed['store'] as String).readAll();
+  final rows = salesHistoryFromEvents(events);
+  if (parsed['format'] == 'json') {
+    stdout.writeln(
+      const JsonEncoder.withIndent(
+        '  ',
+      ).convert(rows.map((row) => row.toJson()).toList()),
+    );
+  } else {
+    stdout.write(salesHistoryCsv(rows));
   }
 }
 
@@ -151,6 +191,76 @@ Future<void> _revokeTerminal(List<String> args) async {
   );
   await LocalEventStore(parsed['store'] as String).append(event);
   stdout.writeln(const JsonEncoder.withIndent('  ').convert(event.toJson()));
+}
+
+Future<void> _recordSale(List<String> args) async {
+  final parser = ArgParser()
+    ..addOption('store', defaultsTo: '.nostr-pos/events.jsonl')
+    ..addOption('terminal-pubkey', defaultsTo: 'c' * 64)
+    ..addOption('sale-id', defaultsTo: 'sale-demo')
+    ..addOption('currency', defaultsTo: 'CRC')
+    ..addOption('amount', defaultsTo: '8500')
+    ..addOption('sats', defaultsTo: '25000')
+    ..addOption('method', defaultsTo: 'lightning_swap')
+    ..addOption('status', defaultsTo: 'settled')
+    ..addOption('txid', defaultsTo: 'demo-txid');
+  final parsed = parser.parse(args);
+  final store = LocalEventStore(parsed['store'] as String);
+  final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+  final saleId = parsed['sale-id'] as String;
+  final sale = buildUnsignedEvent(
+    pubkey: parsed['terminal-pubkey'] as String,
+    kind: NostrPosKinds.saleCreated,
+    tags: [
+      ['sale', saleId],
+      ['terminal', parsed['terminal-pubkey'] as String],
+    ],
+    content: {
+      'sale_id': saleId,
+      'created_at': now,
+      'amount': {
+        'fiat_currency': parsed['currency'],
+        'fiat_amount': parsed['amount'],
+        'sat_amount': int.parse(parsed['sats'] as String),
+      },
+      'note': null,
+      'discount_fiat': null,
+      'status': 'created',
+    },
+  );
+  final status = buildUnsignedEvent(
+    pubkey: parsed['terminal-pubkey'] as String,
+    kind: NostrPosKinds.paymentStatus,
+    tags: [
+      ['sale', saleId],
+      ['terminal', parsed['terminal-pubkey'] as String],
+      ['status', parsed['status'] as String],
+    ],
+    content: {
+      'sale_id': saleId,
+      'status': parsed['status'],
+      'method': parsed['method'],
+      'updated_at': now,
+      'payment': {'settlement_txid': parsed['txid']},
+    },
+  );
+  final receipt = buildUnsignedEvent(
+    pubkey: parsed['terminal-pubkey'] as String,
+    kind: NostrPosKinds.receipt,
+    tags: [
+      ['sale', saleId],
+      ['terminal', parsed['terminal-pubkey'] as String],
+    ],
+    content: {'receipt_id': 'R-$saleId', 'sale_id': saleId, 'created_at': now},
+  );
+  await store.append(sale);
+  await store.append(status);
+  await store.append(receipt);
+  stdout.writeln(
+    const JsonEncoder.withIndent(
+      '  ',
+    ).convert([sale.toJson(), status.toJson(), receipt.toJson()]),
+  );
 }
 
 Future<void> _listEvents(List<String> args) async {

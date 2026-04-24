@@ -3201,3 +3201,6 @@ verification evidence stay close to the source of truth.
   and records the status update. This is the IndexedDB side of the PRD's
   "transaction sheet after refresh" path; live relay merge remains the next
   adapter swap-in.
+- Added controller-side accounting foundations: event-history merge for
+  sale/status/receipt records, CSV/JSON export helpers, and CLI commands for
+  `record-sale`, `list-sales`, and `export-sales`.

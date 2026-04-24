@@ -1,5 +1,6 @@
 library;
 
+export 'src/accounting/sales_history.dart';
 export 'src/fx/bull_bitcoin.dart';
 export 'src/local/event_store.dart';
 export 'src/pairing/code.dart';
