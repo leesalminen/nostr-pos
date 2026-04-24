@@ -12,6 +12,7 @@
   import { decodeIndexPrice } from '../lib/fx/bull-bitcoin';
   import { putAttempt } from '../lib/db/repositories/ledger';
   import { formatExchangeRate, formatFiat, formatSats, statusLabel } from '../lib/util/formatting';
+  import { payWithWebNfc } from '../lib/nfc/web-nfc';
 
   let { params = {} }: { params?: { link?: string } } = $props();
 
@@ -20,6 +21,7 @@
   let rate = $state<FxRate | undefined>();
   let selectedMethod = $state<PaymentMethod>('lightning_swap');
   let boltCardPending = $state(false);
+  let boltCardMessage = $state('');
   let error = $state('');
   let settling = $state(false);
 
@@ -74,6 +76,7 @@
   async function selectMethod(method: PaymentMethod) {
     selectedMethod = method;
     boltCardPending = false;
+    boltCardMessage = '';
     if (!attempt || !sale) return;
     attempt = { ...attempt, method, paymentData: paymentPayload(method, sale.amountSat, sale.id, attempt.liquidAddress), updatedAt: Date.now() };
     await putAttempt(attempt);
@@ -83,9 +86,20 @@
   async function startBoltCard() {
     if (!attempt || !sale) return;
     boltCardPending = true;
+    boltCardMessage = 'Hold the card near the back of this device.';
     attempt = { ...attempt, method: 'bolt_card', paymentData: paymentPayload('lightning_swap', sale.amountSat, sale.id), updatedAt: Date.now() };
     await putAttempt(attempt);
     await refreshTransactions();
+    try {
+      const result = await payWithWebNfc(activePaymentData);
+      if (result === 'unsupported') {
+        boltCardMessage = 'NFC is not available here. Use the QR code instead.';
+      } else {
+        boltCardMessage = 'Card payment sent. Waiting for settlement.';
+      }
+    } catch (err) {
+      boltCardMessage = err instanceof Error ? err.message : 'Card not recognized. Try again or use QR.';
+    }
   }
 
   const tabs: Array<{ method: PaymentMethod; label: string }> = [
@@ -161,7 +175,7 @@
 
           {#if boltCardPending}
             <p class="inline-flex items-center gap-2 text-xs text-[#776b5a] dark:text-[#b9aa91]">
-              <CreditCard size={14} /> Hold the card near the back of this device.
+              <CreditCard size={14} /> {boltCardMessage}
             </p>
           {/if}
 
