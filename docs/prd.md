@@ -3227,6 +3227,8 @@ verification evidence stay close to the source of truth.
 - Extended startup polling reconciliation to use detailed Boltz status responses
   too, so reload/offline recovery can fetch the lockup transaction id/hex and run
   the same claim path even when no WebSocket update is active.
+- Moved Vite/PWA/polyfill plugins to devDependencies after audit review; runtime
+  dependency audit now passes with zero production vulnerabilities.
 - Added local protocol outbox events for sale-created, payment-status, and
   receipt records, plus startup reconciliation that expires stale open attempts
   and records the status update. This is the IndexedDB side of the PRD's
