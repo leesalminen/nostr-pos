@@ -25,8 +25,13 @@ vi.mock('../db/repositories/terminal', () => ({
   getTerminalConfig: vi.fn(() => config)
 }));
 
+vi.mock('./claim-engine', () => ({
+  claimLiquidReverseSwap: vi.fn(async () => ({ swapId: 'swap', status: 'skipped', reason: 'not ready' }))
+}));
+
 describe('startup reconciliation', () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     sales.clear();
     attempts.clear();
     receipts.clear();
@@ -189,6 +194,73 @@ describe('startup reconciliation', () => {
     expect(recoveries.get('swap4')?.status).toBe('claimable');
     expect(sales.get('sale4')?.status).toBe('payment_detected');
     expect(outbox).toHaveLength(1);
+  });
+
+  it('claims Lightning swaps from detailed provider polling after refresh', async () => {
+    const { claimLiquidReverseSwap } = await import('./claim-engine');
+    const { reconcileOpenPayments } = await import('./reconciler');
+    vi.mocked(claimLiquidReverseSwap).mockResolvedValue({ swapId: 'swap5', status: 'broadcast', txid: 'claimtxid' });
+    config = {
+      merchantName: 'Merchant',
+      posName: 'Counter',
+      currency: 'CRC',
+      terminalId: 'term1',
+      terminalPubkey: 'pub',
+      pairingCode: 'ABCD-EFGH',
+      maxInvoiceSat: 100000,
+      syncServers: [],
+      authorization: {
+        liquid_backends: [{ type: 'esplora', url: 'https://liquid.example/api' }]
+      }
+    };
+    sales.set('sale5', {
+      id: 'sale5',
+      receiptNumber: 'R-5',
+      posRef: 'pos',
+      terminalId: 'term1',
+      amountFiat: '8500',
+      fiatCurrency: 'CRC',
+      amountSat: 25000,
+      status: 'payment_ready',
+      createdAt: 0,
+      updatedAt: 0
+    });
+    attempts.set('attempt5', {
+      id: 'attempt5',
+      saleId: 'sale5',
+      method: 'lightning_swap',
+      status: 'waiting',
+      swapId: 'swap5',
+      createdAt: 0,
+      updatedAt: 0,
+      expiresAt: 100
+    });
+
+    await expect(
+      reconcileOpenPayments({
+        now: 12,
+        swapProvider: {
+          id: 'test',
+          getLimits: async () => ({ minSat: 1000, maxSat: 100000 }),
+          createReverseSwap: async () => {
+            throw new Error('not used');
+          },
+          getSwapStatus: async () => 'created',
+          getSwapStatusDetails: async () => ({ status: 'transaction.confirmed', txid: 'lockuptxid', transactionHex: 'lockuphex' }),
+          verifySwap: () => ({ ok: true }),
+          supportsClaimCovenants: () => false
+        }
+      })
+    ).resolves.toBe(1);
+    expect(claimLiquidReverseSwap).toHaveBeenCalledWith(config, {
+      swapId: 'swap5',
+      lockupTxHex: 'lockuphex',
+      lockupTxid: 'lockuptxid',
+      fetcher: undefined
+    });
+    expect(attempts.get('attempt5')).toMatchObject({ status: 'settled', settlementTxid: 'claimtxid' });
+    expect(sales.get('sale5')?.status).toBe('receipt_ready');
+    expect(Array.from(receipts.values())).toHaveLength(1);
   });
 
   it('resumes an existing sale without creating a new attempt', async () => {

@@ -1,5 +1,14 @@
 import { getPublicKey } from '@noble/secp256k1';
-import type { ReverseSwapRequest, ReverseSwapResponse, SwapLimits, SwapPair, SwapProvider, SwapStatus, VerificationResult } from './provider';
+import type {
+  ReverseSwapRequest,
+  ReverseSwapResponse,
+  SwapLimits,
+  SwapPair,
+  SwapProvider,
+  SwapStatus,
+  SwapStatusDetails,
+  VerificationResult
+} from './provider';
 
 type Fetcher = typeof fetch;
 
@@ -108,9 +117,19 @@ export class BoltzReverseSwapProvider implements SwapProvider {
   }
 
   async getSwapStatus(id: string): Promise<SwapStatus> {
+    return (await this.getSwapStatusDetails(id)).status;
+  }
+
+  async getSwapStatusDetails(id: string): Promise<SwapStatusDetails> {
     const response = await this.fetcher(`${this.apiBase}/v2/swap/${encodeURIComponent(id)}`);
-    if (!response.ok) return 'created';
-    return normalizeStatus(asObject(await response.json())['status']);
+    if (!response.ok) return { status: 'created' };
+    const json = asObject(await response.json());
+    const transaction = json.transaction && typeof json.transaction === 'object' ? (json.transaction as Record<string, unknown>) : undefined;
+    return {
+      status: normalizeStatus(json['status']),
+      txid: typeof transaction?.id === 'string' ? transaction.id : undefined,
+      transactionHex: typeof transaction?.hex === 'string' ? transaction.hex : undefined
+    };
   }
 
   verifySwap(response: ReverseSwapResponse, expected: ReverseSwapRequest): VerificationResult {

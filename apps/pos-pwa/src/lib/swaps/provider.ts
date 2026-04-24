@@ -33,6 +33,12 @@ export type SwapStatus =
   | 'expired'
   | 'failed';
 
+export type SwapStatusDetails = {
+  status: SwapStatus;
+  txid?: string;
+  transactionHex?: string;
+};
+
 export type VerificationResult = {
   ok: boolean;
   reason?: string;
@@ -43,6 +49,7 @@ export interface SwapProvider {
   getLimits(pair: SwapPair): Promise<SwapLimits>;
   createReverseSwap(req: ReverseSwapRequest): Promise<ReverseSwapResponse>;
   getSwapStatus(id: string): Promise<SwapStatus>;
+  getSwapStatusDetails?(id: string): Promise<SwapStatusDetails>;
   verifySwap(response: ReverseSwapResponse, expected: ReverseSwapRequest): VerificationResult;
   supportsClaimCovenants(): boolean;
 }

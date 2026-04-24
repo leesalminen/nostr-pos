@@ -3224,6 +3224,9 @@ verification evidence stay close to the source of truth.
   `claim_tx_hex` before broadcast, then broadcasts through the configured
   Esplora backend. Remaining hardening gap: fee bump/RBF policy and
   non-cooperative script-path fallback.
+- Extended startup polling reconciliation to use detailed Boltz status responses
+  too, so reload/offline recovery can fetch the lockup transaction id/hex and run
+  the same claim path even when no WebSocket update is active.
 - Added local protocol outbox events for sale-created, payment-status, and
   receipt records, plus startup reconciliation that expires stale open attempts
   and records the status update. This is the IndexedDB side of the PRD's

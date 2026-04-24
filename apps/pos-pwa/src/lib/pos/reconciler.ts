@@ -3,6 +3,7 @@ import { getTerminalConfig } from '../db/repositories/terminal';
 import { fetchAddressTransactions, verifyAddressPayment } from '../liquid/esplora';
 import { paymentStatusEvent } from '../nostr/events';
 import type { PaymentAttempt, Sale } from './types';
+import { claimLiquidReverseSwap } from './claim-engine';
 import { settleAttempt } from './settlement';
 import { swapProviderForConfig } from './payment-state';
 import type { SwapProvider, SwapStatus } from '../swaps/provider';
@@ -63,14 +64,27 @@ async function reconcileSwapAttempt(
   if (attempt.method === 'liquid' || !attempt.swapId) return { changed: false, terminal: false };
   const config = await getTerminalConfig();
   if (!config) return { changed: false, terminal: false };
-  let status;
+  let details;
   try {
     const provider = options.swapProvider ?? swapProviderForConfig(config);
-    status = await provider.getSwapStatus(attempt.swapId);
+    details = provider.getSwapStatusDetails
+      ? await provider.getSwapStatusDetails(attempt.swapId)
+      : { status: await provider.getSwapStatus(attempt.swapId) };
   } catch {
     return { changed: false, terminal: false };
   }
-  return applySwapStatusUpdate(sale, attempt, status, { now: options.now });
+  if (details.status === 'transaction.mempool' || details.status === 'transaction.confirmed') {
+    const claim = await claimLiquidReverseSwap(config, {
+      swapId: attempt.swapId,
+      lockupTxHex: details.transactionHex,
+      lockupTxid: details.txid,
+      fetcher: options.fetcher
+    });
+    if (claim.status === 'broadcast' && claim.txid) {
+      return applySwapStatusUpdate(sale, attempt, 'transaction.claimed', { now: options.now, txid: claim.txid });
+    }
+  }
+  return applySwapStatusUpdate(sale, attempt, details.status, { now: options.now, txid: details.txid });
 }
 
 export async function applySwapStatusUpdate(
