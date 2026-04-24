@@ -3196,3 +3196,8 @@ verification evidence stay close to the source of truth.
   commands, deterministic Liquid receive derivation with address-index
   persistence, and a swap-provider abstraction with a mock Boltz reverse-swap
   adapter that verifies claim address/amount before exposing invoice data.
+- Added local protocol outbox events for sale-created, payment-status, and
+  receipt records, plus startup reconciliation that expires stale open attempts
+  and records the status update. This is the IndexedDB side of the PRD's
+  "transaction sheet after refresh" path; live relay merge remains the next
+  adapter swap-in.

@@ -4,9 +4,11 @@
   import TransactionSheet from '../lib/ui/TransactionSheet.svelte';
   import { loadTerminal, terminal } from '../lib/stores/terminal';
   import { transactions, refreshTransactions } from '../lib/stores/ledger';
+  import { reconcileOpenPayments } from '../lib/pos/reconciler';
 
   onMount(async () => {
     await loadTerminal();
+    await reconcileOpenPayments();
     await refreshTransactions();
   });
 </script>

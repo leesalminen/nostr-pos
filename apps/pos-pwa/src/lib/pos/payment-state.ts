@@ -7,6 +7,7 @@ import { getBullBitcoinRate, fiatToSats } from '../fx/bull-bitcoin';
 import { deriveLiquidAddress, liquidBip21 } from '../liquid/address';
 import { MockBoltzReverseSwapProvider } from '../swaps/mock-boltz';
 import { ulid } from '../util/ulid';
+import { paymentStatusEvent, receiptEvent, saleCreatedEvent } from '../nostr/events';
 
 export function statusAfterDetection(method: PaymentMethod): SaleStatus {
   return method === 'liquid' ? 'settled' : 'settling';
@@ -73,6 +74,13 @@ export async function createSale(config: TerminalConfig, fiatAmount: string, met
 
   await putSale(sale);
   await putAttempt(attempt);
+  await putOutbox({
+    id: `sale_${sale.id}`,
+    type: 'sale_created',
+    payload: saleCreatedEvent(sale),
+    createdAt: now,
+    okFrom: []
+  });
 
   if (method !== 'liquid') {
     const okFrom = config.syncServers.slice(0, 2);
@@ -134,6 +142,13 @@ export async function markReady(sale: Sale, attempt: PaymentAttempt): Promise<vo
   const now = Date.now();
   await putSale({ ...sale, status: 'payment_ready', updatedAt: now });
   await putAttempt({ ...attempt, status: 'waiting', updatedAt: now });
+  await putOutbox({
+    id: `status_${attempt.id}_${now}`,
+    type: 'payment_status',
+    payload: paymentStatusEvent({ ...sale, status: 'payment_ready', updatedAt: now }, { ...attempt, status: 'waiting', updatedAt: now }),
+    createdAt: now,
+    okFrom: []
+  });
 }
 
 export async function simulateSettlement(sale: Sale, attempt: PaymentAttempt): Promise<Receipt> {
@@ -144,10 +159,26 @@ export async function simulateSettlement(sale: Sale, attempt: PaymentAttempt): P
   await new Promise((resolve) => setTimeout(resolve, attempt.method === 'liquid' ? 500 : 1400));
   const settledAt = Date.now();
   const txid = crypto.randomUUID().replaceAll('-', '');
-  await putSale({ ...sale, status: 'receipt_ready', updatedAt: settledAt });
-  await putAttempt({ ...attempt, status: 'settled', settlementTxid: txid, updatedAt: settledAt });
+  const finalSale = { ...sale, status: 'receipt_ready' as const, updatedAt: settledAt };
+  const finalAttempt = { ...attempt, status: 'settled' as const, settlementTxid: txid, updatedAt: settledAt };
+  await putSale(finalSale);
+  await putAttempt(finalAttempt);
   const receipt = { id: ulid(settledAt), saleId: sale.id, createdAt: settledAt };
   await putReceipt(receipt);
+  await putOutbox({
+    id: `status_${attempt.id}_${settledAt}`,
+    type: 'payment_status',
+    payload: paymentStatusEvent(finalSale, finalAttempt),
+    createdAt: settledAt,
+    okFrom: []
+  });
+  await putOutbox({
+    id: `receipt_${sale.id}`,
+    type: 'receipt',
+    payload: receiptEvent(finalSale, finalAttempt),
+    createdAt: settledAt,
+    okFrom: []
+  });
 
   navigator.vibrate?.(80);
   void confetti({ particleCount: 90, spread: 70, origin: { y: 0.78 } });

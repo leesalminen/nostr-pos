@@ -6,6 +6,7 @@
   import Keypad from '../lib/ui/Keypad.svelte';
   import { terminal, loadTerminal } from '../lib/stores/terminal';
   import { refreshTransactions } from '../lib/stores/ledger';
+  import { reconcileOpenPayments } from '../lib/pos/reconciler';
 
   let amount = $state('');
   let note = $state('');
@@ -16,6 +17,7 @@
       location.hash = '#/activate';
       return;
     }
+    await reconcileOpenPayments();
     await refreshTransactions();
   });
 
