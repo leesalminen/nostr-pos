@@ -5,6 +5,7 @@
   import Button from '../lib/ui/Button.svelte';
   import { activateTerminal, applyTerminalApproval, loadTerminal, terminal } from '../lib/stores/terminal';
   import { announcePairingRequest } from '../lib/activation/pairing';
+  import { syncTerminalApproval } from '../lib/activation/approval-sync';
 
   let announced = $state(false);
   let approvalText = $state('');
@@ -13,13 +14,32 @@
   let requestMessage = $state('Preparing approval request...');
   const isDev = import.meta.env.DEV;
 
-  onMount(async () => {
-    const config = await loadTerminal();
-    const result = await announcePairingRequest(config);
-    requestMessage = result.published
-      ? 'Ready for owner approval.'
-      : 'Approval request saved. Connect to the internet, then try Sync now in Advanced.';
-    announced = true;
+  onMount(() => {
+    let timer: ReturnType<typeof setInterval> | undefined;
+
+    async function checkApproval() {
+      const config = await loadTerminal();
+      const approved = await syncTerminalApproval(config);
+      if (approved) location.hash = '#/';
+    }
+
+    async function start() {
+      const config = await loadTerminal();
+      const result = await announcePairingRequest(config);
+      requestMessage = result.published
+        ? 'Ready for owner approval.'
+        : 'Approval request saved. Connect to the internet, then try Sync now in Advanced.';
+      announced = true;
+      await checkApproval();
+      timer = setInterval(() => {
+        void checkApproval();
+      }, 5000);
+    }
+
+    void start();
+    return () => {
+      if (timer) clearInterval(timer);
+    };
   });
 
   async function applyApproval() {

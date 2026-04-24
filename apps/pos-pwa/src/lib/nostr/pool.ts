@@ -1,4 +1,5 @@
 import { finalizeEvent, SimplePool, verifyEvent, type Event, type EventTemplate } from 'nostr-tools';
+import type { Filter } from 'nostr-tools/filter';
 import { hexToBytes } from '../security/keys';
 
 export type PublishResult = {
@@ -32,6 +33,15 @@ export async function publishSignedEvent(relays: string[], event: Event): Promis
     if (result.status === 'fulfilled') return result.value;
     return { relay: relays[index], ok: false, message: String(result.reason) };
   });
+}
+
+export async function querySignedEvents(relays: string[], filter: Filter, maxWait = 5000): Promise<Event[]> {
+  const pool = new SimplePool();
+  try {
+    return await pool.querySync(relays, filter, { maxWait });
+  } finally {
+    pool.destroy();
+  }
 }
 
 export function relayOkCount(results: PublishResult[]): number {

@@ -3249,6 +3249,10 @@ verification evidence stay close to the source of truth.
   encrypted recovery backup is written locally and receives at least two backup
   server confirmations; otherwise the attempt is failed before an invoice is
   shown.
+- Added terminal-side approval discovery from relays: the activation screen now
+  polls for matching terminal-authorization events, supports both plaintext
+  CLI pilot payloads and NIP-44 encrypted payloads addressed to the terminal,
+  validates the pairing code/key, saves the authorization, and enters the POS.
 
 ### Known follow-ups
 
