@@ -18,8 +18,9 @@ npm run protocol:check
 npm run check
 npm run test -w apps/pos-pwa
 npm run build -w apps/pos-pwa
+npm run audit:pwa
 cd packages/nostr_pos && dart analyze && dart test
-cd apps/nostr_pos_cli && dart analyze
+cd apps/nostr_pos_cli && dart analyze && dart test
 ```
 
 Relay smoke:
@@ -64,4 +65,29 @@ dart run bin/nostr_pos.dart auth-terminal \
 
 ```bash
 dart run bin/nostr_pos.dart publish-events --kind 30381
+```
+
+## Recovery Operations
+
+List encrypted swap recovery records from a local event store, or merge relay
+records addressed to the merchant recovery key:
+
+```bash
+cd apps/nostr_pos_cli
+dart run bin/nostr_pos.dart recover-swaps \
+  --store .nostr-pos/events.jsonl \
+  --relays wss://no.str.cr,wss://relay.primal.net,wss://nos.lol \
+  --merchant-recovery-privkey <merchant-recovery-private-key-hex>
+```
+
+If a terminal prepared and published `claim_tx_hex` before dying, the controller
+can broadcast that prepared claim through a Liquid Esplora backend:
+
+```bash
+dart run bin/nostr_pos.dart recover-swaps \
+  --store .nostr-pos/events.jsonl \
+  --relays wss://no.str.cr,wss://relay.primal.net,wss://nos.lol \
+  --merchant-recovery-privkey <merchant-recovery-private-key-hex> \
+  --broadcast-prepared \
+  --liquid-api https://blockstream.info/liquid/api
 ```
