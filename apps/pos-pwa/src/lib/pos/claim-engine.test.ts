@@ -164,6 +164,32 @@ describe('prepared claim broadcaster', () => {
     });
   });
 
+  it('auto-resumes only fresh claimable prepared claims', async () => {
+    const { broadcastLiquidTransaction } = await import('../liquid/esplora');
+    const { resumePreparedClaims } = await import('./claim-engine');
+    recoveries.set('swap1', { ...recoveries.get('swap1')!, status: 'failed', claimLastError: 'previous failure' });
+    recoveries.set('swap3', {
+      saleId: 'sale3',
+      paymentAttemptId: 'attempt3',
+      swapId: 'swap3',
+      encryptedLocalBlob: 'ciphertext',
+      localSavedAt: 0,
+      okFrom: ['wss://one'],
+      expiresAt: 1000,
+      claimTxHex: '03000000',
+      status: 'claimable'
+    });
+    vi.mocked(broadcastLiquidTransaction).mockResolvedValue('txid3');
+
+    await expect(resumePreparedClaims(config, { now: 700 })).resolves.toEqual([
+      { swapId: 'swap3', status: 'broadcast', txid: 'txid3' }
+    ]);
+    expect(broadcastLiquidTransaction).toHaveBeenCalledTimes(1);
+    expect(broadcastLiquidTransaction).toHaveBeenCalledWith('https://liquid.example/api/', '03000000', undefined);
+    expect(recoveries.get('swap1')).toMatchObject({ status: 'failed', claimLastError: 'previous failure' });
+    expect(recoveries.get('swap3')).toMatchObject({ status: 'claimed', claimTxid: 'txid3' });
+  });
+
   it('reports prepared claims as skipped when no backend is configured', async () => {
     const { broadcastPreparedClaims } = await import('./claim-engine');
 

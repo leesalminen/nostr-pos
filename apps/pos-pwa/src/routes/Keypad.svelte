@@ -16,7 +16,7 @@
 
   onMount(async () => {
     const config = await loadTerminal();
-    const [{ syncTerminalRevocation }, { reconcileOpenPayments }, { reconcileClaimBroadcasts }, { syncTerminalRecoveryBackups }, { mergePaymentHistory }] =
+    const [{ syncTerminalRevocation }, { reconcileOpenPayments }, { reconcileClaimBroadcasts, resumePreparedClaims }, { syncTerminalRecoveryBackups }, { mergePaymentHistory }] =
       await Promise.all([
         import('../lib/activation/revocation-sync'),
         import('../lib/pos/reconciler'),
@@ -33,9 +33,10 @@
       location.hash = '#/activate';
       return;
     }
-    await reconcileOpenPayments();
-    await reconcileClaimBroadcasts(config);
     await syncTerminalRecoveryBackups(config);
+    await reconcileOpenPayments();
+    await resumePreparedClaims(config);
+    await reconcileClaimBroadcasts(config);
     await mergePaymentHistory(config);
     await refreshTransactions();
   });

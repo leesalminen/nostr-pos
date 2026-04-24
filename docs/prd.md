@@ -3441,6 +3441,10 @@ verification evidence stay close to the source of truth.
   reconciliation fetch terminal-addressed kind-1059 wraps, unwrap them with the
   terminal key, and restore missing kind-9381 recovery records into IndexedDB so
   the local claim/resume path can survive deleted local rows.
+- Fixed the recovered prepared-claim path: terminal-imported recovery backups
+  that contain `claim_tx_hex` now become locally claimable, and cashier startup
+  / payment-screen polling automatically broadcasts fresh claimable prepared
+  claims while leaving failed manual retries to the recovery center.
 - CI now runs `dart analyze` for the Dart SDK as well as the CLI so relay,
   signing, and recovery SDK code gets static checks on every push.
 - README now documents the current smoke commands and the live relay-backed

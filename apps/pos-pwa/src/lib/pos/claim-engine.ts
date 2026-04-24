@@ -127,6 +127,16 @@ export async function broadcastPreparedClaims(
   return results;
 }
 
+export async function resumePreparedClaims(
+  config: TerminalConfig,
+  options: { fetcher?: typeof fetch; records?: SwapRecoveryRecord[]; now?: number } = {}
+): Promise<PreparedClaimResult[]> {
+  const records = (options.records ?? (await recoveryRecords())).filter(
+    (record) => record.status === 'claimable' && Boolean(record.claimTxHex)
+  );
+  return broadcastPreparedClaims(config, { ...options, records });
+}
+
 type RecoveryPayload = {
   settlement?: { address?: string };
   swap?: ReverseSwapResponse;

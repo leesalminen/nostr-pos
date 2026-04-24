@@ -49,6 +49,16 @@ function parseRecoveryContent(content: string): Partial<SwapRecoveryRecord> | un
   }
 }
 
+function mergedRecoveryStatus(
+  existing: SwapRecoveryRecord | undefined,
+  parsed: Partial<SwapRecoveryRecord>
+): SwapRecoveryRecord['status'] {
+  if (existing?.status === 'claimed' || parsed.claimConfirmedAt || parsed.claimTxid) return 'claimed';
+  if (existing?.status === 'failed') return 'failed';
+  if (parsed.claimTxHex) return 'claimable';
+  return existing?.status ?? 'pending';
+}
+
 export function unwrapTerminalRecoveryEvent(config: TerminalConfig, event: Event): RecoveryRumor | undefined {
   if (!config.terminalPrivkeyEnc || event.kind !== KINDS.giftWrap || !isValidSignedEvent(event)) return undefined;
   if (!event.tags.some((tag) => tag[0] === 'p' && tag[1] === config.terminalPubkey)) return undefined;
@@ -89,7 +99,7 @@ export async function applyTerminalRecoveryBackup(config: TerminalConfig, event:
     claimBroadcastAt: parsed.claimBroadcastAt ?? existing?.claimBroadcastAt,
     claimConfirmedAt: parsed.claimConfirmedAt ?? existing?.claimConfirmedAt,
     claimNeedsFeeBump: existing?.claimNeedsFeeBump,
-    status: existing?.status ?? 'pending'
+    status: mergedRecoveryStatus(existing, parsed)
   };
   await putRecovery(next);
   return true;

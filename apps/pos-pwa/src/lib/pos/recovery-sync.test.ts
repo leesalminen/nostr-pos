@@ -71,7 +71,40 @@ describe('terminal recovery backup sync', () => {
       claimBroadcastAt: 4000,
       claimFeeSatPerVbyte: 0.3,
       claimRbfCount: 1,
-      status: 'pending'
+      status: 'claimed'
+    });
+  });
+
+  it('marks relay-prepared claim backups claimable after device recovery', async () => {
+    const { syncTerminalRecoveryBackups } = await import('./recovery-sync');
+    const item: OutboxItem = {
+      id: 'recovery2',
+      type: 'payment_backup',
+      payload: {
+        kind: 9381,
+        tags: [['proto', 'nostr-pos', '0.2'], ['swap', 'swap2']],
+        content: {
+          sale_id: 'sale2',
+          payment_attempt_id: 'attempt2',
+          swap_id: 'swap2',
+          encrypted_local_blob: 'ciphertext',
+          expires_at: 5,
+          claim: {
+            claim_tx_hex: 'claimhex',
+            claim_prepared_at: 4
+          }
+        }
+      },
+      createdAt: 1000,
+      okFrom: []
+    };
+    const wrapped = nip59.wrapEvent(outboxItemToTemplate(item), hexToBytes(merchant.privateKey), terminal.publicKey);
+
+    await expect(syncTerminalRecoveryBackups(config, async () => [wrapped])).resolves.toBe(1);
+    expect(recoveries.get('swap2')).toMatchObject({
+      claimTxHex: 'claimhex',
+      claimPreparedAt: 4000,
+      status: 'claimable'
     });
   });
 });
