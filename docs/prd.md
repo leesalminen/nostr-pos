@@ -3367,6 +3367,10 @@ verification evidence stay close to the source of truth.
   terminal, decrypt terminal-authored records via the merchant recovery
   conversation key or merchant-authored records via the signer key, and merge
   known sale status/receipt updates back into IndexedDB.
+- Added terminal-side recovery-backup import: startup and payment-screen
+  reconciliation fetch terminal-addressed kind-1059 wraps, unwrap them with the
+  terminal key, and restore missing kind-9381 recovery records into IndexedDB so
+  the local claim/resume path can survive deleted local rows.
 - CI now runs `dart analyze` for the Dart SDK as well as the CLI so relay,
   signing, and recovery SDK code gets static checks on every push.
 - README now documents the current smoke commands and the live relay-backed

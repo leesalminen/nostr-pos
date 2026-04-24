@@ -12,6 +12,7 @@
   import { syncQueuedRecords } from '../lib/pos/sync';
   import { syncTerminalRevocation } from '../lib/activation/revocation-sync';
   import { mergePaymentHistory } from '../lib/pos/payment-history';
+  import { syncTerminalRecoveryBackups } from '../lib/pos/recovery-sync';
 
   let amount = $state('');
   let note = $state('');
@@ -31,6 +32,7 @@
       return;
     }
     await reconcileOpenPayments();
+    await syncTerminalRecoveryBackups(config);
     await mergePaymentHistory(config);
     await refreshTransactions();
   });

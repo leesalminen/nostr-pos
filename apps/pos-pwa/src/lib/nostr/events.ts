@@ -5,6 +5,7 @@ export const KINDS = {
   terminalAuthorization: 30381,
   terminalRevocation: 30382,
   pairingAnnouncement: 30383,
+  giftWrap: 1059,
   saleCreated: 9380,
   swapRecovery: 9381,
   paymentStatus: 9382,

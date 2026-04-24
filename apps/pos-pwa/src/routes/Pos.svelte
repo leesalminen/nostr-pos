@@ -18,6 +18,7 @@
   import { isPosProfileReference } from '../lib/pos/profile-loader';
   import { subscribeBoltzSwapUpdates, type SwapUpdateSubscription } from '../lib/swaps/boltz-ws';
   import { mergePaymentHistory } from '../lib/pos/payment-history';
+  import { syncTerminalRecoveryBackups } from '../lib/pos/recovery-sync';
 
   let { params = {} }: { params?: { saleId?: string } } = $props();
 
@@ -55,6 +56,7 @@
     async function refreshPaymentState() {
       if (!attempt || stopped) return;
       await reconcileOpenPayments({ now: Date.now() });
+      await loadTerminal().then(syncTerminalRecoveryBackups);
       await loadTerminal().then(mergePaymentHistory);
       const resumed = await resumeAttempt(attempt.id);
       if (!resumed || stopped) return;
