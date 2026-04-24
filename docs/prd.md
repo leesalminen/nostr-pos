@@ -3450,6 +3450,9 @@ verification evidence stay close to the source of truth.
   terminal, decrypt terminal-authored records via the merchant recovery
   conversation key or merchant-authored records via the signer key, and merge
   known sale status/receipt updates back into IndexedDB.
+- The recent-transactions screen now renders local IndexedDB rows before
+  running payment reconciliation, preserving the fast refresh-confidence path
+  while still updating statuses afterward.
 - Added terminal-side recovery-backup import: startup and payment-screen
   reconciliation fetch terminal-addressed kind-1059 wraps, unwrap them with the
   terminal key, and restore missing kind-9381 recovery records into IndexedDB so

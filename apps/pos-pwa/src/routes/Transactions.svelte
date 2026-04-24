@@ -9,6 +9,7 @@
 
   onMount(async () => {
     await loadTerminal();
+    await refreshTransactions();
     await reconcileOpenPayments();
     await refreshTransactions();
   });
