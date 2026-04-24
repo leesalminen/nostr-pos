@@ -5,7 +5,7 @@
   import BullFooter from '../lib/ui/BullFooter.svelte';
   import BullSpinner from '../lib/ui/BullSpinner.svelte';
   import QrCard from '../lib/ui/QrCard.svelte';
-  import { terminal, loadTerminal } from '../lib/stores/terminal';
+  import { terminal, loadTerminal, loadPosProfileReference } from '../lib/stores/terminal';
   import { refreshTransactions } from '../lib/stores/ledger';
   import { paymentPayload, simulateSettlement } from '../lib/pos/payment-state';
   import { reconcileOpenPayments, resumeAttempt, resumeSale } from '../lib/pos/reconciler';
@@ -14,6 +14,7 @@
   import { putAttempt } from '../lib/db/repositories/ledger';
   import { formatExchangeRate, formatFiat, formatSats, statusLabel } from '../lib/util/formatting';
   import { payWithWebNfc } from '../lib/nfc/web-nfc';
+  import { isPosProfileReference } from '../lib/pos/profile-loader';
 
   let { params = {} }: { params?: { saleId?: string } } = $props();
 
@@ -62,9 +63,16 @@
 
     async function prepare() {
       try {
+        const target = params.saleId ? decodeURIComponent(params.saleId) : undefined;
+        if (target && isPosProfileReference(target)) {
+          const updated = await loadPosProfileReference(target);
+          location.replace(updated.activatedAt ? '#/' : '#/activate');
+          return;
+        }
+
         await loadTerminal();
         await refreshTransactions();
-        const resumed = params.saleId ? await resumeSale(params.saleId) : undefined;
+        const resumed = target ? await resumeSale(target) : undefined;
         if (!resumed) {
           error = 'Payment not found.';
           return;

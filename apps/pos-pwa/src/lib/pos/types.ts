@@ -95,6 +95,14 @@ export type TerminalAuthorization = {
   [key: string]: unknown;
 };
 
+export type PosProfileConfig = {
+  merchantPubkey: string;
+  posId: string;
+  eventId: string;
+  loadedAt: number;
+  relays: string[];
+};
+
 export type TerminalConfig = {
   merchantName: string;
   posName: string;
@@ -107,6 +115,7 @@ export type TerminalConfig = {
   revokedAt?: number;
   revocationReason?: string;
   authorization?: TerminalAuthorization;
+  posProfile?: PosProfileConfig;
   maxInvoiceSat: number;
   syncServers: string[];
 };

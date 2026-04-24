@@ -3270,6 +3270,10 @@ verification evidence stay close to the source of truth.
 - Generalized controller relay reads: `nostr_pos_cli list-events` can now query
   configured relays by kind, author, `d` tag, or `p` tag, which covers POS
   profile fetches and other protocol event inspection.
+- Added POS profile URL loading in the PWA: opening `#/pos/naddr...` or a
+  `30380:<merchant-pubkey>:<pos-id>` coordinate resolves the public profile from
+  relays, applies merchant name, POS name, fiat currency, relay list, and Liquid
+  backend configuration locally, then continues to activation or the keypad.
 - CI now runs `dart analyze` for the Dart SDK as well as the CLI so relay,
   signing, and recovery SDK code gets static checks on every push.
 - README now documents the current smoke commands and the live relay-backed
