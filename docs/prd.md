@@ -3458,6 +3458,8 @@ verification evidence stay close to the source of truth.
   that contain `claim_tx_hex` now become locally claimable, and cashier startup
   / payment-screen polling automatically broadcasts fresh claimable prepared
   claims while leaving failed manual retries to the recovery center.
+- Tightened transaction-detail action priority so `needs_recovery` states always
+  show the recovery path instead of being treated as generic resumable payments.
 - CI now runs `dart analyze` for the Dart SDK as well as the CLI so relay,
   signing, and recovery SDK code gets static checks on every push.
 - README now documents the current smoke commands and the live relay-backed

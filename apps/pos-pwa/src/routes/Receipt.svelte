@@ -51,10 +51,10 @@
       {#if isPaid}
         <Button variant="secondary" onclick={printReceipt}><Printer size={18} />Print</Button>
         <Button variant="ghost" onclick={shareReceipt}><Share2 size={18} />Share</Button>
-      {:else if canResume}
-        <Button href={`#/pos/${sale?.id}`} variant="secondary"><RotateCw size={18} />Resume</Button>
       {:else if needsRecovery}
         <Button href="#/settings/advanced" variant="secondary"><Wrench size={18} />Recover</Button>
+      {:else if canResume}
+        <Button href={`#/pos/${sale?.id}`} variant="secondary"><RotateCw size={18} />Resume</Button>
       {:else}
         <Button href="#/" variant="secondary"><RotateCw size={18} />New sale</Button>
       {/if}
@@ -73,10 +73,10 @@
         <p class="mt-1 text-sm">
           {#if isPaid}
             Receipt ready.
-          {:else if canResume}
-            Payment is not complete yet.
           {:else if needsRecovery}
             Payment needs recovery.
+          {:else if canResume}
+            Payment is not complete yet.
           {:else}
             Start a new sale.
           {/if}
