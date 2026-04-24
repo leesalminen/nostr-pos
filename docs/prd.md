@@ -3307,6 +3307,9 @@ verification evidence stay close to the source of truth.
   merchant recovery key is authorized: the terminal now publishes separate
   wrapped recovery records for the merchant recovery key and terminal key, and a
   relay only counts durable when both wraps are accepted.
+- Tightened terminal approval sync for production: plaintext kind-30381 relay
+  approvals remain available for local CLI pilot tests, but production PWA
+  builds now only accept approvals that decrypt with the terminal key.
 - CI now runs `dart analyze` for the Dart SDK as well as the CLI so relay,
   signing, and recovery SDK code gets static checks on every push.
 - README now documents the current smoke commands and the live relay-backed

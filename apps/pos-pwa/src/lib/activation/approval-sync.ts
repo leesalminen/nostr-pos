@@ -6,13 +6,27 @@ import { querySignedEvents } from '../nostr/pool';
 import type { TerminalConfig } from '../pos/types';
 import { configWithTerminalAuthorization } from './authorization';
 
-export function configFromApprovalEvent(config: TerminalConfig, event: Event, now = Date.now()): TerminalConfig | undefined {
-  const candidates = [event.content];
+export type ApprovalSyncOptions = {
+  allowPlaintext?: boolean;
+};
+
+function plaintextApprovalAllowed(): boolean {
+  return !import.meta.env.PROD;
+}
+
+export function configFromApprovalEvent(
+  config: TerminalConfig,
+  event: Event,
+  now = Date.now(),
+  options: ApprovalSyncOptions = {}
+): TerminalConfig | undefined {
+  const allowPlaintext = options.allowPlaintext ?? plaintextApprovalAllowed();
+  const candidates = allowPlaintext ? [event.content] : [];
   if (config.terminalPrivkeyEnc) {
     try {
       candidates.push(JSON.stringify(decryptContent<unknown>(event.content, config.terminalPrivkeyEnc, event.pubkey)));
     } catch {
-      // Plaintext approval payloads are still accepted for CLI/dev pilots.
+      // Plaintext approval payloads are accepted only for CLI/dev pilots.
     }
   }
 
@@ -28,7 +42,8 @@ export function configFromApprovalEvent(config: TerminalConfig, event: Event, no
 
 export async function findTerminalApproval(
   config: TerminalConfig,
-  fetchEvents = querySignedEvents
+  fetchEvents = querySignedEvents,
+  options: ApprovalSyncOptions = {}
 ): Promise<TerminalConfig | undefined> {
   const events = await fetchEvents(config.syncServers, {
     kinds: [KINDS.terminalAuthorization],
@@ -37,7 +52,7 @@ export async function findTerminalApproval(
   });
   const newestFirst = [...events].sort((a, b) => b.created_at - a.created_at);
   for (const event of newestFirst) {
-    const approved = configFromApprovalEvent(config, event);
+    const approved = configFromApprovalEvent(config, event, Date.now(), options);
     if (approved) return approved;
   }
   return undefined;

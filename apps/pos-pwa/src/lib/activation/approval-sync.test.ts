@@ -46,6 +46,20 @@ describe('approval relay sync', () => {
     expect(configFromApprovalEvent(config, event, 1000)?.posName).toBe('Front Counter');
   });
 
+  it('rejects plaintext relay approvals when production mode disables pilot compatibility', () => {
+    const event = signEvent(
+      {
+        kind: 30381,
+        tags: [['p', terminalKeys.publicKey]],
+        content: JSON.stringify(approval),
+        created_at: 1000
+      },
+      merchantKeys.privateKey
+    );
+
+    expect(configFromApprovalEvent(config, event, 1000, { allowPlaintext: false })).toBeUndefined();
+  });
+
   it('decrypts approval events addressed to the terminal', () => {
     const event = signEvent(
       {
@@ -80,7 +94,7 @@ describe('approval relay sync', () => {
       merchantKeys.privateKey
     );
 
-    const approved = await findTerminalApproval(config, async () => [stale, newest]);
+    const approved = await findTerminalApproval(config, async () => [stale, newest], { allowPlaintext: true });
     expect(approved?.posName).toBe('Front Counter');
   });
 });
