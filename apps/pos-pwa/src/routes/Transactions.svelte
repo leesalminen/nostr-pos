@@ -30,7 +30,7 @@
     </header>
 
     <div class="mb-5">
-      <h1 class="text-3xl font-bold leading-tight">Recent transactions</h1>
+      <h1 class="font-display text-4xl uppercase tracking-display leading-none">Recent transactions</h1>
       <p class="mt-1 text-xs font-medium uppercase tracking-[0.12em] text-[#776b5a] dark:text-[#b9aa91]">
         {$terminal?.posName ?? 'Counter 1'}
       </p>

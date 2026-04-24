@@ -46,7 +46,7 @@
     <ReceiptView sale={sale} attempt={attempt} merchantName={$terminal?.merchantName ?? 'Seguras Butcher'} posName={$terminal?.posName ?? 'Counter 1'} />
     <div class="no-print mx-auto mt-5 max-w-sm text-center">
       <div class="rounded-md bg-[#d9f3df] px-5 py-4 text-[#14522d]">
-        <p class="text-3xl font-black">Paid</p>
+        <p class="font-display text-5xl uppercase tracking-display leading-none">Paid</p>
         <p class="mt-1 text-sm">Receipt ready.</p>
       </div>
     </div>

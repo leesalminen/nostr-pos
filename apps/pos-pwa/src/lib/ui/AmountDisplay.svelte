@@ -6,8 +6,8 @@
 </script>
 
 <div class="text-right">
-  <div class="text-xs font-medium uppercase tracking-[0.12em] text-[#776b5a] dark:text-[#b9aa91]">Total</div>
-  <div class="mt-2 whitespace-nowrap font-black tabular-nums text-[clamp(2rem,8vw,6.8rem)] leading-none text-[#211f1a] dark:text-[#fff6e8]">
+  <div class="font-display text-xs uppercase tracking-[0.18em] text-[#776b5a] dark:text-[#b9aa91]">Total</div>
+  <div class="mt-1 whitespace-nowrap font-display tabular-nums tracking-display text-[clamp(2.5rem,10vw,7.5rem)] leading-[0.95] text-[#211f1a] dark:text-[#fff6e8]">
     {display}
   </div>
 </div>

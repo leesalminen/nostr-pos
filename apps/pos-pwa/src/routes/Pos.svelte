@@ -1,7 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { ArrowLeft, CreditCard, History, Loader2, Settings } from 'lucide-svelte';
+  import { ArrowLeft, CreditCard, History, Settings } from 'lucide-svelte';
   import Button from '../lib/ui/Button.svelte';
+  import BullSpinner from '../lib/ui/BullSpinner.svelte';
   import QrCard from '../lib/ui/QrCard.svelte';
   import { terminal, loadTerminal } from '../lib/stores/terminal';
   import { refreshTransactions } from '../lib/stores/ledger';
@@ -121,7 +122,7 @@
         <div class="mx-auto flex max-w-md flex-col items-center gap-5">
           <div class="flex w-full flex-col items-center gap-1">
             <div class="flex items-baseline gap-3">
-              <p class="text-6xl font-black tabular-nums leading-none">{formatFiat(sale.amountFiat, sale.fiatCurrency)}</p>
+              <p class="font-display text-7xl tabular-nums tracking-display leading-none">{formatFiat(sale.amountFiat, sale.fiatCurrency)}</p>
             </div>
             <p class={`inline-flex items-center gap-1.5 text-xs font-semibold ${statusTone}`}>
               <span class="inline-block h-1.5 w-1.5 rounded-full bg-current"></span>
@@ -171,7 +172,7 @@
             disabled={settling}
           >
             {#if settling}
-              <Loader2 class="inline animate-spin" size={13} /> Finishing…
+              <span class="inline-flex items-center gap-2"><BullSpinner size={16} /> Finishing…</span>
             {:else}
               Dev: simulate paid
             {/if}
@@ -179,7 +180,7 @@
         </div>
       {:else}
         <div class="grid min-h-[60vh] place-items-center">
-          <Loader2 class="animate-spin" size={36} />
+          <BullSpinner size={72} label="Preparing" />
         </div>
       {/if}
     </section>

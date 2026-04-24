@@ -2,6 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
+@font-face {
+  font-family: "Bebas Neue";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/BebasNeue-Regular.woff2') format('woff2');
+}
+
 :root {
   color-scheme: light;
   font-family:

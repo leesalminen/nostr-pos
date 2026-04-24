@@ -35,7 +35,7 @@
     <section class="flex min-h-[100dvh] flex-1 flex-col px-5 py-4 sm:px-8 sm:py-6">
       <header class="mb-4 flex items-center justify-between gap-4 sm:mb-6">
         <div>
-          <h1 class="text-2xl font-bold leading-tight">{$terminal?.merchantName ?? 'Seguras Butcher'}</h1>
+          <h1 class="font-display text-3xl uppercase tracking-display leading-none">{$terminal?.merchantName ?? 'Seguras Butcher'}</h1>
           <p class="mt-0.5 text-xs font-medium uppercase tracking-[0.12em] text-[#776b5a] dark:text-[#b9aa91]">{$terminal?.posName ?? 'Counter 1'}</p>
         </div>
         <div class="flex items-center gap-2">

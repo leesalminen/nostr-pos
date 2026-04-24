@@ -6,6 +6,12 @@ export default {
     extend: {
       borderRadius: {
         md: '8px'
+      },
+      fontFamily: {
+        display: ['"Bebas Neue"', 'ui-sans-serif', 'system-ui', 'sans-serif']
+      },
+      letterSpacing: {
+        display: '0.03em'
       }
     }
   },
