@@ -7,7 +7,7 @@ import { getBullBitcoinRate, fiatToSats } from '../fx/bull-bitcoin';
 import { deriveLiquidAddress, liquidBip21 } from '../liquid/address';
 import { MockBoltzReverseSwapProvider } from '../swaps/mock-boltz';
 import { ulid } from '../util/ulid';
-import { paymentStatusEvent, receiptEvent, saleCreatedEvent } from '../nostr/events';
+import { paymentStatusEvent, receiptEvent, saleCreatedEvent, swapRecoveryEvent } from '../nostr/events';
 
 export function statusAfterDetection(method: PaymentMethod): SaleStatus {
   return method === 'liquid' ? 'settled' : 'settling';
@@ -115,7 +115,7 @@ export async function createSale(config: TerminalConfig, fiatAmount: string, met
       }
     };
     const encryptedLocalBlob = await encryptJson(recoveryPayload, config.terminalId);
-    await putRecovery({
+    const recoveryRecord = {
       saleId: sale.id,
       paymentAttemptId: attempt.id,
       swapId,
@@ -125,11 +125,19 @@ export async function createSale(config: TerminalConfig, fiatAmount: string, met
       okFrom,
       expiresAt: attempt.expiresAt!,
       status: 'pending'
-    });
+    } as const;
+    await putRecovery(recoveryRecord);
     await putOutbox({
       id: `recovery_${swapId}`,
       type: 'payment_backup',
-      payload: { saleId: sale.id, swapId },
+      payload: swapRecoveryEvent({
+        saleId: sale.id,
+        paymentAttemptId: attempt.id,
+        swapId,
+        terminalId: config.terminalId,
+        encryptedLocalBlob,
+        expiresAt: attempt.expiresAt!
+      }),
       createdAt: Date.now(),
       okFrom
     });

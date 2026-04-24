@@ -85,3 +85,29 @@ export function receiptEvent(sale: Sale, attempt: PaymentAttempt): LocalProtocol
     }
   };
 }
+
+export function swapRecoveryEvent(input: {
+  saleId: string;
+  paymentAttemptId: string;
+  swapId: string;
+  terminalId: string;
+  encryptedLocalBlob: string;
+  expiresAt: number;
+}): LocalProtocolEvent {
+  return {
+    kind: KINDS.swapRecovery,
+    tags: [
+      ['proto', 'nostr-pos', '0.2'],
+      ['sale', input.saleId],
+      ['terminal', input.terminalId],
+      ['swap', input.swapId]
+    ],
+    content: {
+      sale_id: input.saleId,
+      payment_attempt_id: input.paymentAttemptId,
+      swap_id: input.swapId,
+      encrypted_local_blob: input.encryptedLocalBlob,
+      expires_at: Math.floor(input.expiresAt / 1000)
+    }
+  };
+}

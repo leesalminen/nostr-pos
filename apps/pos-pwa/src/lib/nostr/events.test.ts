@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { paymentStatusEvent, receiptEvent, saleCreatedEvent } from './events';
+import { paymentStatusEvent, receiptEvent, saleCreatedEvent, swapRecoveryEvent } from './events';
 import type { PaymentAttempt, Sale } from '../pos/types';
 
 const sale: Sale = {
@@ -30,5 +30,20 @@ describe('local protocol events', () => {
     expect(saleCreatedEvent(sale).kind).toBe(9380);
     expect(paymentStatusEvent(sale, attempt).content.status).toBe('settled');
     expect(receiptEvent(sale, attempt).content.receipt_id).toBe('R-1');
+  });
+
+  it('builds publishable swap recovery backup payloads', () => {
+    const event = swapRecoveryEvent({
+      saleId: 'sale1',
+      paymentAttemptId: 'attempt1',
+      swapId: 'swap1',
+      terminalId: 'term1',
+      encryptedLocalBlob: 'ciphertext',
+      expiresAt: 60_000
+    });
+
+    expect(event.kind).toBe(9381);
+    expect(event.tags).toContainEqual(['swap', 'swap1']);
+    expect(event.content.encrypted_local_blob).toBe('ciphertext');
   });
 });
