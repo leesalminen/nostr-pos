@@ -3262,6 +3262,9 @@ verification evidence stay close to the source of truth.
 - Added real BIP-340 Schnorr signing/verification primitives to the Dart SDK so
   controller-generated events can move from placeholder local envelopes toward
   relay-acceptable signed events.
+- Added Dart relay publishing and a `nostr_pos_cli publish-events` command so
+  signed controller events in the local event store can be written to configured
+  relays with per-relay OK reporting.
 
 ### Known follow-ups
 

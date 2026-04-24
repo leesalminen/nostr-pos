@@ -18,6 +18,7 @@ void main(List<String> args) async {
     ..addCommand('announce-terminal')
     ..addCommand('auth-terminal')
     ..addCommand('revoke-terminal')
+    ..addCommand('publish-events')
     ..addCommand('record-sale')
     ..addCommand('list-events')
     ..addCommand('list-sales')
@@ -46,6 +47,8 @@ void main(List<String> args) async {
       await _authTerminal(rest);
     case 'revoke-terminal':
       await _revokeTerminal(rest);
+    case 'publish-events':
+      await _publishEvents(rest);
     case 'record-sale':
       await _recordSale(rest);
     case 'list-events':
@@ -134,6 +137,36 @@ Future<void> _recoverSwaps(List<String> args) async {
   final output = parsed['plan'] == true
       ? recoveryClaimPlan(recoveries)
       : recoveries.map((recovery) => recovery.toJson()).toList();
+  stdout.writeln(const JsonEncoder.withIndent('  ').convert(output));
+}
+
+Future<void> _publishEvents(List<String> args) async {
+  final parser = ArgParser()
+    ..addOption('store', defaultsTo: '.nostr-pos/events.jsonl')
+    ..addOption('relays', defaultsTo: defaultRelays.join(','))
+    ..addOption('kind')
+    ..addOption('limit', defaultsTo: '50');
+  final parsed = parser.parse(args);
+  final kind = parsed['kind'] == null
+      ? null
+      : int.parse(parsed['kind'] as String);
+  final limit = int.parse(parsed['limit'] as String);
+  final allEvents = await LocalEventStore(parsed['store'] as String).readAll();
+  final events = allEvents
+      .where((event) => kind == null || event.kind == kind)
+      .take(limit)
+      .toList();
+  final relays = _parseRelays(parsed['relays'] as String);
+  final output = <Map<String, Object?>>[];
+  for (final event in events) {
+    final results = await publishEventToRelays(relays: relays, event: event);
+    output.add({
+      'event_id': event.id,
+      'kind': event.kind,
+      'ok_count': results.where((result) => result.ok).length,
+      'results': results.map((result) => result.toJson()).toList(),
+    });
+  }
   stdout.writeln(const JsonEncoder.withIndent('  ').convert(output));
 }
 

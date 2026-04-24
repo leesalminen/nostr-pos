@@ -5,6 +5,20 @@ import 'dart:io';
 import '../protocol/event.dart';
 import '../protocol/kinds.dart';
 
+class RelayPublishResult {
+  RelayPublishResult({required this.relay, required this.ok, this.message});
+
+  final String relay;
+  final bool ok;
+  final String? message;
+
+  Map<String, Object?> toJson() => {
+    'relay': relay,
+    'ok': ok,
+    'message': message,
+  };
+}
+
 class NostrRelayClient {
   NostrRelayClient({this.timeout = const Duration(seconds: 8)});
 
@@ -53,6 +67,78 @@ class NostrRelayClient {
       await socket.close();
     }
   }
+
+  Future<RelayPublishResult> publish(
+    String relayUrl,
+    NostrPosEvent event,
+  ) async {
+    final socket = await WebSocket.connect(relayUrl).timeout(timeout);
+    final done = Completer<RelayPublishResult>();
+    StreamSubscription<dynamic>? subscription;
+
+    subscription = socket.listen(
+      (message) {
+        final decoded = jsonDecode(message as String);
+        if (decoded is! List || decoded.isEmpty) return;
+        if (decoded[0] == 'OK' &&
+            decoded.length >= 4 &&
+            decoded[1] == event.id) {
+          if (!done.isCompleted) {
+            done.complete(
+              RelayPublishResult(
+                relay: relayUrl,
+                ok: decoded[2] == true,
+                message: decoded[3] as String?,
+              ),
+            );
+          }
+        }
+      },
+      onError: done.completeError,
+      onDone: () {
+        if (!done.isCompleted) {
+          done.complete(
+            RelayPublishResult(
+              relay: relayUrl,
+              ok: false,
+              message: 'connection closed',
+            ),
+          );
+        }
+      },
+    );
+
+    socket.add(jsonEncode(['EVENT', event.toJson()]));
+    try {
+      return await done.future.timeout(
+        timeout,
+        onTimeout: () =>
+            RelayPublishResult(relay: relayUrl, ok: false, message: 'timeout'),
+      );
+    } finally {
+      await subscription.cancel();
+      await socket.close();
+    }
+  }
+}
+
+Future<List<RelayPublishResult>> publishEventToRelays({
+  required List<String> relays,
+  required NostrPosEvent event,
+  NostrRelayClient? client,
+}) async {
+  final relayClient = client ?? NostrRelayClient();
+  final results = <RelayPublishResult>[];
+  for (final relay in relays) {
+    try {
+      results.add(await relayClient.publish(relay, event));
+    } catch (error) {
+      results.add(
+        RelayPublishResult(relay: relay, ok: false, message: '$error'),
+      );
+    }
+  }
+  return results;
 }
 
 Future<NostrPosEvent?> findPairingAnnouncement({
