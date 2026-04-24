@@ -130,6 +130,67 @@ describe('startup reconciliation', () => {
     expect(outbox).toHaveLength(2);
   });
 
+  it('settles keypad charges paid through the Liquid tab', async () => {
+    const { reconcileOpenPayments } = await import('./reconciler');
+    config = {
+      merchantName: 'Merchant',
+      posName: 'Counter',
+      currency: 'CRC',
+      terminalId: 'term1',
+      terminalPubkey: 'pub',
+      pairingCode: 'ABCD-EFGH',
+      maxInvoiceSat: 100000,
+      syncServers: [],
+      authorization: {
+        liquid_backends: [{ type: 'esplora', url: 'https://liquid.example/api' }]
+      }
+    };
+    sales.set('sale-liquid-tab', {
+      id: 'sale-liquid-tab',
+      receiptNumber: 'R-L',
+      posRef: 'pos',
+      terminalId: 'term1',
+      amountFiat: '8500',
+      fiatCurrency: 'CRC',
+      amountSat: 25000,
+      status: 'payment_ready',
+      createdAt: 0,
+      updatedAt: 0
+    });
+    attempts.set('attempt-liquid-tab', {
+      id: 'attempt-liquid-tab',
+      saleId: 'sale-liquid-tab',
+      method: 'lightning_swap',
+      status: 'waiting',
+      liquidAddress: 'tex1qtabpaid',
+      swapId: 'swap-liquid-tab',
+      createdAt: 0,
+      updatedAt: 0,
+      expiresAt: 100
+    });
+    const fetcher = vi.fn(async () =>
+      new Response(
+        JSON.stringify([
+          {
+            txid: 'liquidtxid',
+            status: { confirmed: false },
+            vout: [{ scriptpubkey_address: 'tex1qtabpaid', value: 25000 }]
+          }
+        ]),
+        { status: 200 }
+      )
+    );
+
+    await expect(reconcileOpenPayments({ now: 12, fetcher })).resolves.toBe(1);
+    expect(attempts.get('attempt-liquid-tab')).toMatchObject({
+      method: 'liquid',
+      status: 'settled',
+      settlementTxid: 'liquidtxid'
+    });
+    expect(sales.get('sale-liquid-tab')?.status).toBe('receipt_ready');
+    expect(outbox).toHaveLength(2);
+  });
+
   it('marks Lightning swaps detected by the provider after refresh', async () => {
     const { reconcileOpenPayments } = await import('./reconciler');
     config = {

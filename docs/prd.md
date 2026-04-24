@@ -3265,6 +3265,11 @@ verification evidence stay close to the source of truth.
   recovery data, covering the crash window after terminal-side claim
   preparation. `nostr_pos_cli recover-swaps --broadcast-prepared --liquid-api
   <esplora>` exposes that controller path.
+- Fixed the hybrid charge screen settlement path: keypad-created charges carry
+  both Lightning and Liquid payment data, and waiting attempts with a Liquid
+  address now reconcile direct Liquid payments even when the default rail was
+  Lightning. The settled attempt is rewritten to `liquid` so receipts/history
+  reflect the rail actually paid.
 - Added local protocol outbox events for sale-created, payment-status, and
   receipt records, plus startup reconciliation that expires stale open attempts
   and records the status update. This is the IndexedDB side of the PRD's

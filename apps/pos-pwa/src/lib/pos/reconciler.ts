@@ -35,7 +35,7 @@ async function verifyLiquidAttempt(
   attempt: PaymentAttempt,
   options: ReconcileOptions
 ): Promise<{ changed: boolean; terminal: true } | { changed: false; terminal: false }> {
-  if (attempt.method !== 'liquid' || !attempt.liquidAddress) return { changed: false, terminal: false };
+  if (!attempt.liquidAddress || !['created', 'waiting'].includes(attempt.status)) return { changed: false, terminal: false };
   const config = await getTerminalConfig();
   const backend = config?.authorization?.liquid_backends?.find((candidate) => candidate.type === 'esplora' && candidate.url);
   if (!backend) return { changed: false, terminal: false };
@@ -46,7 +46,7 @@ async function verifyLiquidAttempt(
     if (!verification.detected) return { changed: false, terminal: false };
     await settleAttempt({
       sale,
-      attempt,
+      attempt: { ...attempt, method: 'liquid' },
       txid: verification.txid ?? `liquid_${attempt.id}`,
       settledAt: options.now
     });
