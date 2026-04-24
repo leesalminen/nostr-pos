@@ -11,7 +11,7 @@
   import { createSale, markReady } from '../lib/pos/payment-state';
   import { syncQueuedRecords } from '../lib/pos/sync';
   import { syncTerminalRevocation } from '../lib/activation/revocation-sync';
-  import { mergeRelayPaymentHistory } from '../lib/pos/relay-history';
+  import { mergePaymentHistory } from '../lib/pos/payment-history';
 
   let amount = $state('');
   let note = $state('');
@@ -31,7 +31,7 @@
       return;
     }
     await reconcileOpenPayments();
-    await mergeRelayPaymentHistory(config);
+    await mergePaymentHistory(config);
     await refreshTransactions();
   });
 

@@ -17,7 +17,7 @@ vi.mock('../db/repositories/ledger', () => ({
   putSale: vi.fn((sale: Sale) => sales.set(sale.id, sale))
 }));
 
-describe('relay payment history merge', () => {
+describe('payment history merge', () => {
   const terminal = createTerminalKeypair();
   const merchant = createTerminalKeypair();
   const config: TerminalConfig = {
@@ -62,7 +62,7 @@ describe('relay payment history merge', () => {
   });
 
   it('decrypts and applies terminal-authored payment status events', async () => {
-    const { mergeRelayPaymentHistory } = await import('./relay-history');
+    const { mergePaymentHistory } = await import('./payment-history');
     const content = {
       sale_id: 'sale1',
       status: 'settled',
@@ -82,7 +82,7 @@ describe('relay payment history merge', () => {
       terminal.privateKey
     );
 
-    await expect(mergeRelayPaymentHistory(config, async () => [event])).resolves.toBe(1);
+    await expect(mergePaymentHistory(config, async () => [event])).resolves.toBe(1);
     expect(attempts.get('attempt1')).toMatchObject({
       status: 'settled',
       swapId: 'swap1',
@@ -92,7 +92,7 @@ describe('relay payment history merge', () => {
   });
 
   it('applies receipt events for known local sales', async () => {
-    const { mergeRelayPaymentHistory } = await import('./relay-history');
+    const { mergePaymentHistory } = await import('./payment-history');
     const event = signEvent(
       {
         kind: 9383,
@@ -107,7 +107,7 @@ describe('relay payment history merge', () => {
       terminal.privateKey
     );
 
-    await expect(mergeRelayPaymentHistory(config, async () => [event])).resolves.toBe(1);
+    await expect(mergePaymentHistory(config, async () => [event])).resolves.toBe(1);
     expect(receipts.get('R-1')).toMatchObject({ saleId: 'sale1' });
     expect(sales.get('sale1')?.status).toBe('receipt_ready');
   });

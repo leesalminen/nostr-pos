@@ -55,7 +55,7 @@ function paymentStatus(value: unknown): PaymentStatus | undefined {
     : undefined;
 }
 
-export async function applyRelayPaymentEvent(
+export async function applyPaymentHistoryEvent(
   config: TerminalConfig,
   event: Event,
   now = Date.now()
@@ -103,7 +103,7 @@ export async function applyRelayPaymentEvent(
   return false;
 }
 
-export async function mergeRelayPaymentHistory(
+export async function mergePaymentHistory(
   config: TerminalConfig,
   fetchEvents = querySignedEvents
 ): Promise<number> {
@@ -114,7 +114,7 @@ export async function mergeRelayPaymentHistory(
   });
   let changed = 0;
   for (const event of events.sort((a, b) => a.created_at - b.created_at)) {
-    if (await applyRelayPaymentEvent(config, event)) changed += 1;
+    if (await applyPaymentHistoryEvent(config, event)) changed += 1;
   }
   return changed;
 }

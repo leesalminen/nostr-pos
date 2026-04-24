@@ -17,7 +17,7 @@
   import { payWithWebNfc } from '../lib/nfc/web-nfc';
   import { isPosProfileReference } from '../lib/pos/profile-loader';
   import { subscribeBoltzSwapUpdates, type SwapUpdateSubscription } from '../lib/swaps/boltz-ws';
-  import { mergeRelayPaymentHistory } from '../lib/pos/relay-history';
+  import { mergePaymentHistory } from '../lib/pos/payment-history';
 
   let { params = {} }: { params?: { saleId?: string } } = $props();
 
@@ -55,7 +55,7 @@
     async function refreshPaymentState() {
       if (!attempt || stopped) return;
       await reconcileOpenPayments({ now: Date.now() });
-      await loadTerminal().then(mergeRelayPaymentHistory);
+      await loadTerminal().then(mergePaymentHistory);
       const resumed = await resumeAttempt(attempt.id);
       if (!resumed || stopped) return;
       sale = resumed.sale;
