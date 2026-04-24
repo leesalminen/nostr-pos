@@ -7,13 +7,6 @@
   import Keypad from '../lib/ui/Keypad.svelte';
   import { terminal, loadTerminal } from '../lib/stores/terminal';
   import { refreshTransactions } from '../lib/stores/ledger';
-  import { reconcileClaimBroadcasts } from '../lib/pos/claim-engine';
-  import { reconcileOpenPayments } from '../lib/pos/reconciler';
-  import { createSale, markReady } from '../lib/pos/payment-state';
-  import { syncQueuedRecords } from '../lib/pos/sync';
-  import { syncTerminalRevocation } from '../lib/activation/revocation-sync';
-  import { mergePaymentHistory } from '../lib/pos/payment-history';
-  import { syncTerminalRecoveryBackups } from '../lib/pos/recovery-sync';
 
   let amount = $state('');
   let note = $state('');
@@ -23,6 +16,14 @@
 
   onMount(async () => {
     const config = await loadTerminal();
+    const [{ syncTerminalRevocation }, { reconcileOpenPayments }, { reconcileClaimBroadcasts }, { syncTerminalRecoveryBackups }, { mergePaymentHistory }] =
+      await Promise.all([
+        import('../lib/activation/revocation-sync'),
+        import('../lib/pos/reconciler'),
+        import('../lib/pos/claim-engine'),
+        import('../lib/pos/recovery-sync'),
+        import('../lib/pos/payment-history')
+      ]);
     const revoked = await syncTerminalRevocation(config);
     if (revoked) {
       lockedMessage = 'This terminal was removed by the owner.';
@@ -50,6 +51,7 @@
     preparing = true;
     try {
       const config = await loadTerminal();
+      const [{ createSale, markReady }, { syncQueuedRecords }] = await Promise.all([import('../lib/pos/payment-state'), import('../lib/pos/sync')]);
       const created = await createSale(config, displayAmount, 'lightning_swap', note || undefined);
       await markReady(created.sale, created.attempt);
       await refreshTransactions();
