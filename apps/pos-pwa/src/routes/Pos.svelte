@@ -30,6 +30,7 @@
   let boltCardMessage = $state('');
   let error = $state('');
   let settling = $state(false);
+  const showDevSettle = import.meta.env.DEV;
 
   const activePaymentData = $derived(
     sale && attempt
@@ -276,18 +277,20 @@
             </p>
           {/if}
 
-          <button
-            type="button"
-            class="mt-2 text-xs font-semibold text-[#776b5a] underline-offset-4 hover:underline disabled:opacity-50 dark:text-[#b9aa91]"
-            onclick={settle}
-            disabled={settling}
-          >
-            {#if settling}
-              <span class="inline-flex items-center gap-2"><BullSpinner size={16} /> Finishing…</span>
-            {:else}
-              Dev: simulate paid
-            {/if}
-          </button>
+          {#if showDevSettle}
+            <button
+              type="button"
+              class="mt-2 text-xs font-semibold text-[#776b5a] underline-offset-4 hover:underline disabled:opacity-50 dark:text-[#b9aa91]"
+              onclick={settle}
+              disabled={settling}
+            >
+              {#if settling}
+                <span class="inline-flex items-center gap-2"><BullSpinner size={16} /> Finishing…</span>
+              {:else}
+                Dev: simulate paid
+              {/if}
+            </button>
+          {/if}
         </div>
       {:else}
         <div class="grid min-h-[60vh] place-items-center">
