@@ -71,7 +71,7 @@ export function saleCreatedEvent(sale: Sale): LocalProtocolEvent {
 export function paymentStatusEvent(sale: Sale, attempt: PaymentAttempt): LocalProtocolEvent {
   return {
     kind: KINDS.paymentStatus,
-    tags: saleTags(sale, [['status', attempt.status]]),
+    tags: saleTags(sale),
     content: {
       sale_id: sale.id,
       status: attempt.status,

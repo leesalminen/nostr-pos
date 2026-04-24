@@ -3310,6 +3310,9 @@ verification evidence stay close to the source of truth.
 - Tightened terminal approval sync for production: plaintext kind-30381 relay
   approvals remain available for local CLI pilot tests, but production PWA
   builds now only accept approvals that decrypt with the terminal key.
+- Reduced public metadata on terminal payment-status records by removing the
+  relay-visible `status` tag from kind-9382; status remains inside encrypted
+  content for controller history.
 - CI now runs `dart analyze` for the Dart SDK as well as the CLI so relay,
   signing, and recovery SDK code gets static checks on every push.
 - README now documents the current smoke commands and the live relay-backed

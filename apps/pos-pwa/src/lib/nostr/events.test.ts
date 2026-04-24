@@ -42,6 +42,7 @@ describe('local protocol events', () => {
     expect(saleCreatedEvent(sale).kind).toBe(9380);
     expect(saleCreatedEvent(sale).tags).toContainEqual(['a', 'pos']);
     expect(paymentStatusEvent(sale, attempt).tags).toContainEqual(['a', 'pos']);
+    expect(paymentStatusEvent(sale, attempt).tags).not.toContainEqual(['status', 'settled']);
     expect(paymentStatusEvent(sale, attempt).content.status).toBe('settled');
     expect(receiptEvent(sale, attempt).tags).toContainEqual(['a', 'pos']);
     expect(receiptEvent(sale, attempt).content.receipt_id).toBe('R-1');
