@@ -35,7 +35,9 @@ Settings -> Advanced reset if available.
 
 ## 2. Shell Environment
 
-Open a controller terminal:
+Open a controller terminal from the repo root. This block generates a fresh
+merchant Nostr keypair for the test run, uses the same key as the recovery key,
+and exports the relay/store/POS variables used by the rest of the runbook:
 
 ```bash
 cd apps/nostr_pos_cli
@@ -45,17 +47,45 @@ export STORE=".nostr-pos/mainnet-e2e-$(date +%s).jsonl"
 export POS_ID="mainnet-test-$(date +%s)"
 export TERMINAL_BRANCH='17'
 
-export MERCHANT_PRIVKEY='<merchant nostr private key hex>'
-export RECOVERY_PRIVKEY="$MERCHANT_PRIVKEY"
-export RECOVERY_PUBKEY="$(node --input-type=module -e 'import { getPublicKey } from "@noble/secp256k1"; const pk=Uint8Array.from(Buffer.from(process.env.RECOVERY_PRIVKEY,"hex")); console.log(Buffer.from(getPublicKey(pk, true)).subarray(1).toString("hex"))')"
+eval "$(
+node --input-type=module <<'NODE'
+import { getPublicKey, utils } from '@noble/secp256k1';
+
+const merchantPriv = utils.randomSecretKey();
+const merchantPrivHex = Buffer.from(merchantPriv).toString('hex');
+const merchantPubHex = Buffer.from(getPublicKey(merchantPriv, true)).subarray(1).toString('hex');
+
+console.log(`export MERCHANT_PRIVKEY='${merchantPrivHex}'`);
+console.log(`export MERCHANT_PUBKEY='${merchantPubHex}'`);
+console.log(`export RECOVERY_PRIVKEY='${merchantPrivHex}'`);
+console.log(`export RECOVERY_PUBKEY='${merchantPubHex}'`);
+NODE
+)"
+
+printf 'Merchant pubkey: %s\nRecovery pubkey: %s\nStore file: %s\nPOS ID: %s\n' \
+  "$MERCHANT_PUBKEY" "$RECOVERY_PUBKEY" "$STORE" "$POS_ID"
 
 export CT_DESCRIPTOR='<liquid mainnet confidential descriptor: ct(slip77(...),elwpkh(...))>'
 export DESCRIPTOR_FINGERPRINT='<descriptor fingerprint, for example ed327521>'
 ```
 
+Keep the generated `MERCHANT_PRIVKEY` and `RECOVERY_PRIVKEY` terminal-local for
+this test. The Nostr keys authorize the POS profile and decrypt recovery
+records; the Liquid descriptor still controls funds.
+
 The descriptor must be a merchant-controlled Liquid mainnet confidential
 descriptor with a `slip77(...)` master blinding key. The terminal uses it to
 derive receive addresses and to verify confidential payment amounts.
+
+If you want to reuse an existing merchant Nostr private key instead of
+generating a fresh one, run this after setting `MERCHANT_PRIVKEY`:
+
+```bash
+export MERCHANT_PRIVKEY='<merchant nostr private key hex>'
+export MERCHANT_PUBKEY="$(node --input-type=module -e 'import { getPublicKey } from "@noble/secp256k1"; const pk=Uint8Array.from(Buffer.from(process.env.MERCHANT_PRIVKEY,"hex")); console.log(Buffer.from(getPublicKey(pk, true)).subarray(1).toString("hex"))')"
+export RECOVERY_PRIVKEY="$MERCHANT_PRIVKEY"
+export RECOVERY_PUBKEY="$MERCHANT_PUBKEY"
+```
 
 Optional POS profile publish:
 
