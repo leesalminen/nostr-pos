@@ -59,6 +59,19 @@ function mergedRecoveryStatus(
   return existing?.status ?? 'pending';
 }
 
+function newerValue<T>(parsedValue: T | undefined, existingValue: T | undefined, parsedAt?: number, existingAt?: number): T | undefined {
+  if (parsedValue === undefined) return existingValue;
+  if (existingValue === undefined) return parsedValue;
+  if (parsedAt === undefined || existingAt === undefined) return parsedValue;
+  return parsedAt >= existingAt ? parsedValue : existingValue;
+}
+
+function newerTime(parsedAt?: number, existingAt?: number): number | undefined {
+  if (parsedAt === undefined) return existingAt;
+  if (existingAt === undefined) return parsedAt;
+  return Math.max(parsedAt, existingAt);
+}
+
 export function unwrapTerminalRecoveryEvent(config: TerminalConfig, event: Event): RecoveryRumor | undefined {
   if (!config.terminalPrivkeyEnc || event.kind !== KINDS.giftWrap || !isValidSignedEvent(event)) return undefined;
   if (!event.tags.some((tag) => tag[0] === 'p' && tag[1] === config.terminalPubkey)) return undefined;
@@ -87,17 +100,17 @@ export async function applyTerminalRecoveryBackup(config: TerminalConfig, event:
     expiresAt: parsed.expiresAt,
     lockupTxHex: parsed.lockupTxHex ?? existing?.lockupTxHex,
     lockupTxid: parsed.lockupTxid ?? existing?.lockupTxid,
-    claimTxHex: parsed.claimTxHex ?? existing?.claimTxHex,
-    claimTxid: parsed.claimTxid ?? existing?.claimTxid,
+    claimTxHex: newerValue(parsed.claimTxHex, existing?.claimTxHex, parsed.claimPreparedAt, existing?.claimPreparedAt),
+    claimTxid: newerValue(parsed.claimTxid, existing?.claimTxid, parsed.claimBroadcastAt, existing?.claimBroadcastAt),
     replacedClaimTxids: parsed.replacedClaimTxids ?? existing?.replacedClaimTxids,
-    claimPreparedAt: parsed.claimPreparedAt ?? existing?.claimPreparedAt,
+    claimPreparedAt: newerTime(parsed.claimPreparedAt, existing?.claimPreparedAt),
     claimLastTriedAt: existing?.claimLastTriedAt,
     claimBroadcastAttempts: existing?.claimBroadcastAttempts,
     claimLastError: existing?.claimLastError,
     claimFeeSatPerVbyte: parsed.claimFeeSatPerVbyte ?? existing?.claimFeeSatPerVbyte,
     claimRbfCount: parsed.claimRbfCount ?? existing?.claimRbfCount,
-    claimBroadcastAt: parsed.claimBroadcastAt ?? existing?.claimBroadcastAt,
-    claimConfirmedAt: parsed.claimConfirmedAt ?? existing?.claimConfirmedAt,
+    claimBroadcastAt: newerTime(parsed.claimBroadcastAt, existing?.claimBroadcastAt),
+    claimConfirmedAt: newerTime(parsed.claimConfirmedAt, existing?.claimConfirmedAt),
     claimNeedsFeeBump: existing?.claimNeedsFeeBump,
     status: mergedRecoveryStatus(existing, parsed)
   };
@@ -116,7 +129,7 @@ export async function syncTerminalRecoveryBackups(
     limit: 100
   });
   let changed = 0;
-  for (const event of events) {
+  for (const event of events.sort((a, b) => a.created_at - b.created_at)) {
     if (await applyTerminalRecoveryBackup(config, event)) changed += 1;
   }
   return changed;

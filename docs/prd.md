@@ -3457,6 +3457,9 @@ verification evidence stay close to the source of truth.
   reconciliation fetch terminal-addressed kind-1059 wraps, unwrap them with the
   terminal key, and restore missing kind-9381 recovery records into IndexedDB so
   the local claim/resume path can survive deleted local rows.
+- Hardened terminal recovery-backup import against out-of-order relay delivery:
+  imported backups are applied oldest-first and older claim hex/txid timestamps
+  cannot overwrite newer local claim state.
 - Fixed the recovered prepared-claim path: terminal-imported recovery backups
   that contain `claim_tx_hex` now become locally claimable, and cashier startup
   / payment-screen polling automatically broadcasts fresh claimable prepared

@@ -107,4 +107,56 @@ describe('terminal recovery backup sync', () => {
       status: 'claimable'
     });
   });
+
+  it('does not let older relay backups overwrite newer local claim state', async () => {
+    const { syncTerminalRecoveryBackups } = await import('./recovery-sync');
+    recoveries.set('swap3', {
+      saleId: 'sale3',
+      paymentAttemptId: 'attempt3',
+      swapId: 'swap3',
+      encryptedLocalBlob: 'ciphertext',
+      localSavedAt: 1000,
+      relaySavedAt: 1000,
+      okFrom: [],
+      expiresAt: 10_000,
+      claimTxHex: 'newclaimhex',
+      claimTxid: 'newclaimtxid',
+      claimPreparedAt: 5000,
+      claimBroadcastAt: 6000,
+      status: 'claimed'
+    });
+    const item: OutboxItem = {
+      id: 'recovery3',
+      type: 'payment_backup',
+      payload: {
+        kind: 9381,
+        tags: [['proto', 'nostr-pos', '0.2'], ['swap', 'swap3']],
+        content: {
+          sale_id: 'sale3',
+          payment_attempt_id: 'attempt3',
+          swap_id: 'swap3',
+          encrypted_local_blob: 'older-ciphertext',
+          expires_at: 10,
+          claim: {
+            claim_tx_hex: 'oldclaimhex',
+            claim_txid: 'oldclaimtxid',
+            claim_prepared_at: 4,
+            claim_broadcast_at: 5
+          }
+        }
+      },
+      createdAt: 1000,
+      okFrom: []
+    };
+    const wrapped = nip59.wrapEvent(outboxItemToTemplate(item), hexToBytes(merchant.privateKey), terminal.publicKey);
+
+    await expect(syncTerminalRecoveryBackups(config, async () => [wrapped])).resolves.toBe(1);
+    expect(recoveries.get('swap3')).toMatchObject({
+      claimTxHex: 'newclaimhex',
+      claimTxid: 'newclaimtxid',
+      claimPreparedAt: 5000,
+      claimBroadcastAt: 6000,
+      status: 'claimed'
+    });
+  });
 });
