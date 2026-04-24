@@ -9,10 +9,12 @@
   import { recoveryBackupsJson, transactionsCsv } from '../../../lib/pos/export';
   import { publishPendingOutbox } from '../../../lib/nostr/outbox';
   import { clearAdminUnlock, isAdminUnlocked, markAdminUnlocked, verifyAdminPin } from '../../../lib/security/admin-pin';
+  import type { SwapRecoveryRecord } from '../../../lib/pos/types';
 
   let exportCount = $state(0);
   let outboxCount = $state(0);
   let recoveryCount = $state(0);
+  let recoveryRows = $state<SwapRecoveryRecord[]>([]);
   let syncMessage = $state('');
   let locked = $state(true);
   let confirmOnly = $state(false);
@@ -26,12 +28,22 @@
     confirmOnly = locked && !config.adminPin;
     if (locked) return;
     outboxCount = (await outboxItems()).length;
-    recoveryCount = (await recoveryRecords()).length;
+    recoveryRows = await recoveryRecords();
+    recoveryCount = recoveryRows.length;
   });
 
   async function loadCounts() {
     outboxCount = (await outboxItems()).length;
-    recoveryCount = (await recoveryRecords()).length;
+    recoveryRows = await recoveryRecords();
+    recoveryCount = recoveryRows.length;
+  }
+
+  function recoveryStatusCount(status: SwapRecoveryRecord['status']) {
+    return recoveryRows.filter((record) => record.status === status).length;
+  }
+
+  function expiringSoonCount(now = Date.now()) {
+    return recoveryRows.filter((record) => record.status !== 'claimed' && record.expiresAt - now <= 60 * 60_000).length;
   }
 
   function downloadFile(filename: string, type: string, content: string) {
@@ -58,6 +70,7 @@
 
   async function exportRecoveryBackups() {
     const records = await recoveryRecords();
+    recoveryRows = records;
     recoveryCount = records.length;
     downloadFile('payment-backups.json', 'application/json', recoveryBackupsJson(records));
   }
@@ -195,10 +208,42 @@
             <dd class="font-bold">{recoveryCount}</dd>
           </div>
           <div class="flex justify-between gap-4">
+            <dt class="text-[#776b5a] dark:text-[#b9aa91]">Claimable swaps</dt>
+            <dd class="font-bold">{recoveryStatusCount('claimable')}</dd>
+          </div>
+          <div class="flex justify-between gap-4">
+            <dt class="text-[#776b5a] dark:text-[#b9aa91]">Pending swaps</dt>
+            <dd class="font-bold">{recoveryStatusCount('pending')}</dd>
+          </div>
+          <div class="flex justify-between gap-4">
+            <dt class="text-[#776b5a] dark:text-[#b9aa91]">Expiring soon</dt>
+            <dd class="font-bold">{expiringSoonCount()}</dd>
+          </div>
+          <div class="flex justify-between gap-4">
+            <dt class="text-[#776b5a] dark:text-[#b9aa91]">Failed claims</dt>
+            <dd class="font-bold">{recoveryStatusCount('failed')}</dd>
+          </div>
+          <div class="flex justify-between gap-4">
             <dt class="text-[#776b5a] dark:text-[#b9aa91]">Queued records</dt>
             <dd class="font-bold">{outboxCount}</dd>
           </div>
         </dl>
+        {#if recoveryRows.length}
+          <div class="mt-4 divide-y divide-[#d7c8b4] overflow-hidden rounded-md border border-[#d7c8b4] text-sm dark:divide-[#3a342a] dark:border-[#3a342a]">
+            {#each recoveryRows.slice(0, 5) as record}
+              <div class="grid grid-cols-[1fr_auto] gap-3 px-3 py-2">
+                <div class="min-w-0">
+                  <p class="truncate font-bold">{record.swapId}</p>
+                  <p class="text-xs text-[#776b5a] dark:text-[#b9aa91]">{record.status}</p>
+                </div>
+                <div class="text-right text-xs text-[#776b5a] dark:text-[#b9aa91]">
+                  <p>{record.okFrom.length} OK</p>
+                  <p>{new Date(record.expiresAt).toLocaleTimeString()}</p>
+                </div>
+              </div>
+            {/each}
+          </div>
+        {/if}
         <div class="mt-4 flex flex-wrap items-center gap-3">
           <Button variant="secondary" onclick={syncNow}>Sync now</Button>
           <Button variant="secondary" onclick={exportRecoveryBackups}><Download size={18} />Export backups</Button>

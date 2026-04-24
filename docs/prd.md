@@ -3359,6 +3359,9 @@ verification evidence stay close to the source of truth.
   polling or websocket updates report lockup progress, the matching local
   recovery record is marked `claimable`; when a claimed update is observed, the
   recovery record moves to `claimed` alongside receipt settlement.
+- Expanded Settings → Advanced into a practical terminal recovery center with
+  visible pending, claimable, expiring-soon, failed, queued, and recent recovery
+  record state instead of only exposing raw backup/export counts.
 - CI now runs `dart analyze` for the Dart SDK as well as the CLI so relay,
   signing, and recovery SDK code gets static checks on every push.
 - README now documents the current smoke commands and the live relay-backed
