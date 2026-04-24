@@ -1,3 +1,6 @@
+import { Buffer } from 'buffer';
+import type { Secp256k1ZKP } from '@vulpemventures/secp256k1-zkp';
+
 export type EsploraTx = {
   txid: string;
   status?: { confirmed?: boolean; block_height?: number; block_time?: number };
@@ -47,7 +50,20 @@ export type ConfidentialPaymentVerificationOptions = PaymentVerificationOptions 
 
 const LIQUID_DEBUG_STORAGE_KEY = 'nostr-pos:debug:liquid';
 const LIQUID_BLOCK_TIME_GRACE_MS = 10 * 60_000;
-const liquidScanInFlight = new Map<string, Promise<unknown>>();
+
+type LiquidDirectContext = {
+  liquid: typeof import('liquidjs-lib');
+  slip77: import('slip77').SLIP77API;
+  zkp: Secp256k1ZKP;
+};
+
+type BufferGlobal = typeof globalThis & { Buffer?: typeof Buffer };
+
+let liquidDirectContextPromise: Promise<LiquidDirectContext> | undefined;
+
+function ensureBufferGlobal() {
+  (globalThis as BufferGlobal).Buffer ??= Buffer;
+}
 
 export async function fetchAddressTransactions(apiBase: string, address: string, fetcher: typeof fetch = fetch): Promise<EsploraTx[]> {
   const response = await fetcher(`${apiBase.replace(/\/$/, '')}/address/${address}/txs`);
@@ -98,6 +114,65 @@ function txIsRecentEnough(tx: EsploraTx, minCreatedAt?: number): boolean {
 
 function outputAddressMatches(outputAddress: { toString(): string; toUnconfidential(): { toString(): string } }, address: string, unconfidential: string): boolean {
   return outputAddress.toString() === address || outputAddress.toUnconfidential().toString() === unconfidential;
+}
+
+function zkpInitFunction(module: unknown): () => Promise<Secp256k1ZKP> {
+  const first = (module as { default?: unknown }).default;
+  const candidate = typeof first === 'function' ? first : (first as { default?: unknown } | undefined)?.default;
+  if (typeof candidate !== 'function') throw new Error('Could not initialize Liquid verification engine.');
+  return candidate as () => Promise<Secp256k1ZKP>;
+}
+
+async function liquidDirectContext(): Promise<LiquidDirectContext> {
+  ensureBufferGlobal();
+  liquidDirectContextPromise ??= (async () => {
+    const [liquid, zkpModule, slip77Module] = await Promise.all([
+      import('liquidjs-lib'),
+      import('@vulpemventures/secp256k1-zkp'),
+      import('slip77')
+    ]);
+    const zkp = await zkpInitFunction(zkpModule)();
+    return {
+      liquid,
+      slip77: slip77Module.SLIP77Factory(zkp.ecc),
+      zkp
+    };
+  })();
+  return liquidDirectContextPromise;
+}
+
+function slip77MasterBlindingKey(descriptor: string): string | undefined {
+  return descriptor.match(/slip77\(([0-9a-fA-F]{64})\)/)?.[1]?.toLowerCase();
+}
+
+function reversedHex(hex: string): string {
+  return Buffer.from(hex, 'hex').reverse().toString('hex');
+}
+
+function assetMatchesPolicy(assetHex: string, policyAsset: string): boolean {
+  const normalizedAsset = assetHex.toLowerCase();
+  const normalizedPolicyAsset = policyAsset.toLowerCase();
+  return normalizedAsset === normalizedPolicyAsset || reversedHex(normalizedAsset) === normalizedPolicyAsset;
+}
+
+async function unblindConfidentialOutput(input: {
+  txHex: string;
+  vout: number;
+  masterBlindingKey: string;
+  policyAsset: string;
+}): Promise<number | undefined> {
+  const { liquid, slip77, zkp } = await liquidDirectContext();
+  const tx = liquid.Transaction.fromHex(input.txHex);
+  const output = tx.outs[input.vout];
+  if (!output) return undefined;
+  const blindingPrivateKey = slip77.fromMasterBlindingKey(input.masterBlindingKey).derive(output.script).privateKey;
+  if (!blindingPrivateKey) return undefined;
+  const confidential = new liquid.confidential.Confidential(zkp as unknown as import('liquidjs-lib').Secp256k1Interface);
+  const unblinded = confidential.unblindOutputWithKey(output, Buffer.from(blindingPrivateKey));
+  const assetHex = Buffer.from(unblinded.asset).toString('hex');
+  if (!assetMatchesPolicy(assetHex, input.policyAsset)) return undefined;
+  const value = Number(unblinded.value);
+  return Number.isSafeInteger(value) && value > 0 ? value : undefined;
 }
 
 export function liquidVerificationDebugEnabled(): boolean {
@@ -154,19 +229,21 @@ export async function verifyConfidentialAddressPayment(
     return verifyAddressPayment(transactions, address, expectedSat, options);
   }
 
-  const { Address, EsploraClient, Network, Transaction, Wollet, WolletDescriptor } = await import('lwk_wasm');
+  const { Address, Network, Transaction, Wollet, WolletDescriptor } = await import('lwk_wasm');
   const target = new Address(address);
   const targetUnconfidential = target.toUnconfidential().toString();
   const descriptor = new WolletDescriptor(options.descriptor);
   const network = target.isMainnet() ? Network.mainnet() : Network.testnet();
   const wallet = new Wollet(network, descriptor);
   const policyAsset = network.policyAsset().toString();
+  const masterBlindingKey = slip77MasterBlindingKey(options.descriptor);
   debugLiquidVerification('started confidential verification', {
     address,
     targetUnconfidential,
     expectedSat,
     addressIndex: options.addressIndex,
-    candidateCount: transactions.length
+    candidateCount: transactions.length,
+    canDirectUnblind: Boolean(masterBlindingKey)
   });
 
   if (options.addressIndex !== undefined) {
@@ -186,11 +263,20 @@ export async function verifyConfidentialAddressPayment(
   let txid: string | undefined;
   const countedOutpoints = new Set<string>();
   const appliedTxids = new Set<string>();
+  const txHexCache = new Map<string, string>();
+
+  async function fetchTxHexCached(txidToFetch: string): Promise<string> {
+    const cached = txHexCache.get(txidToFetch);
+    if (cached) return cached;
+    const txHex = await fetchTransactionHex(options.apiBase, txidToFetch, options.fetcher ?? fetch);
+    txHexCache.set(txidToFetch, txHex);
+    return txHex;
+  }
 
   async function applyTx(txidToApply: string): Promise<boolean> {
     if (appliedTxids.has(txidToApply)) return true;
     try {
-      const txHex = await fetchTransactionHex(options.apiBase, txidToApply, options.fetcher ?? fetch);
+      const txHex = await fetchTxHexCached(txidToApply);
       wallet.applyTransaction(Transaction.fromString(txHex));
       appliedTxids.add(txidToApply);
       debugLiquidVerification('applied tx', { txid: txidToApply });
@@ -198,6 +284,52 @@ export async function verifyConfidentialAddressPayment(
     } catch (err) {
       debugLiquidVerification('could not apply tx', {
         txid: txidToApply,
+        reason: err instanceof Error ? err.message : String(err)
+      });
+      return false;
+    }
+  }
+
+  async function countDirectUnblindedOutput(input: {
+    txid: string;
+    vout: number;
+    fallbackConfirmed: boolean;
+    source: 'candidate_vout' | 'candidate_prevout';
+  }): Promise<boolean> {
+    if (!masterBlindingKey) return false;
+    const outpointKey = `${input.txid}:${input.vout}`;
+    if (countedOutpoints.has(outpointKey)) return true;
+    try {
+      const txHex = await fetchTxHexCached(input.txid);
+      const value = await unblindConfidentialOutput({
+        txHex,
+        vout: input.vout,
+        masterBlindingKey,
+        policyAsset
+      });
+      if (value === undefined) {
+        debugLiquidVerification('direct unblind did not match target policy asset output', {
+          outpoint: outpointKey,
+          source: input.source
+        });
+        return false;
+      }
+      countedOutpoints.add(outpointKey);
+      receivedSat += value;
+      txid ??= input.txid;
+      confirmed ||= input.fallbackConfirmed;
+      debugLiquidVerification('counted direct unblinded output', {
+        outpoint: outpointKey,
+        source: input.source,
+        value,
+        receivedSat,
+        confirmed
+      });
+      return true;
+    } catch (err) {
+      debugLiquidVerification('direct unblind failed', {
+        outpoint: outpointKey,
+        source: input.source,
         reason: err instanceof Error ? err.message : String(err)
       });
       return false;
@@ -260,12 +392,6 @@ export async function verifyConfidentialAddressPayment(
     debugLiquidVerification('inspected wallet tx', { walletTxid, inspected, receivedSat });
   }
 
-  function walletTxIsRecentEnough(walletTx: ReturnType<typeof wallet.transactions>[number]): boolean {
-    if (!options.minCreatedAt) return true;
-    const timestamp = walletTx.timestamp();
-    return timestamp === undefined || timestamp * 1000 >= options.minCreatedAt - LIQUID_BLOCK_TIME_GRACE_MS;
-  }
-
   for (const tx of transactions) {
     if (!txIsRecentEnough(tx, options.minCreatedAt)) {
       debugLiquidVerification('skipped old tx', { txid: tx.txid });
@@ -278,6 +404,16 @@ export async function verifyConfidentialAddressPayment(
       vinCount: tx.vin?.length ?? 0,
       voutCount: tx.vout.length
     });
+    for (let index = 0; index < tx.vout.length; index += 1) {
+      if (tx.vout[index]?.scriptpubkey_address !== targetUnconfidential) continue;
+      await countDirectUnblindedOutput({
+        txid: tx.txid,
+        vout: index,
+        fallbackConfirmed: Boolean(tx.status?.confirmed),
+        source: 'candidate_vout'
+      });
+    }
+    if (receivedSat >= expectedSat) break;
     const prevoutTxids = new Set(
       (tx.vin ?? [])
         .filter((input) => input.txid && input.prevout?.scriptpubkey_address === targetUnconfidential)
@@ -295,7 +431,16 @@ export async function verifyConfidentialAddressPayment(
       matching: Array.from(prevoutTxids)
     });
 
-    for (const prevoutTxid of prevoutTxids) {
+    for (const input of tx.vin ?? []) {
+      const prevoutTxid = input.txid;
+      if (!prevoutTxid || input.vout === undefined || input.prevout?.scriptpubkey_address !== targetUnconfidential) continue;
+      const countedDirectly = await countDirectUnblindedOutput({
+        txid: prevoutTxid,
+        vout: input.vout,
+        fallbackConfirmed: Boolean(tx.status?.confirmed),
+        source: 'candidate_prevout'
+      });
+      if (countedDirectly) continue;
       if (!(await applyTx(prevoutTxid))) continue;
       const prevoutWalletTx = wallet.transactions().find((candidate) => candidate.txid().toString() === prevoutTxid);
       if (prevoutWalletTx) {
@@ -304,6 +449,7 @@ export async function verifyConfidentialAddressPayment(
         debugLiquidVerification('prevout tx applied but not in wallet transactions', { txid: prevoutTxid });
       }
     }
+    if (receivedSat >= expectedSat) break;
 
     if (!(await applyTx(tx.txid))) continue;
     const walletTx = wallet.transactions().find((candidate) => candidate.txid().toString() === tx.txid);
@@ -312,62 +458,7 @@ export async function verifyConfidentialAddressPayment(
       continue;
     }
     countWalletTx(walletTx, Boolean(tx.status?.confirmed));
-  }
-
-  if (receivedSat < expectedSat && options.addressIndex !== undefined) {
-    try {
-      const scanKey = `${options.apiBase.replace(/\/$/, '')}:${targetUnconfidential}:${options.addressIndex}`;
-      let scan = liquidScanInFlight.get(scanKey);
-      if (!scan) {
-        debugLiquidVerification('running esplora scan fallback', {
-          apiBase: options.apiBase,
-          addressIndex: options.addressIndex
-        });
-        scan = (async () => {
-          const client = new EsploraClient(network, options.apiBase.replace(/\/$/, ''), false, 4, false);
-          return client.fullScanToIndex(wallet, options.addressIndex!);
-        })().finally(() => {
-          liquidScanInFlight.delete(scanKey);
-        });
-        liquidScanInFlight.set(scanKey, scan);
-      } else {
-        debugLiquidVerification('awaiting existing esplora scan fallback', {
-          apiBase: options.apiBase,
-          addressIndex: options.addressIndex
-        });
-      }
-      const update = await scan;
-      if (update) {
-        wallet.applyUpdate(update as Parameters<typeof wallet.applyUpdate>[0]);
-        debugLiquidVerification('applied esplora scan update', {
-          addressIndex: options.addressIndex,
-          walletTxCount: wallet.transactions().length
-        });
-      } else {
-        debugLiquidVerification('esplora scan fallback returned no update', {
-          addressIndex: options.addressIndex
-        });
-      }
-      debugLiquidVerification('counting wallet txs after scan fallback', {
-        apiBase: options.apiBase,
-        addressIndex: options.addressIndex,
-        walletTxCount: wallet.transactions().length
-      });
-      for (const walletTx of wallet.transactions()) {
-        if (!walletTxIsRecentEnough(walletTx)) {
-          debugLiquidVerification('skipped old wallet tx from scan', {
-            txid: walletTx.txid().toString(),
-            timestamp: walletTx.timestamp()
-          });
-          continue;
-        }
-        countWalletTx(walletTx, walletTx.height() !== undefined);
-      }
-    } catch (err) {
-      debugLiquidVerification('esplora scan fallback failed', {
-        reason: err instanceof Error ? err.message : String(err)
-      });
-    }
+    if (receivedSat >= expectedSat) break;
   }
 
   debugLiquidVerification('finished', {

@@ -3488,17 +3488,18 @@ verification evidence stay close to the source of truth.
   legacy top-level `ct_descriptor` remains a compatibility fallback only.
 - Direct Liquid payment reconciliation now fails closed for confidential
   address history: Esplora `address/<lq1>/txs` membership is only treated as a
-  candidate hit. The terminal fetches recent candidate tx hex, applies it to an
-  LWK watch-only wallet built from the authorized `settlement.ct_descriptor`,
-  and only settles after unblinding enough policy-asset L-BTC sats at the
-  expected address/index.
+  candidate hit. The terminal fetches recent candidate tx hex and directly
+  unblinds matching candidate outputs with the authorized descriptor's SLIP-77
+  master blinding key; it only settles after proving enough policy-asset L-BTC
+  sats at the expected address.
 - Confidential Liquid reconciliation also handles address histories where the
   receive output has already been spent. Matching wallet-owned inputs are
-  unblinded and counted by original outpoint, with outpoint de-duplication so a
-  receive tx plus a later spend cannot double-count the same payment.
+  verified by fetching and unblinding their original receive outpoints, with
+  outpoint de-duplication so a receive tx plus a later spend cannot double-count
+  the same payment.
 - If Esplora returns only the spending transaction for a confidential address
   hit, the terminal fetches and applies matching `vin.prevout` transaction hexes
-  first so LWK can recover the original receive output amount. Dev builds emit
+  first so the original receive output amount can be verified. Dev builds emit
   scoped console diagnostics for skipped/applied confidential candidates; any
   build can enable the same diagnostics with
   `localStorage.setItem("nostr-pos:debug:liquid", "1")`.
@@ -3506,15 +3507,19 @@ verification evidence stay close to the source of truth.
   as authoritative. The stored local address index is logged when it disagrees
   with LWK's wildcard index, but it is not allowed to reject an otherwise valid
   target-address, policy-asset, sufficient-amount payment.
-- When one-off `Wollet.applyTransaction()` does not surface a matching wallet
-  transaction, the terminal falls back to LWK's `EsploraClient.fullScanToIndex`
-  for the authorized descriptor/index, applies the returned update, and then
-  performs the same unblinded output verification.
-- Payment reconciliation is serialized so a slow Liquid descriptor scan cannot
-  be re-entered by the 5-second payment-screen poll. Liquid block timestamps
-  use a 10-minute grace window relative to local sale creation time, because
-  block timestamps can be a few minutes earlier than the terminal wall-clock
-  even for a payment made after the sale is displayed.
+- Automatic POS polling does not run descriptor-wide Esplora scans. Broad scans
+  create many `/tx` requests and are reserved for an explicit future recovery
+  workflow; live payment detection is limited to the candidate txs returned by
+  the address history endpoint and their matching prevouts.
+- Payment reconciliation is serialized so a slow Liquid verification pass cannot
+  be re-entered by the 5-second payment-screen poll. Liquid block timestamps use
+  a 10-minute grace window relative to local sale creation time, because block
+  timestamps can be a few minutes earlier than the terminal wall-clock even for
+  a payment made after the sale is displayed.
+- The default Liquid Esplora endpoint is `https://liquid.bullbitcoin.com/api`;
+  the browser should call `/address/<address>/txs` plus at most the candidate
+  `/tx/<txid>/hex` payloads needed to unblind those outputs, not historical
+  descriptor-scan traffic.
 - Removed the early UI placeholder Lightning payload path. The payment screen
   now renders Lightning QR data only when a checksummed Bolt11 invoice exists,
   and live dev pilots use the configured Boltz provider instead of the mock

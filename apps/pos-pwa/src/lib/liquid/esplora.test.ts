@@ -1,3 +1,4 @@
+import { Buffer } from 'buffer';
 import { describe, expect, it, vi } from 'vitest';
 import {
   broadcastLiquidTransaction,
@@ -7,6 +8,11 @@ import {
   verifyConfidentialAddressPayment,
   verifyAddressPayment
 } from './esplora';
+
+const liquidTestState = vi.hoisted(() => ({
+  policyAsset: '6f0279e9ed041c3d710a9f57d0c02928416460c4b722ae3457a11eec381c526d',
+  directUnblindValue: '563'
+}));
 
 vi.mock('lwk_wasm', () => {
   class Address {
@@ -32,17 +38,11 @@ vi.mock('lwk_wasm', () => {
       return new Network();
     }
     policyAsset() {
-      return { toString: () => 'policy-asset' };
+      return { toString: () => liquidTestState.policyAsset };
     }
   }
   class WolletDescriptor {
     constructor(_descriptor: string) {}
-  }
-  class EsploraClient {
-    constructor(_network: Network, _url: string, _waterfalls: boolean, _concurrency: number, _utxoOnly: boolean) {}
-    async fullScanToIndex(_wallet: Wollet, _index: number) {
-      return undefined;
-    }
   }
   class Transaction {
     static fromString(_hex: string) {
@@ -71,7 +71,7 @@ vi.mock('lwk_wasm', () => {
                 }),
                 height: () => 123,
                 unblinded: () => ({
-                  asset: () => ({ toString: () => 'policy-asset' }),
+                  asset: () => ({ toString: () => liquidTestState.policyAsset }),
                   value: () => BigInt(25_000)
                 })
               })
@@ -92,7 +92,7 @@ vi.mock('lwk_wasm', () => {
                 }),
                 height: () => undefined,
                 unblinded: () => ({
-                  asset: () => ({ toString: () => 'policy-asset' }),
+                  asset: () => ({ toString: () => liquidTestState.policyAsset }),
                   value: () => BigInt(25_000)
                 })
               })
@@ -114,7 +114,7 @@ vi.mock('lwk_wasm', () => {
                 }),
                 height: () => 456,
                 unblinded: () => ({
-                  asset: () => ({ toString: () => 'policy-asset' }),
+                  asset: () => ({ toString: () => liquidTestState.policyAsset }),
                   value: () => BigInt(25_000)
                 })
               })
@@ -124,8 +124,53 @@ vi.mock('lwk_wasm', () => {
       ];
     }
   }
-  return { Address, EsploraClient, Network, Transaction, Wollet, WolletDescriptor };
+  return { Address, Network, Transaction, Wollet, WolletDescriptor };
 });
+
+vi.mock('@vulpemventures/secp256k1-zkp', () => ({
+  default: vi.fn(async () => ({
+    ecc: {
+      pointFromScalar: () => Buffer.alloc(33, 2)
+    }
+  }))
+}));
+
+vi.mock('slip77', () => ({
+  SLIP77Factory: () => ({
+    fromMasterBlindingKey: () => ({
+      derive: () => ({ privateKey: Buffer.alloc(32, 1) })
+    })
+  })
+}));
+
+vi.mock('liquidjs-lib', () => ({
+  Transaction: {
+    fromHex: () => ({
+      outs: [
+        {
+          script: Buffer.from('0014target', 'hex'),
+          value: Buffer.alloc(33, 8),
+          asset: Buffer.alloc(33, 10),
+          nonce: Buffer.alloc(33, 2),
+          rangeProof: Buffer.from('01', 'hex'),
+          surjectionProof: Buffer.from('01', 'hex')
+        }
+      ]
+    })
+  },
+  confidential: {
+    Confidential: class {
+      unblindOutputWithKey() {
+        return {
+          value: liquidTestState.directUnblindValue,
+          asset: Buffer.from(liquidTestState.policyAsset, 'hex'),
+          valueBlindingFactor: Buffer.alloc(32),
+          assetBlindingFactor: Buffer.alloc(32)
+        };
+      }
+    }
+  }
+}));
 
 describe('Liquid Esplora adapter', () => {
   it('fetches address transactions', async () => {
@@ -334,7 +379,42 @@ describe('Liquid Esplora adapter', () => {
       txid: 'receivetx'
     });
     expect(fetcher).toHaveBeenCalledWith('https://example.test/api/tx/receivetx/hex');
-    expect(fetcher).toHaveBeenCalledWith('https://example.test/api/tx/spendtx/hex');
+    expect(fetcher).not.toHaveBeenCalledWith('https://example.test/api/tx/spendtx/hex');
+  });
+
+  it('unblinds matching confidential candidate outputs directly without scanning history', async () => {
+    const fetcher = vi.fn(async () => ({
+      ok: true,
+      text: async () => '02000000'
+    }));
+
+    await expect(
+      verifyConfidentialAddressPayment(
+        [
+          {
+            txid: 'directtx',
+            status: { confirmed: true, block_time: 200 },
+            vout: [{ scriptpubkey_address: 'ex1qtarget', valuecommitment: '08commitment' }]
+          }
+        ],
+        'lq1qqconfidential',
+        563,
+        {
+          apiBase: 'https://example.test/api',
+          descriptor: `ct(slip77(${'11'.repeat(32)}),elwpkh(xpub-demo/0/*))`,
+          addressIndex: 11,
+          fetcher: fetcher as unknown as typeof fetch,
+          minCreatedAt: 150_000
+        }
+      )
+    ).resolves.toEqual({
+      detected: true,
+      confirmed: true,
+      receivedSat: 563,
+      txid: 'directtx'
+    });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(fetcher).toHaveBeenCalledWith('https://example.test/api/tx/directtx/hex');
   });
 
   it('ignores old confidential address history before the sale', () => {
