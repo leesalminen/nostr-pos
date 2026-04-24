@@ -19,6 +19,7 @@ jobs:
       - run: npm run check
       - run: npm run test
       - run: npm run build
+      - run: cd apps/pos-pwa && npm audit --omit=dev
 
   dart:
     runs-on: ubuntu-latest

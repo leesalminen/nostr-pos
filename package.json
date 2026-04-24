@@ -16,7 +16,8 @@
     "relay:smoke": "node scripts/relay-smoke.mjs",
     "dart:test": "cd packages/nostr_pos && dart test",
     "dart:cli": "cd apps/nostr_pos_cli && dart run bin/nostr_pos.dart",
-    "dart:cli:test": "cd apps/nostr_pos_cli && dart test"
+    "dart:cli:test": "cd apps/nostr_pos_cli && dart test",
+    "audit:pwa": "cd apps/pos-pwa && npm audit --omit=dev"
   },
   "devDependencies": {
     "@types/ws": "^8.18.1",
