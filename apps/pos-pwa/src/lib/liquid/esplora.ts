@@ -8,6 +8,12 @@ export type EsploraTx = {
   }>;
 };
 
+export type EsploraTransactionStatus = {
+  txid: string;
+  confirmed: boolean;
+  blockHeight?: number;
+};
+
 export type PaymentVerification = {
   detected: boolean;
   confirmed: boolean;
@@ -27,6 +33,17 @@ export async function fetchTransactionHex(apiBase: string, txid: string, fetcher
   const txHex = (await response.text()).trim();
   if (!/^[0-9a-fA-F]+$/.test(txHex)) throw new Error('Liquid backend returned invalid transaction hex.');
   return txHex;
+}
+
+export async function fetchTransactionStatus(apiBase: string, txid: string, fetcher: typeof fetch = fetch): Promise<EsploraTransactionStatus> {
+  const response = await fetcher(`${apiBase.replace(/\/$/, '')}/tx/${encodeURIComponent(txid)}`);
+  if (!response.ok) throw new Error("Can't fetch the Liquid transaction right now.");
+  const json = (await response.json()) as { txid?: string; status?: { confirmed?: boolean; block_height?: number } };
+  return {
+    txid: json.txid ?? txid,
+    confirmed: Boolean(json.status?.confirmed),
+    blockHeight: json.status?.block_height
+  };
 }
 
 export async function broadcastLiquidTransaction(apiBase: string, txHex: string, fetcher: typeof fetch = fetch): Promise<string> {

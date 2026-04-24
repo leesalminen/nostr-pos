@@ -61,7 +61,26 @@ describe('swap recovery state', () => {
       status: 'claimed',
       claimTxHex: '00',
       claimTxid: 'tx1',
-      claimLastTriedAt: 70
+      claimLastTriedAt: 70,
+      claimBroadcastAt: 70
+    });
+  });
+
+  it('flags stale unconfirmed claims for fee bump and clears flag on confirmation', async () => {
+    const { markSwapClaimNeedsFeeBump, markSwapClaimConfirmed, markSwapRecoveryFinished } = await import('./recovery-state');
+
+    await markSwapRecoveryFinished({ swapId: 'swap1', claimTxHex: '00', claimTxid: 'tx1', now: 70 });
+    await markSwapClaimNeedsFeeBump({ swapId: 'swap1', now: 200 });
+
+    expect(recoveries.get('swap1')).toMatchObject({
+      claimNeedsFeeBump: true,
+      claimLastTriedAt: 200
+    });
+
+    await markSwapClaimConfirmed({ swapId: 'swap1', now: 300 });
+    expect(recoveries.get('swap1')).toMatchObject({
+      claimConfirmedAt: 300,
+      claimNeedsFeeBump: false
     });
   });
 });

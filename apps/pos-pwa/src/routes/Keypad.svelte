@@ -7,6 +7,7 @@
   import Keypad from '../lib/ui/Keypad.svelte';
   import { terminal, loadTerminal } from '../lib/stores/terminal';
   import { refreshTransactions } from '../lib/stores/ledger';
+  import { reconcileClaimBroadcasts } from '../lib/pos/claim-engine';
   import { reconcileOpenPayments } from '../lib/pos/reconciler';
   import { createSale, markReady } from '../lib/pos/payment-state';
   import { syncQueuedRecords } from '../lib/pos/sync';
@@ -32,6 +33,7 @@
       return;
     }
     await reconcileOpenPayments();
+    await reconcileClaimBroadcasts(config);
     await syncTerminalRecoveryBackups(config);
     await mergePaymentHistory(config);
     await refreshTransactions();

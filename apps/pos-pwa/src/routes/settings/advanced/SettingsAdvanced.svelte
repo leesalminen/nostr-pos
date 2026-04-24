@@ -52,6 +52,14 @@
     return recoveryRows.filter((record) => (record.status === 'claimable' || record.status === 'failed') && record.claimTxHex).length;
   }
 
+  function unconfirmedClaimCount() {
+    return recoveryRows.filter((record) => record.status === 'claimed' && record.claimTxid && !record.claimConfirmedAt).length;
+  }
+
+  function feeBumpDueCount() {
+    return recoveryRows.filter((record) => record.claimNeedsFeeBump).length;
+  }
+
   function downloadFile(filename: string, type: string, content: string) {
     const blob = new Blob([content], { type });
     const url = URL.createObjectURL(blob);
@@ -253,6 +261,14 @@
             <dd class="font-bold">{recoveryStatusCount('failed')}</dd>
           </div>
           <div class="flex justify-between gap-4">
+            <dt class="text-[#776b5a] dark:text-[#b9aa91]">Unconfirmed claims</dt>
+            <dd class="font-bold">{unconfirmedClaimCount()}</dd>
+          </div>
+          <div class="flex justify-between gap-4">
+            <dt class="text-[#776b5a] dark:text-[#b9aa91]">Fee bumps due</dt>
+            <dd class="font-bold">{feeBumpDueCount()}</dd>
+          </div>
+          <div class="flex justify-between gap-4">
             <dt class="text-[#776b5a] dark:text-[#b9aa91]">Queued records</dt>
             <dd class="font-bold">{outboxCount}</dd>
           </div>
@@ -265,6 +281,7 @@
                   <p class="truncate font-bold">{record.swapId}</p>
                   <p class="text-xs text-[#776b5a] dark:text-[#b9aa91]">
                     {record.status}{record.claimBroadcastAttempts ? ` · ${record.claimBroadcastAttempts} tries` : ''}
+                    {record.claimNeedsFeeBump ? ' · fee bump due' : ''}
                   </p>
                   {#if record.claimLastError}
                     <p class="truncate text-xs text-[#8c2d28] dark:text-[#e8a49e]">{record.claimLastError}</p>

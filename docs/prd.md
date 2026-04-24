@@ -3236,6 +3236,11 @@ verification evidence stay close to the source of truth.
   attempt count, last error, fee rate, and RBF count slots. Failed prepared
   claims keep their `claim_tx_hex` and are included in the Advanced retry flow,
   making broadcast failures visible without losing the durable recovery path.
+- The terminal now reconciles broadcast claim txids against the Liquid backend:
+  confirmed claims are stamped with `claim_confirmed_at`, while unconfirmed
+  claims older than the 30 minute RBF window are flagged in the recovery center
+  as needing a fee bump. Actual replacement-tx construction remains the next
+  hardening step.
 - Added local protocol outbox events for sale-created, payment-status, and
   receipt records, plus startup reconciliation that expires stale open attempts
   and records the status update. This is the IndexedDB side of the PRD's

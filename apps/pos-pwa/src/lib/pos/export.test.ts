@@ -78,6 +78,9 @@ describe('recovery backup export', () => {
           claim_last_error: null,
           claim_fee_sat_per_vbyte: null,
           claim_rbf_count: 0,
+          claim_broadcast_at: null,
+          claim_confirmed_at: null,
+          claim_needs_fee_bump: false,
           status: 'pending'
         }
       ]

@@ -56,6 +56,38 @@ export async function markSwapClaimBroadcastFailed(input: {
   return next;
 }
 
+export async function markSwapClaimNeedsFeeBump(input: {
+  swapId: string;
+  now?: number;
+}): Promise<SwapRecoveryRecord | undefined> {
+  const record = await getRecoveryBySwap(input.swapId);
+  if (!record || record.status !== 'claimed' || record.claimConfirmedAt) return record;
+  const next: SwapRecoveryRecord = {
+    ...record,
+    claimNeedsFeeBump: true,
+    claimLastTriedAt: input.now ?? record.claimLastTriedAt
+  };
+  await putRecovery(next);
+  return next;
+}
+
+export async function markSwapClaimConfirmed(input: {
+  swapId: string;
+  now?: number;
+}): Promise<SwapRecoveryRecord | undefined> {
+  const record = await getRecoveryBySwap(input.swapId);
+  if (!record) return undefined;
+  const next: SwapRecoveryRecord = {
+    ...record,
+    status: 'claimed',
+    claimConfirmedAt: input.now ?? Date.now(),
+    claimNeedsFeeBump: false,
+    claimLastError: undefined
+  };
+  await putRecovery(next);
+  return next;
+}
+
 export async function markSwapRecoveryFinished(input: {
   swapId: string;
   claimTxHex?: string;
@@ -70,6 +102,8 @@ export async function markSwapRecoveryFinished(input: {
     claimTxHex: input.claimTxHex ?? record.claimTxHex,
     claimTxid: input.claimTxid ?? record.claimTxid,
     claimLastTriedAt: input.now ?? Date.now(),
+    claimBroadcastAt: input.claimTxid ? (input.now ?? Date.now()) : record.claimBroadcastAt,
+    claimNeedsFeeBump: false,
     claimLastError: undefined
   };
   await putRecovery(next);

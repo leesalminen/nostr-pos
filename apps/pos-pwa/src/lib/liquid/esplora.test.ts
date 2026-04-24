@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import { broadcastLiquidTransaction, fetchAddressTransactions, fetchTransactionHex, verifyAddressPayment } from './esplora';
+import {
+  broadcastLiquidTransaction,
+  fetchAddressTransactions,
+  fetchTransactionHex,
+  fetchTransactionStatus,
+  verifyAddressPayment
+} from './esplora';
 
 describe('Liquid Esplora adapter', () => {
   it('fetches address transactions', async () => {
@@ -36,6 +42,20 @@ describe('Liquid Esplora adapter', () => {
 
     await expect(fetchTransactionHex('https://example.test/api/', 'txid1', fetcher as unknown as typeof fetch)).resolves.toBe('02000000');
     expect(fetcher).toHaveBeenCalledWith('https://example.test/api/tx/txid1/hex');
+  });
+
+  it('fetches transaction confirmation status', async () => {
+    const fetcher = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ txid: 'txid1', status: { confirmed: true, block_height: 100 } })
+    }));
+
+    await expect(fetchTransactionStatus('https://example.test/api/', 'txid1', fetcher as unknown as typeof fetch)).resolves.toEqual({
+      txid: 'txid1',
+      confirmed: true,
+      blockHeight: 100
+    });
+    expect(fetcher).toHaveBeenCalledWith('https://example.test/api/tx/txid1');
   });
 
   it('surfaces failed broadcasts as retryable errors', async () => {

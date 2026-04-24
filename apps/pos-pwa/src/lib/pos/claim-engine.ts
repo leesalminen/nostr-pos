@@ -1,11 +1,13 @@
 import { decryptJson } from '../db/crypto';
 import { getAttempt, getRecoveryBySwap, getSale, recoveryRecords } from '../db/repositories/ledger';
-import { broadcastLiquidTransaction, fetchTransactionHex } from '../liquid/esplora';
+import { broadcastLiquidTransaction, fetchTransactionHex, fetchTransactionStatus } from '../liquid/esplora';
 import { buildBoltzLiquidReverseClaim } from '../swaps/boltz-claim';
 import {
   markSwapClaimable,
   markSwapClaimBroadcastAttempt,
   markSwapClaimBroadcastFailed,
+  markSwapClaimConfirmed,
+  markSwapClaimNeedsFeeBump,
   markSwapRecoveryFinished
 } from './recovery-state';
 import { settleAttempt } from './settlement';
@@ -16,6 +18,12 @@ export type PreparedClaimResult = {
   swapId: string;
   status: 'broadcast' | 'skipped' | 'failed';
   txid?: string;
+  reason?: string;
+};
+
+export type ClaimConfirmationResult = {
+  swapId: string;
+  status: 'confirmed' | 'unconfirmed' | 'fee_bump_due' | 'failed';
   reason?: string;
 };
 
@@ -128,4 +136,45 @@ export async function claimLiquidReverseSwap(
       reason
     };
   }
+}
+
+export async function reconcileClaimBroadcasts(
+  config: TerminalConfig,
+  options: { fetcher?: typeof fetch; now?: number; records?: SwapRecoveryRecord[]; rbfDelayMs?: number } = {}
+): Promise<ClaimConfirmationResult[]> {
+  const backend = primaryLiquidBackend(config);
+  const records = (options.records ?? (await recoveryRecords())).filter(
+    (record) => record.claimTxid && !record.claimConfirmedAt && record.status === 'claimed'
+  );
+  if (!backend) {
+    return records.map((record) => ({ swapId: record.swapId, status: 'failed', reason: 'No Liquid backend configured.' }));
+  }
+
+  const now = options.now ?? Date.now();
+  const rbfDelayMs = options.rbfDelayMs ?? 30 * 60_000;
+  const results: ClaimConfirmationResult[] = [];
+  for (const record of records) {
+    try {
+      const status = await fetchTransactionStatus(backend.url, record.claimTxid as string, options.fetcher);
+      if (status.confirmed) {
+        await markSwapClaimConfirmed({ swapId: record.swapId, now });
+        results.push({ swapId: record.swapId, status: 'confirmed' });
+        continue;
+      }
+      const broadcastAt = record.claimBroadcastAt ?? record.claimLastTriedAt ?? now;
+      if (now - broadcastAt >= rbfDelayMs) {
+        await markSwapClaimNeedsFeeBump({ swapId: record.swapId, now });
+        results.push({ swapId: record.swapId, status: 'fee_bump_due' });
+      } else {
+        results.push({ swapId: record.swapId, status: 'unconfirmed' });
+      }
+    } catch (err) {
+      results.push({
+        swapId: record.swapId,
+        status: 'failed',
+        reason: err instanceof Error ? err.message : 'Could not verify claim transaction.'
+      });
+    }
+  }
+  return results;
 }

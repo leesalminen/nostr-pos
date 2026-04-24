@@ -8,7 +8,7 @@
   import { terminal, loadTerminal, loadPosProfileReference } from '../lib/stores/terminal';
   import { refreshTransactions } from '../lib/stores/ledger';
   import { paymentPayload, simulateSettlement } from '../lib/pos/payment-state';
-  import { claimLiquidReverseSwap } from '../lib/pos/claim-engine';
+  import { claimLiquidReverseSwap, reconcileClaimBroadcasts } from '../lib/pos/claim-engine';
   import { applySwapStatusUpdate, reconcileOpenPayments, resumeAttempt, resumeSale } from '../lib/pos/reconciler';
   import type { PaymentAttempt, PaymentMethod, Sale } from '../lib/pos/types';
   import { syncQueuedRecords } from '../lib/pos/sync';
@@ -56,7 +56,9 @@
 
     async function refreshPaymentState() {
       if (!attempt || stopped) return;
-      await reconcileOpenPayments({ now: Date.now() });
+      const now = Date.now();
+      await reconcileOpenPayments({ now });
+      await loadTerminal().then((config) => reconcileClaimBroadcasts(config, { now }));
       await loadTerminal().then(syncTerminalRecoveryBackups);
       await loadTerminal().then(mergePaymentHistory);
       const resumed = await resumeAttempt(attempt.id);

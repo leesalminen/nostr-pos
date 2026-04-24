@@ -85,6 +85,9 @@ export type SwapRecoveryRecord = {
   claimLastError?: string;
   claimFeeSatPerVbyte?: number;
   claimRbfCount?: number;
+  claimBroadcastAt?: number;
+  claimConfirmedAt?: number;
+  claimNeedsFeeBump?: boolean;
   status: 'pending' | 'claimable' | 'claimed' | 'failed' | 'expired';
 };
 

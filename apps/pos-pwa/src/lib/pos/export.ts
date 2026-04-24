@@ -66,6 +66,9 @@ export function recoveryBackupsJson(records: SwapRecoveryRecord[], exportedAt = 
         claim_last_error: record.claimLastError ?? null,
         claim_fee_sat_per_vbyte: record.claimFeeSatPerVbyte ?? null,
         claim_rbf_count: record.claimRbfCount ?? 0,
+        claim_broadcast_at: record.claimBroadcastAt ? new Date(record.claimBroadcastAt).toISOString() : null,
+        claim_confirmed_at: record.claimConfirmedAt ? new Date(record.claimConfirmedAt).toISOString() : null,
+        claim_needs_fee_bump: record.claimNeedsFeeBump ?? false,
         status: record.status
       }))
     },

@@ -24,7 +24,8 @@ vi.mock('../db/crypto', () => ({
 }));
 vi.mock('../liquid/esplora', () => ({
   broadcastLiquidTransaction: vi.fn(),
-  fetchTransactionHex: vi.fn()
+  fetchTransactionHex: vi.fn(),
+  fetchTransactionStatus: vi.fn()
 }));
 vi.mock('../swaps/boltz-claim', () => ({
   buildBoltzLiquidReverseClaim: vi.fn()
@@ -256,5 +257,51 @@ describe('prepared claim broadcaster', () => {
     });
     expect(fetchTransactionHex).toHaveBeenCalledWith('https://liquid.example/api/', 'lockuptxid', undefined);
     expect(buildBoltzLiquidReverseClaim).toHaveBeenCalledWith(expect.objectContaining({ lockupTxHex: 'lockuphex' }));
+  });
+
+  it('marks broadcast claims confirmed when the backend confirms the claim tx', async () => {
+    const { fetchTransactionStatus } = await import('../liquid/esplora');
+    const { reconcileClaimBroadcasts } = await import('./claim-engine');
+    recoveries.set('swap5', {
+      saleId: 'sale5',
+      paymentAttemptId: 'attempt5',
+      swapId: 'swap5',
+      encryptedLocalBlob: 'ciphertext',
+      localSavedAt: 0,
+      okFrom: [],
+      expiresAt: 1000,
+      claimTxHex: 'claimhex',
+      claimTxid: 'claimtxid',
+      claimBroadcastAt: 100,
+      status: 'claimed'
+    });
+    vi.mocked(fetchTransactionStatus).mockResolvedValue({ txid: 'claimtxid', confirmed: true, blockHeight: 101 });
+
+    await expect(reconcileClaimBroadcasts(config, { now: 200 })).resolves.toEqual([{ swapId: 'swap5', status: 'confirmed' }]);
+    expect(recoveries.get('swap5')).toMatchObject({ claimConfirmedAt: 200, claimNeedsFeeBump: false });
+  });
+
+  it('flags stale unconfirmed broadcast claims for fee bump', async () => {
+    const { fetchTransactionStatus } = await import('../liquid/esplora');
+    const { reconcileClaimBroadcasts } = await import('./claim-engine');
+    recoveries.set('swap6', {
+      saleId: 'sale6',
+      paymentAttemptId: 'attempt6',
+      swapId: 'swap6',
+      encryptedLocalBlob: 'ciphertext',
+      localSavedAt: 0,
+      okFrom: [],
+      expiresAt: 1000,
+      claimTxHex: 'claimhex',
+      claimTxid: 'claimtxid',
+      claimBroadcastAt: 100,
+      status: 'claimed'
+    });
+    vi.mocked(fetchTransactionStatus).mockResolvedValue({ txid: 'claimtxid', confirmed: false });
+
+    await expect(reconcileClaimBroadcasts(config, { now: 200, rbfDelayMs: 50 })).resolves.toEqual([
+      { swapId: 'swap6', status: 'fee_bump_due' }
+    ]);
+    expect(recoveries.get('swap6')).toMatchObject({ claimNeedsFeeBump: true });
   });
 });
