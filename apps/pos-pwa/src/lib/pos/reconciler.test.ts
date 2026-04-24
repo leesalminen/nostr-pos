@@ -456,6 +456,61 @@ describe('startup reconciliation', () => {
     expect(Array.from(receipts.values())).toHaveLength(0);
   });
 
+  it('does not settle provider claimed updates without a Liquid claim txid', async () => {
+    const { reconcileOpenPayments } = await import('./reconciler');
+    config = {
+      merchantName: 'Merchant',
+      posName: 'Counter',
+      currency: 'CRC',
+      terminalId: 'term1',
+      terminalPubkey: 'pub',
+      pairingCode: 'ABCD-EFGH',
+      maxInvoiceSat: 100000,
+      syncServers: []
+    };
+    sales.set('sale7', {
+      id: 'sale7',
+      receiptNumber: 'R-7',
+      posRef: 'pos',
+      terminalId: 'term1',
+      amountFiat: '8500',
+      fiatCurrency: 'CRC',
+      amountSat: 25000,
+      status: 'payment_ready',
+      createdAt: 0,
+      updatedAt: 0
+    });
+    attempts.set('attempt7', {
+      id: 'attempt7',
+      saleId: 'sale7',
+      method: 'lightning_swap',
+      status: 'waiting',
+      swapId: 'swap7',
+      createdAt: 0,
+      updatedAt: 0,
+      expiresAt: 100
+    });
+
+    await expect(
+      reconcileOpenPayments({
+        now: 12,
+        swapProvider: {
+          id: 'test',
+          getLimits: async () => ({ minSat: 1000, maxSat: 100000 }),
+          createReverseSwap: async () => {
+            throw new Error('not used');
+          },
+          getSwapStatus: async () => 'transaction.claimed',
+          verifySwap: () => ({ ok: true }),
+          supportsClaimCovenants: () => false
+        }
+      })
+    ).resolves.toBe(1);
+    expect(attempts.get('attempt7')).toMatchObject({ status: 'detected' });
+    expect(sales.get('sale7')?.status).toBe('payment_detected');
+    expect(Array.from(receipts.values())).toHaveLength(0);
+  });
+
   it('resumes an existing sale without creating a new attempt', async () => {
     const { resumeSale } = await import('./reconciler');
     sales.set('sale3', {

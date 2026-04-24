@@ -53,9 +53,9 @@ function mergedRecoveryStatus(
   existing: SwapRecoveryRecord | undefined,
   parsed: Partial<SwapRecoveryRecord>
 ): SwapRecoveryRecord['status'] {
-  if (existing?.status === 'claimed' || parsed.claimConfirmedAt || parsed.claimTxid) return 'claimed';
+  if ((existing?.status === 'claimed' && existing.claimTxid) || parsed.claimConfirmedAt || parsed.claimTxid) return 'claimed';
   if (existing?.status === 'failed') return 'failed';
-  if (parsed.claimTxHex) return 'claimable';
+  if (parsed.claimTxHex || (existing?.status === 'claimed' && !existing.claimTxid && existing.claimTxHex)) return 'claimable';
   return existing?.status ?? 'pending';
 }
 

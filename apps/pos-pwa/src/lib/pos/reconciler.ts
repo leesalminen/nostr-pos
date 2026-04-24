@@ -147,6 +147,9 @@ export async function applySwapStatusUpdate(
 ): Promise<{ changed: boolean; terminal: boolean }> {
   const now = options.now ?? Date.now();
   if (status === 'transaction.claimed') {
+    if (!options.txid) {
+      return applySwapStatusUpdate(sale, attempt, 'invoice.settled', { now });
+    }
     if (attempt.swapId) await markSwapRecoveryFinished({ swapId: attempt.swapId, claimTxid: options.txid });
     await settleAttempt({
       sale,

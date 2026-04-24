@@ -2,6 +2,20 @@ import type { OutboxItem, PaymentAttempt, Receipt, Sale, SwapRecoveryRecord, Tra
 import { toPlainJson } from '../plain';
 import { getDb } from '../schema';
 
+export function normalizedRecoveryRecord(record: SwapRecoveryRecord): SwapRecoveryRecord {
+  if (record.status !== 'claimed' || record.claimTxid || record.claimConfirmedAt) return record;
+  return {
+    ...record,
+    status: record.claimTxHex ? 'claimable' : 'failed',
+    claimNeedsFeeBump: false,
+    claimLastError:
+      record.claimLastError ??
+      (record.claimTxHex
+        ? 'Claim was marked without a Liquid transaction id. Retry claim broadcast.'
+        : 'Claim was marked without a Liquid transaction id or prepared claim transaction.')
+  };
+}
+
 export async function putSale(sale: Sale): Promise<void> {
   await (await getDb()).put('sales', toPlainJson(sale));
 }
@@ -31,11 +45,24 @@ export async function getOutboxItem(id: string): Promise<OutboxItem | undefined>
 }
 
 export async function recoveryRecords(): Promise<SwapRecoveryRecord[]> {
-  return (await getDb()).getAll('swap_recovery_records');
+  const db = await getDb();
+  const records = await db.getAll('swap_recovery_records');
+  const normalized = records.map(normalizedRecoveryRecord);
+  await Promise.all(
+    normalized.map((record, index) =>
+      record === records[index] ? Promise.resolve() : db.put('swap_recovery_records', toPlainJson(record))
+    )
+  );
+  return normalized;
 }
 
 export async function getRecoveryBySwap(swapId: string): Promise<SwapRecoveryRecord | undefined> {
-  return (await getDb()).get('swap_recovery_records', swapId);
+  const db = await getDb();
+  const record = await db.get('swap_recovery_records', swapId);
+  if (!record) return undefined;
+  const normalized = normalizedRecoveryRecord(record);
+  if (normalized !== record) await db.put('swap_recovery_records', toPlainJson(normalized));
+  return normalized;
 }
 
 export async function openPaymentAttempts(): Promise<PaymentAttempt[]> {

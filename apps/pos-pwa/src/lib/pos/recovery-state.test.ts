@@ -66,6 +66,19 @@ describe('swap recovery state', () => {
     });
   });
 
+  it('does not mark recovery claimed without a Liquid claim txid', async () => {
+    const { markSwapRecoveryFinished } = await import('./recovery-state');
+
+    await markSwapRecoveryFinished({ swapId: 'swap1', claimTxHex: '00', now: 70 });
+
+    expect(recoveries.get('swap1')).toMatchObject({
+      status: 'claimable',
+      claimTxHex: '00',
+      claimTxid: undefined,
+      claimLastError: 'Claim broadcast did not return a Liquid transaction id.'
+    });
+  });
+
   it('stores the lockup transaction and prepares replacement claims without losing old tx audit', async () => {
     const { markSwapClaimReplacementPrepared, markSwapLockupSeen, markSwapRecoveryFinished } = await import('./recovery-state');
 

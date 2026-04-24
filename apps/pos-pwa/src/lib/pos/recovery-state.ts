@@ -161,15 +161,17 @@ export async function markSwapRecoveryFinished(input: {
 }): Promise<SwapRecoveryRecord | undefined> {
   const record = await getRecoveryBySwap(input.swapId);
   if (!record) return undefined;
+  const claimTxid = input.claimTxid ?? record.claimTxid;
+  const claimTxHex = input.claimTxHex ?? record.claimTxHex;
   const next: SwapRecoveryRecord = {
     ...record,
-    status: 'claimed',
-    claimTxHex: input.claimTxHex ?? record.claimTxHex,
-    claimTxid: input.claimTxid ?? record.claimTxid,
+    status: claimTxid ? 'claimed' : claimTxHex ? 'claimable' : 'failed',
+    claimTxHex,
+    claimTxid,
     claimLastTriedAt: input.now ?? Date.now(),
-    claimBroadcastAt: input.claimTxid ? (input.now ?? Date.now()) : record.claimBroadcastAt,
+    claimBroadcastAt: claimTxid && input.claimTxid ? (input.now ?? Date.now()) : record.claimBroadcastAt,
     claimNeedsFeeBump: false,
-    claimLastError: undefined
+    claimLastError: claimTxid ? undefined : 'Claim broadcast did not return a Liquid transaction id.'
   };
   await putRecovery(next);
   return next;
