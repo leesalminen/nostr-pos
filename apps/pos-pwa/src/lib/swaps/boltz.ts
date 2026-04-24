@@ -97,7 +97,8 @@ export class BoltzReverseSwapProvider implements SwapProvider {
         to: 'L-BTC',
         from: 'BTC',
         claimPublicKey,
-        preimageHash
+        preimageHash,
+        description: req.memo
       })
     });
     if (!response.ok) throw new Error('Lightning is temporarily unavailable. Use Liquid instead.');

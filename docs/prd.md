@@ -1685,6 +1685,20 @@ If either fails:
 
 Default durability threshold: `2 of N relay OKs` where N ≥ 2. If only 1 relay configured, fail safely ("Add a backup sync server to use Lightning").
 
+### 11.4.1 Lightning Invoice Memo
+
+The terminal sends a human-readable Bolt11 description/memo to the swap
+provider in the form:
+
+```text
+<merchant name> sale <sale id>
+```
+
+The `sale id` is the canonical local sale ULID persisted in IndexedDB and
+published in encrypted sale/recovery events. This keeps customer wallet history
+and merchant recovery records aligned without exposing line items or private
+notes in the public Lightning invoice.
+
 ### 11.5 Swap Provider Abstraction
 
 ```ts
@@ -3532,6 +3546,9 @@ verification evidence stay close to the source of truth.
   checks both the invoice amount and payment hash against the terminal-generated
   preimage hash. The adapter also reads the current v2 reverse-swap limits shape
   (`limits.minimal` / `limits.maximal`).
+- Lightning swap creation now sends a Bolt11 memo/description of
+  `<merchant name> sale <sale id>` to Boltz, using the same sale ULID that is
+  persisted locally and referenced by recovery records.
 
 ### Known follow-ups
 

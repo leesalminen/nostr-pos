@@ -33,6 +33,11 @@ export function posRefForConfig(config: TerminalConfig): string {
   return config.posProfile ? `30380:${config.posProfile.merchantPubkey}:${config.posProfile.posId}` : 'pilot-seguras-butcher';
 }
 
+export function lightningInvoiceMemo(config: Pick<TerminalConfig, 'merchantName'>, saleId: string): string {
+  const storeName = (config.merchantName || 'Store').replace(/\s+/g, ' ').trim();
+  return `${storeName || 'Store'} sale ${saleId}`.slice(0, 180);
+}
+
 export function assertTerminalCanCharge(config: TerminalConfig, now = Date.now()): void {
   if (!config.activatedAt) throw new Error('This terminal needs owner approval before taking payments.');
   if (config.revokedAt) throw new Error('This terminal was removed by the owner.');
@@ -66,6 +71,8 @@ export async function createSale(
   }
 
   const now = Date.now();
+  const saleId = ulid(now);
+  const attemptId = ulid(now + 1);
   const addressIndex = await reserveAddressIndex();
   const liquid = await deriveLiquidAddress(config, addressIndex);
   let swap: ReverseSwapResponse | undefined;
@@ -75,22 +82,20 @@ export async function createSale(
       throw new Error('Lightning is disabled by the owner approval for this terminal.');
     }
     const swapProvider = options.swapProvider ?? swapProviderForConfig(config);
-    swap = await swapProvider.createReverseSwap({
-      saleId: ulid(now + 2),
+    const swapRequest = {
+      saleId,
       invoiceSat: amountSat,
-      claimAddress: liquid.address
-    });
-    const verification = swapProvider.verifySwap(swap, {
-      saleId: swap.id.replace(/^swap_/, ''),
-      invoiceSat: amountSat,
-      claimAddress: liquid.address
-    });
+      claimAddress: liquid.address,
+      memo: lightningInvoiceMemo(config, saleId)
+    };
+    swap = await swapProvider.createReverseSwap(swapRequest);
+    const verification = swapProvider.verifySwap(swap, swapRequest);
     if (!verification.ok) {
       throw new Error(`Could not safely prepare Lightning payment: ${verification.reason}.`);
     }
   }
   const sale: Sale = {
-    id: ulid(now),
+    id: saleId,
     receiptNumber: `R-${String(now).slice(-8)}`,
     posRef: posRefForConfig(config),
     terminalId: config.terminalId,
@@ -109,7 +114,7 @@ export async function createSale(
   };
 
   const attempt: PaymentAttempt = {
-    id: ulid(now + 1),
+    id: attemptId,
     saleId: sale.id,
     method,
     status: 'created',

@@ -9,6 +9,7 @@ export type ReverseSwapRequest = {
   saleId: string;
   invoiceSat: number;
   claimAddress: string;
+  memo?: string;
 };
 
 export type ReverseSwapResponse = {

@@ -109,6 +109,10 @@ describe('sale creation payment rails', () => {
       )
     ).rejects.toThrow('recovery backup reached 1/2 relays');
 
+    const swapRequest = vi.mocked(swapProvider.createReverseSwap).mock.calls[0]?.[0];
+    expect(swapRequest?.saleId).toMatch(/^01/);
+    expect(swapRequest?.memo).toBe(`Merchant sale ${swapRequest?.saleId}`);
+    expect(vi.mocked(swapProvider.verifySwap).mock.calls[0]?.[1]).toEqual(swapRequest);
     expect(Array.from(sales.values()).at(-1)).toMatchObject({ status: 'failed' });
     expect(Array.from(attempts.values()).at(-1)).toMatchObject({ status: 'failed' });
   });

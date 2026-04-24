@@ -159,6 +159,7 @@ requests.
    - the returned Bolt11 invoice is checksummed,
    - the invoice amount equals the sale sats,
    - the invoice payment hash equals the terminal-generated preimage hash,
+   - the Bolt11 memo/description is `<merchant name> sale <sale id>`,
    - the encrypted recovery backup reached at least two relays.
 5. Scan and pay the Lightning QR.
 6. Expected result: Boltz reports payment/lockup status, the terminal builds

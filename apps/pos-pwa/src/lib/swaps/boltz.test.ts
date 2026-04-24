@@ -13,7 +13,8 @@ describe('Boltz reverse swap adapter', () => {
       expect(body).toMatchObject({
         invoiceAmount: 1000,
         to: 'L-BTC',
-        from: 'BTC'
+        from: 'BTC',
+        description: 'Seguras Butcher sale sale1'
       });
       expect(body.preimageHash).toMatch(/^[0-9a-f]{64}$/);
       expect(body.claimPublicKey).toMatch(/^[0-9a-f]{66}$/);
@@ -38,7 +39,8 @@ describe('Boltz reverse swap adapter', () => {
     const swap = await provider.createReverseSwap({
       saleId: 'sale1',
       invoiceSat: 1000,
-      claimAddress: 'lq1claim'
+      claimAddress: 'lq1claim',
+      memo: 'Seguras Butcher sale sale1'
     });
     swap.preimageHash = validPaymentHash;
 
