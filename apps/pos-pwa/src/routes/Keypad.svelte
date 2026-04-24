@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { History, Settings } from 'lucide-svelte';
   import AmountDisplay from '../lib/ui/AmountDisplay.svelte';
+  import BullFooter from '../lib/ui/BullFooter.svelte';
   import Button from '../lib/ui/Button.svelte';
   import Keypad from '../lib/ui/Keypad.svelte';
   import { terminal, loadTerminal } from '../lib/stores/terminal';
@@ -52,11 +53,12 @@
         <AmountDisplay amount={displayAmount} currency={$terminal?.currency ?? 'CRC'} />
         <Keypad onInput={applyInput} />
         <textarea
-          class="min-h-12 rounded-lg border border-[#d7c8b4] bg-[#fffaf0] px-4 py-3 text-base outline-none focus:ring-2 focus:ring-[#1f513a] dark:border-[#3a342a] dark:bg-[#211f1a]"
+          class="min-h-12 rounded-lg border border-[#d7c8b4] bg-[#fffaf0] px-4 py-3 text-base outline-none focus:ring-2 focus:ring-[#B7000B] dark:border-[#3a342a] dark:bg-[#211f1a]"
           bind:value={note}
           placeholder="Add note"
           rows="1"
         ></textarea>
+        <BullFooter />
       </div>
 
       <div class="sticky bottom-0 mx-auto mt-3 flex w-full max-w-xl flex-col bg-gradient-to-t from-[#f5f0e8] from-60% to-transparent pb-[max(0.25rem,env(safe-area-inset-bottom))] pt-3 dark:from-[#161512]">
