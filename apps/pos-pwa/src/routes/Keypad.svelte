@@ -29,8 +29,8 @@
     <section class="flex flex-col px-5 py-5 sm:px-8">
       <header class="mb-8 flex items-center justify-between gap-4">
         <div>
-          <p class="text-sm font-bold uppercase tracking-[0.12em] text-[#776b5a] dark:text-[#b9aa91]">{$terminal?.posName ?? 'Counter 1'}</p>
-          <h1 class="text-2xl font-black">{$terminal?.merchantName ?? 'Seguras Butcher'}</h1>
+          <h1 class="text-2xl font-bold leading-tight">{$terminal?.merchantName ?? 'Seguras Butcher'}</h1>
+          <p class="mt-0.5 text-xs font-medium uppercase tracking-[0.12em] text-[#776b5a] dark:text-[#b9aa91]">{$terminal?.posName ?? 'Counter 1'}</p>
         </div>
         <div class="flex items-center gap-2">
           <a class="grid min-h-12 min-w-12 place-items-center rounded-md bg-[#eadfce] text-[#211f1a] dark:bg-[#2c2922] dark:text-[#fff6e8]" href="#/transactions" aria-label="Recent transactions">
@@ -46,7 +46,7 @@
         <AmountDisplay amount={displayAmount} currency={$terminal?.currency ?? 'CRC'} />
         <Keypad onInput={applyInput} />
         <textarea
-          class="min-h-12 rounded-md border border-[#d7c8b4] bg-[#fffaf0] px-4 py-3 text-base outline-none focus:ring-2 focus:ring-[#1f513a] dark:border-[#3a342a] dark:bg-[#211f1a]"
+          class="min-h-12 rounded-lg border border-[#d7c8b4] bg-[#fffaf0] px-4 py-3 text-base outline-none focus:ring-2 focus:ring-[#1f513a] dark:border-[#3a342a] dark:bg-[#211f1a]"
           bind:value={note}
           placeholder="Add note"
           rows="2"

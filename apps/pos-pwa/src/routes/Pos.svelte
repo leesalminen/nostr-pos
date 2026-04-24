@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { ArrowLeft, CheckCircle2, CreditCard, History, Loader2, Settings, Smartphone, Zap } from 'lucide-svelte';
+  import { ArrowLeft, CreditCard, History, Loader2, Settings } from 'lucide-svelte';
   import Button from '../lib/ui/Button.svelte';
   import QrCard from '../lib/ui/QrCard.svelte';
   import { terminal, loadTerminal } from '../lib/stores/terminal';
@@ -10,7 +10,7 @@
   import type { FxRate } from '../lib/fx/bull-bitcoin';
   import { decodeIndexPrice } from '../lib/fx/bull-bitcoin';
   import { putAttempt } from '../lib/db/repositories/ledger';
-  import { formatBtcFromSats, formatExchangeRate, formatFiat, formatSats, methodLabel, statusLabel } from '../lib/util/formatting';
+  import { formatExchangeRate, formatFiat, formatSats, statusLabel } from '../lib/util/formatting';
 
   let { params = {} }: { params?: { link?: string } } = $props();
 
@@ -28,6 +28,16 @@
   const rawNote = $derived(parts[2]);
   const amount = $derived(String(Number(rawAmount || '0')));
   const activePaymentData = $derived(sale ? paymentPayload(selectedMethod, sale.amountSat, sale.id) : '');
+
+  const statusTone = $derived(
+    !sale
+      ? 'text-[#776b5a] dark:text-[#b9aa91]'
+      : sale.status === 'receipt_ready' || sale.status === 'settled'
+        ? 'text-[#14522d] dark:text-[#8bc8a4]'
+        : sale.status === 'failed' || sale.status === 'needs_recovery' || sale.status === 'expired'
+          ? 'text-[#8c2d28] dark:text-[#e8a49e]'
+          : 'text-[#1e4e73] dark:text-[#9fc6e3]'
+  );
 
   onMount(async () => {
     try {
@@ -86,10 +96,10 @@
 <main class="min-h-screen bg-[#f5f0e8] text-[#211f1a] dark:bg-[#161512] dark:text-[#fff6e8]">
   <div class="mx-auto grid min-h-screen max-w-4xl grid-rows-1">
     <section class="px-5 py-5 sm:px-8">
-      <header class="mb-8 flex items-center justify-between">
-        <a class="inline-flex min-h-12 items-center gap-2 rounded-md px-2 font-bold" href="#/">
+      <header class="mb-6 flex items-center justify-between">
+        <a class="inline-flex min-h-12 items-center gap-2 rounded-md px-2 text-sm font-semibold" href="#/">
           <ArrowLeft size={21} />
-          New sale
+          Cancel sale
         </a>
         <div class="flex items-center gap-2">
           <a class="grid min-h-12 min-w-12 place-items-center rounded-md bg-[#eadfce] text-[#211f1a] dark:bg-[#2c2922] dark:text-[#fff6e8]" href="#/transactions" aria-label="Recent transactions">
@@ -102,24 +112,31 @@
       </header>
 
       {#if error}
-        <div class="mx-auto max-w-lg rounded-md bg-[#ffe0d9] p-5 text-[#8c2d28]">
-          <h1 class="text-xl font-black">Could not prepare payment.</h1>
+        <div class="mx-auto max-w-lg rounded-lg bg-[#ffe0d9] p-5 text-[#8c2d28]">
+          <h1 class="text-xl font-bold">Could not prepare payment.</h1>
           <p class="mt-2">{error}</p>
           <div class="mt-4"><Button href="#/">Try Again</Button></div>
         </div>
       {:else if sale && attempt}
-        <div class="mx-auto flex max-w-xl flex-col items-center gap-5 text-center">
-          <p class="text-6xl font-black tabular-nums">{formatFiat(sale.amountFiat, sale.fiatCurrency)}</p>
-          <p class="rounded-full bg-[#e2edf5] px-4 py-2 text-sm font-bold text-[#1e4e73]">{statusLabel(sale.status)}</p>
+        <div class="mx-auto flex max-w-md flex-col items-center gap-5">
+          <div class="flex w-full flex-col items-center gap-1">
+            <div class="flex items-baseline gap-3">
+              <p class="text-6xl font-black tabular-nums leading-none">{formatFiat(sale.amountFiat, sale.fiatCurrency)}</p>
+            </div>
+            <p class={`inline-flex items-center gap-1.5 text-xs font-semibold ${statusTone}`}>
+              <span class="inline-block h-1.5 w-1.5 rounded-full bg-current"></span>
+              {boltCardPending ? 'Tap card to device' : statusLabel(sale.status)}
+            </p>
+          </div>
 
-          <div class="grid w-full grid-cols-2 gap-2 rounded-md bg-[#eadfce] p-1 dark:bg-[#2c2922]">
+          <div class="inline-flex rounded-md bg-[#eadfce] p-0.5 text-xs dark:bg-[#2c2922]">
             {#each tabs as tab}
               <button
                 type="button"
-                class={`min-h-12 rounded-md px-2 text-sm font-black transition ${
+                class={`min-h-9 rounded-md px-4 font-semibold transition ${
                   selectedMethod === tab.method
                     ? 'bg-[#fffaf0] text-[#1f513a] shadow-sm dark:bg-[#161512] dark:text-[#8bc8a4]'
-                    : 'text-[#5f5547] hover:bg-[#f5ead9] dark:text-[#c9bca7] dark:hover:bg-[#363126]'
+                    : 'text-[#5f5547] dark:text-[#c9bca7]'
                 }`}
                 onclick={() => selectMethod(tab.method)}
               >
@@ -131,50 +148,34 @@
           {#if activePaymentData}
             <QrCard
               value={activePaymentData}
-              label={`${methodLabel(selectedMethod)} payment code`}
+              label={`${tabs.find((t) => t.method === selectedMethod)?.label ?? 'Payment'} payment code`}
               showBoltCard={selectedMethod === 'lightning_swap'}
               onBoltCard={startBoltCard}
             />
           {/if}
 
-          <div class="grid w-full gap-2 rounded-md border border-[#d7c8b4] bg-[#fffaf0] p-4 text-left text-sm dark:border-[#3a342a] dark:bg-[#211f1a]">
-            <div class="flex justify-between gap-4">
-              <span class="text-[#776b5a] dark:text-[#b9aa91]">Fiat amount</span>
-              <strong>{formatFiat(sale.amountFiat, sale.fiatCurrency)}</strong>
-            </div>
-            <div class="flex justify-between gap-4">
-              <span class="text-[#776b5a] dark:text-[#b9aa91]">BTC amount</span>
-              <strong>{formatBtcFromSats(sale.amountSat)}</strong>
-            </div>
-            <div class="flex justify-between gap-4">
-              <span class="text-[#776b5a] dark:text-[#b9aa91]">Sats</span>
-              <strong>{formatSats(sale.amountSat)}</strong>
-            </div>
-            {#if rate}
-              <div class="flex justify-between gap-4">
-                <span class="text-[#776b5a] dark:text-[#b9aa91]">Exchange rate</span>
-                <strong>{formatExchangeRate(decodeIndexPrice(rate), sale.fiatCurrency)}</strong>
-              </div>
-            {/if}
-          </div>
+          <p class="text-center text-xs text-[#776b5a] tabular-nums dark:text-[#b9aa91]">
+            {formatSats(sale.amountSat)}{#if rate} &middot; {formatExchangeRate(decodeIndexPrice(rate), sale.fiatCurrency)}{/if}
+          </p>
 
           {#if boltCardPending}
-            <p class="inline-flex items-center gap-2 text-sm text-[#776b5a] dark:text-[#b9aa91]"><CreditCard size={16} /> Hold the card near the back of this device.</p>
-          {:else if selectedMethod === 'lightning_swap'}
-            <p class="inline-flex items-center gap-2 text-sm text-[#776b5a] dark:text-[#b9aa91]"><Zap size={16} /> Lightning is ready to scan or tap.</p>
-          {:else}
-            <p class="inline-flex items-center gap-2 text-sm text-[#776b5a] dark:text-[#b9aa91]"><Smartphone size={16} /> Liquid is ready to scan.</p>
+            <p class="inline-flex items-center gap-2 text-xs text-[#776b5a] dark:text-[#b9aa91]">
+              <CreditCard size={14} /> Hold the card near the back of this device.
+            </p>
           {/if}
 
-          <Button onclick={settle} disabled={settling}>
+          <button
+            type="button"
+            class="mt-2 text-xs font-semibold text-[#776b5a] underline-offset-4 hover:underline disabled:opacity-50 dark:text-[#b9aa91]"
+            onclick={settle}
+            disabled={settling}
+          >
             {#if settling}
-              <Loader2 class="animate-spin" size={19} />
-              Finishing payment...
+              <Loader2 class="inline animate-spin" size={13} /> Finishing…
             {:else}
-              <CheckCircle2 size={19} />
-              Simulate Paid
+              Dev: simulate paid
             {/if}
-          </Button>
+          </button>
         </div>
       {:else}
         <div class="grid min-h-[60vh] place-items-center">

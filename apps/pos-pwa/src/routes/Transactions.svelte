@@ -14,7 +14,7 @@
 <main class="min-h-screen bg-[#f5f0e8] px-5 py-5 text-[#211f1a] dark:bg-[#161512] dark:text-[#fff6e8]">
   <div class="mx-auto max-w-3xl">
     <header class="mb-8 flex items-center justify-between gap-4">
-      <a class="inline-flex min-h-12 items-center gap-2 rounded-md px-2 font-bold" href="#/">
+      <a class="inline-flex min-h-12 items-center gap-2 rounded-md px-2 text-sm font-semibold" href="#/">
         <ArrowLeft size={21} />
         Back
       </a>
@@ -28,10 +28,10 @@
     </header>
 
     <div class="mb-5">
-      <p class="text-sm font-bold uppercase tracking-[0.12em] text-[#776b5a] dark:text-[#b9aa91]">
+      <h1 class="text-3xl font-bold leading-tight">Recent transactions</h1>
+      <p class="mt-1 text-xs font-medium uppercase tracking-[0.12em] text-[#776b5a] dark:text-[#b9aa91]">
         {$terminal?.posName ?? 'Counter 1'}
       </p>
-      <h1 class="text-3xl font-black">Recent Transactions</h1>
     </div>
 
     <TransactionSheet rows={$transactions} />

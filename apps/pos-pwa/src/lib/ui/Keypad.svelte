@@ -9,7 +9,7 @@
   {#each keys as key}
     <button
       type="button"
-      class="grid aspect-[1.55] min-h-16 place-items-center rounded-md border border-[#d7c8b4] bg-[#fffaf0] text-3xl font-bold tabular-nums text-[#211f1a] shadow-sm transition hover:bg-[#f2e6d4] active:translate-y-px dark:border-[#3a342a] dark:bg-[#211f1a] dark:text-[#fff6e8] dark:hover:bg-[#2f2a22]"
+      class="grid aspect-[1.55] min-h-16 place-items-center rounded-md border border-[#d7c8b4] bg-[#fffaf0] text-3xl font-semibold tabular-nums text-[#211f1a] shadow-sm transition-transform duration-75 ease-out active:scale-[0.97] active:bg-[#ecdcc1] active:shadow-inner dark:border-[#3a342a] dark:bg-[#211f1a] dark:text-[#fff6e8] dark:active:bg-[#2f2a22]"
       aria-label={key === 'back' ? 'Delete digit' : `Add ${key}`}
       onclick={() => onInput(key)}
     >

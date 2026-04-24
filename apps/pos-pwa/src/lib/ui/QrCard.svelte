@@ -23,7 +23,7 @@
   });
 </script>
 
-<div class="mx-auto w-full max-w-sm rounded-md border border-[#d7c8b4] bg-[#fffaf0] p-4 text-center shadow-sm dark:border-[#3a342a] dark:bg-[#211f1a]">
+<div class="mx-auto w-full max-w-sm rounded-lg border border-[#d7c8b4] bg-[#fffaf0] p-4 text-center shadow-sm dark:border-[#3a342a] dark:bg-[#211f1a]">
   {#if dataUrl}
     <img class="mx-auto aspect-square w-full max-w-[300px]" src={dataUrl} alt={label} />
   {/if}
