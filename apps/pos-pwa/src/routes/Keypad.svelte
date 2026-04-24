@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
   import { History, Settings } from 'lucide-svelte';
   import AmountDisplay from '../lib/ui/AmountDisplay.svelte';
   import BullFooter from '../lib/ui/BullFooter.svelte';
@@ -7,15 +7,21 @@
   import Keypad from '../lib/ui/Keypad.svelte';
   import { terminal, loadTerminal } from '../lib/stores/terminal';
   import { refreshTransactions } from '../lib/stores/ledger';
+  import { createTerminalTabLock, type TerminalTabLock } from '../lib/security/tab-lock';
 
   let amount = $state('');
   let note = $state('');
   let preparing = $state(false);
   let error = $state('');
   let lockedMessage = $state('');
+  let tabReadOnly = $state(false);
+  let tabLock: TerminalTabLock | undefined;
 
   onMount(async () => {
     const config = await loadTerminal();
+    tabLock = createTerminalTabLock(config.terminalPubkey, (state) => {
+      tabReadOnly = state.readonly;
+    });
     const [{ syncTerminalRevocation }, { reconcileOpenPayments }, { reconcileClaimBroadcasts, resumePreparedClaims }, { syncTerminalRecoveryBackups }, { mergePaymentHistory }] =
       await Promise.all([
         import('../lib/activation/revocation-sync'),
@@ -41,13 +47,17 @@
     await refreshTransactions();
   });
 
+  onDestroy(() => {
+    tabLock?.close();
+  });
+
   function applyInput(value: string) {
     if (value === 'back') amount = amount.slice(0, -1);
     else amount = (amount + value).replace(/^0+(?=\d)/, '').slice(0, 9);
   }
 
   async function charge() {
-    if (!canCharge || preparing) return;
+    if (!canCharge || preparing || tabReadOnly) return;
     error = '';
     preparing = true;
     try {
@@ -72,7 +82,7 @@
     }
   }
 
-  const canCharge = $derived(Number(amount) > 0);
+  const canCharge = $derived(Number(amount) > 0 && !tabReadOnly);
   const displayAmount = $derived(amount || '0');
 </script>
 
@@ -95,7 +105,12 @@
       </header>
 
       <div class="mx-auto flex w-full max-w-xl flex-1 flex-col justify-center gap-4 sm:gap-6">
-        {#if lockedMessage}
+        {#if tabReadOnly}
+          <div class="rounded-md bg-[#ffe0d9] px-5 py-4 text-center text-[#8c2d28]">
+            <p class="font-display text-3xl uppercase tracking-display leading-none">Terminal open in another tab</p>
+            <p class="mt-2 text-sm font-semibold">Close the other tab to take sales here.</p>
+          </div>
+        {:else if lockedMessage}
           <div class="rounded-md bg-[#ffe0d9] px-5 py-4 text-center text-[#8c2d28]">
             <p class="font-display text-3xl uppercase tracking-display leading-none">Terminal locked</p>
             <p class="mt-2 text-sm font-semibold">{lockedMessage}</p>

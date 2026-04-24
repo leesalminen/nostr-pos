@@ -20,6 +20,7 @@
   import { subscribeBoltzSwapUpdates, type SwapUpdateSubscription } from '../lib/swaps/boltz-ws';
   import { mergePaymentHistory } from '../lib/pos/payment-history';
   import { syncTerminalRecoveryBackups } from '../lib/pos/recovery-sync';
+  import { createTerminalTabLock, type TerminalTabLock } from '../lib/security/tab-lock';
 
   let { params = {} }: { params?: { saleId?: string } } = $props();
 
@@ -30,6 +31,7 @@
   let boltCardMessage = $state('');
   let error = $state('');
   let settling = $state(false);
+  let tabReadOnly = $state(false);
   const showDevSettle = import.meta.env.DEV;
 
   const activePaymentData = $derived(
@@ -53,10 +55,11 @@
   onMount(() => {
     let pollTimer: ReturnType<typeof setInterval> | undefined;
     let swapSubscription: SwapUpdateSubscription | undefined;
+    let tabLock: TerminalTabLock | undefined;
     let stopped = false;
 
     async function refreshPaymentState() {
-      if (!attempt || stopped) return;
+      if (!attempt || stopped || tabReadOnly) return;
       const now = Date.now();
       await loadTerminal().then(syncTerminalRecoveryBackups);
       await reconcileOpenPayments({ now });
@@ -83,7 +86,10 @@
           return;
         }
 
-        await loadTerminal();
+        const terminalConfig = await loadTerminal();
+        tabLock = createTerminalTabLock(terminalConfig.terminalPubkey, (state) => {
+          tabReadOnly = state.readonly;
+        });
         await refreshTransactions();
         const resumed = target ? await resumeSale(target) : undefined;
         if (!resumed) {
@@ -102,6 +108,7 @@
             swapIds: [resumed.attempt.swapId],
             async onUpdate(update) {
               if (stopped || update.id !== resumed.attempt.swapId || !sale || !attempt) return;
+              if (tabReadOnly) return;
               const applied =
                 update.status === 'transaction.mempool' || update.status === 'transaction.confirmed'
                   ? await claimLiquidReverseSwap(config, {
@@ -144,11 +151,12 @@
       stopped = true;
       if (pollTimer) clearInterval(pollTimer);
       swapSubscription?.close();
+      tabLock?.close();
     };
   });
 
   async function settle() {
-    if (!sale || !attempt) return;
+    if (!sale || !attempt || tabReadOnly) return;
     settling = true;
     const receiptMethod: PaymentMethod = boltCardPending ? 'bolt_card' : selectedMethod;
     const selectedAttempt = { ...attempt, method: receiptMethod, paymentData: activePaymentData };
@@ -164,6 +172,7 @@
   }
 
   async function selectMethod(method: PaymentMethod) {
+    if (tabReadOnly) return;
     selectedMethod = method;
     boltCardPending = false;
     boltCardMessage = '';
@@ -179,7 +188,7 @@
   }
 
   async function startBoltCard() {
-    if (!attempt || !sale) return;
+    if (!attempt || !sale || tabReadOnly) return;
     boltCardPending = true;
     boltCardMessage = 'Hold the card near the back of this device.';
     attempt = {
@@ -234,6 +243,11 @@
         </div>
       {:else if sale && attempt}
         <div class="mx-auto flex max-w-md flex-col items-center gap-5">
+          {#if tabReadOnly}
+            <div class="w-full rounded-md bg-[#ffe0d9] px-4 py-3 text-center text-sm font-semibold text-[#8c2d28]">
+              Terminal open in another tab. Close the other tab to finish payments here.
+            </div>
+          {/if}
           <div class="flex w-full flex-col items-center gap-1">
             <div class="flex items-baseline gap-3">
               <p class="font-display text-7xl tabular-nums tracking-display leading-none">{formatFiat(sale.amountFiat, sale.fiatCurrency)}</p>
@@ -254,6 +268,7 @@
                     : 'text-[#5f5547] dark:text-[#c9bca7]'
                 }`}
                 onclick={() => selectMethod(tab.method)}
+                disabled={tabReadOnly}
               >
                 {tab.label}
               </button>
@@ -264,7 +279,7 @@
             <QrCard
               value={activePaymentData}
               label={`${tabs.find((t) => t.method === selectedMethod)?.label ?? 'Payment'} payment code`}
-              showBoltCard={selectedMethod === 'lightning_swap'}
+              showBoltCard={selectedMethod === 'lightning_swap' && !tabReadOnly}
               onBoltCard={startBoltCard}
             />
           {/if}
@@ -284,7 +299,7 @@
               type="button"
               class="mt-2 text-xs font-semibold text-[#776b5a] underline-offset-4 hover:underline disabled:opacity-50 dark:text-[#b9aa91]"
               onclick={settle}
-              disabled={settling}
+              disabled={settling || tabReadOnly}
             >
               {#if settling}
                 <span class="inline-flex items-center gap-2"><BullSpinner size={16} /> Finishing…</span>
