@@ -10,32 +10,49 @@ const defaultRelays = [
   'wss://nos.lol',
 ];
 
-void main(List<String> args) async {
-  final parser = ArgParser()
-    ..addCommand('create-pos')
-    ..addCommand('pairing-code')
-    ..addCommand('fetch-pairing')
-    ..addCommand('pos-url')
-    ..addCommand('announce-terminal')
-    ..addCommand('auth-terminal')
-    ..addCommand('revoke-terminal')
-    ..addCommand('publish-events')
-    ..addCommand('record-sale')
-    ..addCommand('list-events')
-    ..addCommand('list-sales')
-    ..addCommand('export-sales')
-    ..addCommand('recover-swaps')
-    ..addCommand('quote');
+const _usage = '''
+nostr_pos — Dart controller CLI for the open Nostr POS protocol.
 
-  if (args.isEmpty) {
-    stdout.writeln('Commands: create-pos, pos-url, pairing-code, quote');
-    exitCode = 64;
+Streamlined demo flow (run alongside the web cashier):
+  init           Generate merchant + recovery keys and write .nostr-pos/profile.json
+  serve-pos      Publish the POS profile and print the pairing URL for the PWA
+  pair-terminal  Watch relays for the pairing code, sign + publish the auth event
+
+Lower-level commands:
+  create-pos          Build a POS profile event and append it to the local store
+  pos-url             Print the naddr-encoded URL the cashier scans
+  pairing-code        Derive the pairing code from a terminal pubkey
+  announce-terminal   Build a pairing-announcement event (test/dev only)
+  fetch-pairing       Look up a pairing announcement on relays
+  auth-terminal       Build the encrypted terminal-authorization event
+  revoke-terminal     Build the terminal-revocation event
+  publish-events      Push local-store events to relays (--kind / --limit)
+  record-sale         Record sale-created + payment-status + receipt locally
+  list-events         List events from the local store or relays
+  list-sales          Reduce sales/payment/receipt events into a sales table
+  export-sales        Export sales as csv or json
+  recover-swaps       Inspect / broadcast swap recovery records
+  quote               Fetch a Bull Bitcoin index price quote
+
+Run any command with no args to see its options.
+''';
+
+void main(List<String> args) async {
+  if (args.isEmpty || args.first == '--help' || args.first == '-h') {
+    stdout.write(_usage);
+    if (args.isEmpty) exitCode = 64;
     return;
   }
 
   final command = args.first;
   final rest = args.skip(1).toList();
   switch (command) {
+    case 'init':
+      await _init(rest);
+    case 'serve-pos':
+      await _servePos(rest);
+    case 'pair-terminal':
+      await _pairTerminal(rest);
     case 'create-pos':
       await _createPos(rest);
     case 'pairing-code':
@@ -65,8 +82,314 @@ void main(List<String> args) async {
     case 'quote':
       await _quote(rest);
     default:
-      stdout.writeln(parser.usage);
+      stdout.write(_usage);
       exitCode = 64;
+  }
+}
+
+class _DemoProfile {
+  _DemoProfile({
+    required this.merchantPrivkey,
+    required this.merchantPubkey,
+    required this.recoveryPrivkey,
+    required this.recoveryPubkey,
+    required this.posId,
+    required this.name,
+    required this.merchantName,
+    required this.currency,
+    required this.relays,
+    required this.store,
+    required this.baseUrl,
+  });
+
+  final String merchantPrivkey;
+  final String merchantPubkey;
+  final String recoveryPrivkey;
+  final String recoveryPubkey;
+  final String posId;
+  final String name;
+  final String merchantName;
+  final String currency;
+  final List<String> relays;
+  final String store;
+  final String baseUrl;
+
+  Map<String, Object?> toJson() => {
+    'version': 1,
+    'merchant': {'privkey': merchantPrivkey, 'pubkey': merchantPubkey},
+    'recovery': {'privkey': recoveryPrivkey, 'pubkey': recoveryPubkey},
+    'pos_id': posId,
+    'name': name,
+    'merchant_name': merchantName,
+    'currency': currency,
+    'relays': relays,
+    'store': store,
+    'base_url': baseUrl,
+  };
+
+  static _DemoProfile fromJson(Map<String, Object?> json) {
+    final merchant = (json['merchant'] as Map).cast<String, Object?>();
+    final recovery = (json['recovery'] as Map).cast<String, Object?>();
+    return _DemoProfile(
+      merchantPrivkey: merchant['privkey']! as String,
+      merchantPubkey: merchant['pubkey']! as String,
+      recoveryPrivkey: recovery['privkey']! as String,
+      recoveryPubkey: recovery['pubkey']! as String,
+      posId: json['pos_id']! as String,
+      name: json['name']! as String,
+      merchantName: json['merchant_name']! as String,
+      currency: json['currency']! as String,
+      relays: (json['relays']! as List).cast<String>(),
+      store: json['store']! as String,
+      baseUrl: json['base_url']! as String,
+    );
+  }
+}
+
+const _profilePath = '.nostr-pos/profile.json';
+
+Future<_DemoProfile?> _loadProfile(String path) async {
+  final file = File(path);
+  if (!await file.exists()) return null;
+  return _DemoProfile.fromJson(
+    jsonDecode(await file.readAsString()) as Map<String, Object?>,
+  );
+}
+
+Future<_DemoProfile> _requireProfile(String path) async {
+  final profile = await _loadProfile(path);
+  if (profile == null) {
+    stderr.writeln(
+      'No profile at $path. Run `dart run bin/nostr_pos.dart init` first.',
+    );
+    exit(66);
+  }
+  return profile;
+}
+
+Future<void> _init(List<String> args) async {
+  final parser = ArgParser()
+    ..addOption('profile', defaultsTo: _profilePath)
+    ..addOption('store', defaultsTo: '.nostr-pos/events.jsonl')
+    ..addOption('pos-id')
+    ..addOption('name', defaultsTo: 'Counter 1')
+    ..addOption('merchant', defaultsTo: 'Demo Merchant')
+    ..addOption('currency', defaultsTo: 'USD')
+    ..addOption('relays', defaultsTo: defaultRelays.join(','))
+    ..addOption('base-url', defaultsTo: 'https://pay.bullbitcoin.com/#/pos')
+    ..addOption('merchant-privkey', help: 'Reuse an existing 32-byte hex key.')
+    ..addOption('recovery-privkey', help: 'Reuse an existing 32-byte hex key.')
+    ..addFlag(
+      'force',
+      defaultsTo: false,
+      help: 'Overwrite an existing profile file.',
+    );
+  final parsed = parser.parse(args);
+  final profilePath = parsed['profile'] as String;
+  final file = File(profilePath);
+  if (await file.exists() && parsed['force'] != true) {
+    stderr.writeln(
+      'Refusing to overwrite $profilePath. Pass --force to regenerate.',
+    );
+    exitCode = 73;
+    return;
+  }
+
+  final merchantPrivkey =
+      (parsed['merchant-privkey'] as String?) ?? randomAuxHex();
+  final recoveryPrivkey =
+      (parsed['recovery-privkey'] as String?) ?? randomAuxHex();
+  final posId =
+      (parsed['pos-id'] as String?) ??
+      'demo-${DateTime.now().millisecondsSinceEpoch ~/ 1000}';
+  final profile = _DemoProfile(
+    merchantPrivkey: merchantPrivkey,
+    merchantPubkey: publicKeyFromPrivateKey(merchantPrivkey),
+    recoveryPrivkey: recoveryPrivkey,
+    recoveryPubkey: publicKeyFromPrivateKey(recoveryPrivkey),
+    posId: posId,
+    name: parsed['name'] as String,
+    merchantName: parsed['merchant'] as String,
+    currency: parsed['currency'] as String,
+    relays: _parseRelays(parsed['relays'] as String),
+    store: parsed['store'] as String,
+    baseUrl: parsed['base-url'] as String,
+  );
+  await file.parent.create(recursive: true);
+  await file.writeAsString(
+    '${const JsonEncoder.withIndent('  ').convert(profile.toJson())}\n',
+  );
+
+  stdout
+    ..writeln('Wrote $profilePath')
+    ..writeln('  merchant pubkey:  ${profile.merchantPubkey}')
+    ..writeln('  recovery pubkey:  ${profile.recoveryPubkey}')
+    ..writeln('  pos id:           ${profile.posId}')
+    ..writeln('  store:            ${profile.store}')
+    ..writeln('  relays:           ${profile.relays.join(", ")}')
+    ..writeln('')
+    ..writeln('Next:')
+    ..writeln('  dart run bin/nostr_pos.dart serve-pos')
+    ..writeln('  dart run bin/nostr_pos.dart pair-terminal --pairing-code XXXX-XXXX');
+}
+
+Future<void> _servePos(List<String> args) async {
+  final parser = ArgParser()
+    ..addOption('profile', defaultsTo: _profilePath)
+    ..addFlag(
+      'publish',
+      defaultsTo: true,
+      help: 'Publish the profile event to the configured relays.',
+    );
+  final parsed = parser.parse(args);
+  final profile = await _requireProfile(parsed['profile'] as String);
+
+  final posProfile = PosProfile(
+    name: profile.name,
+    merchantName: profile.merchantName,
+    currency: profile.currency,
+    description: 'Retail counter',
+    relays: profile.relays,
+  );
+  final event = signNostrPosEvent(
+    buildPosProfileEvent(
+      merchantPubkey: profile.merchantPubkey,
+      posId: profile.posId,
+      profile: posProfile,
+    ),
+    profile.merchantPrivkey,
+  );
+  await LocalEventStore(profile.store).append(event);
+
+  final url = posProfileUrl(
+    baseUrl: profile.baseUrl,
+    identifier: profile.posId,
+    pubkey: profile.merchantPubkey,
+    relays: profile.relays,
+  );
+
+  stdout
+    ..writeln('POS profile event id: ${event.id}')
+    ..writeln('Local store:          ${profile.store}');
+
+  if (parsed['publish'] == true) {
+    final results = await publishEventToRelays(
+      relays: profile.relays,
+      event: event,
+    );
+    final ok = results.where((r) => r.ok).length;
+    stdout.writeln('Published profile to $ok/${results.length} relays.');
+    for (final result in results.where((r) => !r.ok)) {
+      stdout.writeln('  ! ${result.relay}: ${result.message}');
+    }
+  }
+
+  stdout
+    ..writeln('')
+    ..writeln('Open this URL on the cashier device to start activation:')
+    ..writeln('  $url');
+}
+
+Future<void> _pairTerminal(List<String> args) async {
+  final parser = ArgParser()
+    ..addOption('profile', defaultsTo: _profilePath)
+    ..addOption('pairing-code', mandatory: true)
+    ..addOption(
+      'descriptor',
+      help: 'Liquid CT descriptor (defaults to a demo placeholder).',
+    )
+    ..addOption('fingerprint', defaultsTo: 'demo-fingerprint')
+    ..addOption('branch', defaultsTo: '17')
+    ..addOption('terminal-name', defaultsTo: 'Counter 1')
+    ..addOption(
+      'timeout-seconds',
+      defaultsTo: '60',
+      help: 'How long to wait for the pairing announcement on relays.',
+    )
+    ..addOption(
+      'poll-seconds',
+      defaultsTo: '2',
+      help: 'Polling interval while waiting for the pairing announcement.',
+    );
+  final parsed = parser.parse(args);
+  final profile = await _requireProfile(parsed['profile'] as String);
+  final code = (parsed['pairing-code'] as String).trim().toUpperCase();
+  final descriptor =
+      (parsed['descriptor'] as String?) ??
+      'ct(slip77(00),elwpkh([00000000/84h/1776h/0h]xpub-demo/0/*))';
+
+  final timeout = Duration(
+    seconds: int.parse(parsed['timeout-seconds'] as String),
+  );
+  final poll = Duration(seconds: int.parse(parsed['poll-seconds'] as String));
+  final deadline = DateTime.now().add(timeout);
+
+  stdout.writeln('Watching ${profile.relays.length} relays for $code…');
+  NostrPosEvent? pairing;
+  while (DateTime.now().isBefore(deadline)) {
+    pairing = await findPairingAnnouncement(
+      relays: profile.relays,
+      pairingCode: code,
+    );
+    if (pairing != null) break;
+    await Future<void>.delayed(poll);
+  }
+  if (pairing == null) {
+    stderr.writeln('Timed out: no pairing announcement for $code.');
+    exitCode = 66;
+    return;
+  }
+
+  final terminalPubkey = pairing.tags.firstWhere((tag) => tag[0] == 'p')[1];
+  final store = LocalEventStore(profile.store);
+  await store.append(pairing);
+
+  final authorization = TerminalAuthorization(
+    posRef: posRef(
+      merchantPubkey: profile.merchantPubkey,
+      posId: profile.posId,
+    ),
+    terminalPubkey: terminalPubkey,
+    terminalName: parsed['terminal-name'] as String,
+    pairingCodeHint: code,
+    ctDescriptor: descriptor,
+    descriptorFingerprint: parsed['fingerprint'] as String,
+    terminalBranch: int.parse(parsed['branch'] as String),
+    merchantRecoveryPubkey: profile.recoveryPubkey,
+    expiresAt:
+        DateTime.now().add(const Duration(days: 365)).millisecondsSinceEpoch ~/
+        1000,
+  );
+  final unsigned = buildTerminalAuthorizationEvent(
+    merchantPubkey: profile.merchantPubkey,
+    posId: profile.posId,
+    authorization: authorization,
+  );
+  final encrypted = replaceEventContent(
+    unsigned,
+    await nip44EncryptToPubkey(
+      plaintext: unsigned.content,
+      privateKeyHex: profile.merchantPrivkey,
+      publicKeyHex: terminalPubkey,
+    ),
+  );
+  final signed = signNostrPosEvent(encrypted, profile.merchantPrivkey);
+  await store.append(signed);
+
+  final results = await publishEventToRelays(
+    relays: profile.relays,
+    event: signed,
+  );
+  final ok = results.where((r) => r.ok).length;
+  stdout
+    ..writeln('Authorized terminal ${terminalPubkey.substring(0, 12)}…')
+    ..writeln('Authorization event:  ${signed.id}')
+    ..writeln('Published auth to $ok/${results.length} relays.');
+  for (final result in results.where((r) => !r.ok)) {
+    stdout.writeln('  ! ${result.relay}: ${result.message}');
+  }
+  if (ok == 0) {
+    exitCode = 70;
   }
 }
 
