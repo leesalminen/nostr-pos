@@ -30,13 +30,13 @@ void main() {
 
   test('builds POS profile URLs for the PWA route', () {
     final url = posProfileUrl(
-      baseUrl: 'https://pay.bullbitcoin.com/#/pos',
+      baseUrl: 'https://nostr-pos.vercel.app/#/pos',
       identifier: 'seguras',
       pubkey: 'a' * 64,
       relays: ['wss://one'],
     );
 
-    expect(url, startsWith('https://pay.bullbitcoin.com/#/pos/naddr1'));
+    expect(url, startsWith('https://nostr-pos.vercel.app/#/pos/naddr1'));
     expect(naddrDecode(url.split('/').last).identifier, 'seguras');
   });
 }

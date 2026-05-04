@@ -3,6 +3,7 @@
   import { ShieldCheck } from 'lucide-svelte';
   import BullFooter from '../lib/ui/BullFooter.svelte';
   import Button from '../lib/ui/Button.svelte';
+  import QrCard from '../lib/ui/QrCard.svelte';
   import { activateTerminal, loadTerminal, terminal } from '../lib/stores/terminal';
   import { announcePairingRequest } from '../lib/activation/pairing';
   import { syncTerminalApproval } from '../lib/activation/approval-sync';
@@ -10,6 +11,7 @@
   let announced = $state(false);
   let requestMessage = $state('Preparing approval request...');
   const isDev = import.meta.env.DEV;
+  const pairingCode = $derived($terminal?.pairingCode);
 
   onMount(() => {
     let timer: ReturnType<typeof setInterval> | undefined;
@@ -45,9 +47,18 @@
     <ShieldCheck class="mx-auto text-[#1f513a]" size={44} />
     <h1 class="mt-5 text-3xl font-black">Activate this terminal</h1>
     <p class="mt-3 text-[#776b5a] dark:text-[#b9aa91]">Open the merchant wallet, choose Connect terminal, and enter this code.</p>
-    <div class="my-8 rounded-md border border-[#d7c8b4] bg-[#fffaf0] px-5 py-7 text-5xl font-black tracking-[0.12em] shadow-sm dark:border-[#3a342a] dark:bg-[#211f1a]">
-      {$terminal?.pairingCode ?? '4F7G-YJDP'}
-    </div>
+    {#if pairingCode}
+      <div class="my-8 rounded-md border border-[#d7c8b4] bg-[#fffaf0] px-5 py-7 text-5xl font-black tracking-[0.12em] shadow-sm dark:border-[#3a342a] dark:bg-[#211f1a]">
+        {pairingCode}
+      </div>
+      <div class="mx-auto mb-6 max-w-xs">
+        <QrCard value={pairingCode} label="Terminal pairing code" />
+      </div>
+    {:else}
+      <div class="my-8 rounded-md border border-[#d7c8b4] bg-[#fffaf0] px-5 py-7 text-lg font-bold shadow-sm dark:border-[#3a342a] dark:bg-[#211f1a]">
+        Preparing code...
+      </div>
+    {/if}
     <p class="mb-5 text-sm text-[#776b5a] dark:text-[#b9aa91]">
       {announced ? requestMessage : 'Preparing approval request...'}
     </p>

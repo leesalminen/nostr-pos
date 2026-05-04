@@ -159,6 +159,7 @@ class _DemoProfile {
 }
 
 const _profilePath = '.nostr-pos/profile.json';
+const _defaultPosBaseUrl = 'https://nostr-pos.vercel.app/#/pos';
 
 Future<_DemoProfile?> _loadProfile(String path) async {
   final file = File(path);
@@ -193,7 +194,7 @@ Future<void> _init(List<String> args) async {
       allowed: ['mainnet', 'testnet'],
     )
     ..addOption('relays', defaultsTo: defaultRelays.join(','))
-    ..addOption('base-url', defaultsTo: 'https://pay.bullbitcoin.com/#/pos')
+    ..addOption('base-url', defaultsTo: _defaultPosBaseUrl)
     ..addOption('merchant-privkey', help: 'Reuse an existing 32-byte hex key.')
     ..addOption('recovery-privkey', help: 'Reuse an existing 32-byte hex key.')
     ..addFlag(
@@ -320,7 +321,8 @@ Future<void> _pairTerminal(List<String> args) async {
     ..addOption('pairing-code', mandatory: true)
     ..addOption(
       'descriptor',
-      help: 'Liquid CT descriptor (defaults to a demo placeholder).',
+      mandatory: true,
+      help: 'Liquid CT descriptor for this terminal authorization.',
     )
     ..addOption('fingerprint', defaultsTo: 'demo-fingerprint')
     ..addOption('branch', defaultsTo: '17')
@@ -341,9 +343,12 @@ Future<void> _pairTerminal(List<String> args) async {
   final parsed = parser.parse(args);
   final profile = await _requireProfile(parsed['profile'] as String);
   final code = (parsed['pairing-code'] as String).trim().toUpperCase();
-  final descriptor =
-      (parsed['descriptor'] as String?) ??
-      'ct(slip77(00),elwpkh([00000000/84h/1776h/0h]xpub-demo/0/*))';
+  final descriptor = (parsed['descriptor'] as String).trim();
+  if (descriptor.isEmpty) {
+    stderr.writeln('Liquid CT descriptor is required.');
+    exitCode = 64;
+    return;
+  }
 
   final timeout = Duration(
     seconds: int.parse(parsed['timeout-seconds'] as String),
@@ -684,7 +689,7 @@ void _posUrl(List<String> args) {
     ..addOption('merchant-pubkey', defaultsTo: 'a' * 64)
     ..addOption('merchant-privkey')
     ..addOption('relays', defaultsTo: defaultRelays.join(','))
-    ..addOption('base-url', defaultsTo: 'https://pay.bullbitcoin.com/#/pos');
+    ..addOption('base-url', defaultsTo: _defaultPosBaseUrl);
   final parsed = parser.parse(args);
   final merchantPrivkey = parsed['merchant-privkey'] as String?;
   final merchantPubkey = merchantPrivkey == null
@@ -756,7 +761,8 @@ Future<void> _authTerminal(List<String> args) async {
     ..addOption('terminal-name', defaultsTo: 'Counter 1')
     ..addOption(
       'descriptor',
-      defaultsTo: 'ct(slip77(00),elwpkh([00000000/84h/1776h/0h]xpub-demo/0/*))',
+      mandatory: true,
+      help: 'Liquid CT descriptor for this terminal authorization.',
     )
     ..addOption('fingerprint', defaultsTo: 'demo-fingerprint')
     ..addOption('branch', defaultsTo: '17')

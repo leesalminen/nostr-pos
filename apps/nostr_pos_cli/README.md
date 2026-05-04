@@ -58,7 +58,7 @@ signed and published. The PWA picks it up and unlocks the keypad.
 - `--pos-id <id>` — defaults to `demo-<unix-ts>`.
 - `--name`, `--merchant`, `--currency` — POS profile metadata.
 - `--relays <csv>` — defaults to `wss://no.str.cr,wss://relay.primal.net,wss://nos.lol`.
-- `--base-url <url>` — defaults to `https://pay.bullbitcoin.com/#/pos`. Point at
+- `--base-url <url>` — defaults to `https://nostr-pos.vercel.app/#/pos`. Point at
   your local PWA build (e.g. `http://localhost:4173/#/pos`) for offline demos.
 - `--merchant-privkey`, `--recovery-privkey` — reuse existing 32-byte hex keys.
 - `--force` — overwrite an existing profile file.
@@ -109,7 +109,7 @@ Every command supports `--store <path>`; defaults to `.nostr-pos/events.jsonl`.
   "currency": "USD",
   "relays": ["wss://no.str.cr", "wss://relay.primal.net", "wss://nos.lol"],
   "store": ".nostr-pos/events.jsonl",
-  "base_url": "https://pay.bullbitcoin.com/#/pos"
+  "base_url": "https://nostr-pos.vercel.app/#/pos"
 }
 ```
 

@@ -9,7 +9,8 @@
     '/receipt/:saleId': wrap({ asyncComponent: () => import('./routes/Receipt.svelte') }),
     '/transactions': wrap({ asyncComponent: () => import('./routes/Transactions.svelte') }),
     '/settings': wrap({ asyncComponent: () => import('./routes/Settings.svelte') }),
-    '/settings/advanced': wrap({ asyncComponent: () => import('./routes/settings/advanced/SettingsAdvanced.svelte') })
+    '/settings/advanced': wrap({ asyncComponent: () => import('./routes/settings/advanced/SettingsAdvanced.svelte') }),
+    '/:saleId': wrap({ asyncComponent: () => import('./routes/Pos.svelte') })
   };
 </script>
 

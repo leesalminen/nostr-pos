@@ -72,7 +72,7 @@ Future<void> main() async {
 
   // 4. Print the URL the cashier scans.
   print(posProfileUrl(
-    baseUrl: 'https://pay.bullbitcoin.com/#/pos',
+    baseUrl: 'https://nostr-pos.vercel.app/#/pos',
     identifier: 'demo-1',
     pubkey: merchantPub,
     relays: profile.relays,

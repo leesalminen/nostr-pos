@@ -286,13 +286,13 @@ No dynamic Bull backend is required. Static hosting options:
 
 ```text
 https://pos.example/#/pos/naddr1...
-https://pay.bullbitcoin.com/#/pos/naddr1...
+https://nostr-pos.vercel.app/#/pos/naddr1...
 https://merchant.example/pos/#/pos/naddr1...
 IPFS mirror
 local PWA install
 ```
 
-If `pay.bullbitcoin.com` goes offline but the PWA is already installed or mirrored, the POS profile remains usable with relays and payment backends.
+If the hosted PWA goes offline but the PWA is already installed or mirrored, the POS profile remains usable with relays and payment backends.
 
 ---
 
@@ -2240,7 +2240,7 @@ The system may use:
   a clear error — no silent staleness beyond 5 minutes)
 ```
 
-The app must be mirrorable and portable. If `pay.bullbitcoin.com` goes offline but the PWA is already installed or mirrored, the POS profile remains usable with relays and payment backends.
+The app must be mirrorable and portable. If the hosted PWA goes offline but the PWA is already installed or mirrored, the POS profile remains usable with relays and payment backends.
 
 ---
 
