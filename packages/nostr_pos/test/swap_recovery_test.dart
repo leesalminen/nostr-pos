@@ -15,6 +15,7 @@ void main() {
         'sale_id': 'sale1',
         'payment_attempt_id': 'attempt1',
         'swap_id': 'swap1',
+        'terminal_id': 'term1',
         'expires_at': DateTime.now().millisecondsSinceEpoch ~/ 1000 + 3600,
         'encrypted_local_blob': 'ciphertext',
         'claim': {
@@ -34,6 +35,28 @@ void main() {
       recoveryClaimPlan(recoveries).single['action'],
       'broadcast_prepared_claim',
     );
+  });
+
+  test('extracts terminal id from private recovery content', () {
+    final event = buildUnsignedEvent(
+      pubkey: 'c' * 64,
+      kind: NostrPosKinds.swapRecoveryBackup,
+      tags: [
+        ['swap', 'swap1'],
+      ],
+      content: {
+        'sale_id': 'sale1',
+        'payment_attempt_id': 'attempt1',
+        'swap_id': 'swap1',
+        'terminal_id': 'term1',
+        'expires_at': DateTime.now().millisecondsSinceEpoch ~/ 1000 + 3600,
+        'encrypted_local_blob': 'ciphertext',
+      },
+    );
+
+    final recoveries = swapRecoveriesFromEvents([event]);
+
+    expect(recoveries.single.terminalId, 'term1');
   });
 
   test('decrypts terminal WebCrypto recovery blobs', () async {

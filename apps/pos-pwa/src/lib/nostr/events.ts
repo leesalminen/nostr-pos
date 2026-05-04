@@ -140,6 +140,7 @@ export function swapRecoveryEvent(input: {
       sale_id: input.saleId,
       payment_attempt_id: input.paymentAttemptId,
       swap_id: input.swapId,
+      terminal_id: input.terminalId,
       encrypted_local_blob: input.encryptedLocalBlob,
       expires_at: Math.floor(input.expiresAt / 1000),
       lockup_txid: input.lockupTxid ?? null,

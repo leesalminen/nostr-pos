@@ -71,6 +71,8 @@ describe('local protocol events', () => {
     expect(event.kind).toBe(9381);
     expect(event.tags).toContainEqual(['swap', 'swap1']);
     expect(event.tags).toContainEqual(['p', 'b'.repeat(64)]);
+    expect(event.tags.some((tag) => tag[0] === 'terminal')).toBe(false);
+    expect(event.content.terminal_id).toBe('term1');
     expect(event.content.encrypted_local_blob).toBe('ciphertext');
     expect(event.content.claim).toMatchObject({ claim_tx_hex: 'claimhex' });
   });

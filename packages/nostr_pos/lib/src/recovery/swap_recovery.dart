@@ -87,11 +87,13 @@ List<SwapRecoverySummary> swapRecoveriesFromEvents(List<NostrPosEvent> events) {
     final content = jsonDecode(event.content) as Map<String, Object?>;
     final swapId = content['swap_id'] as String?;
     if (swapId == null) continue;
-    final terminalId = event.tags
-        .where((tag) => tag.length >= 2 && tag[0] == 'terminal')
-        .map((tag) => tag[1])
-        .cast<String?>()
-        .firstOrNull;
+    final terminalId =
+        content['terminal_id'] as String? ??
+        event.tags
+            .where((tag) => tag.length >= 2 && tag[0] == 'terminal')
+            .map((tag) => tag[1])
+            .cast<String?>()
+            .firstOrNull;
     final claim = content['claim'] is Map
         ? (content['claim'] as Map).cast<String, Object?>()
         : const <String, Object?>{};
