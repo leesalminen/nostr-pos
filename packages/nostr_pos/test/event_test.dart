@@ -53,12 +53,16 @@ void main() {
     final authorization = TerminalAuthorization(
       posRef: posRef(merchantPubkey: 'a' * 64, posId: 'seguras'),
       terminalPubkey: 'b' * 64,
+      terminalId: '1' * 32,
       terminalName: 'Counter 1',
       pairingCodeHint: 'ABCD-EFGH',
       ctDescriptor: 'ct(slip77(00),elwpkh(xpub-demo/0/*))',
       descriptorFingerprint: 'demo-fingerprint',
       terminalBranch: 17,
       merchantRecoveryPubkey: 'c' * 64,
+      saleBucketSecret: 'd' * 64,
+      saleBucketGeneration: 1,
+      effectiveFromEpochDay: 19800,
       expiresAt: 1790000000,
       network: PosNetwork.testnet,
     );
@@ -91,6 +95,12 @@ void main() {
     expect(
       event.tags.any(
         (tag) => tag.length == 2 && tag[0] == 'expiration' && tag[1] == '400',
+      ),
+      isFalse,
+    );
+    expect(
+      event.tags.any(
+        (tag) => tag.length == 2 && tag[0] == 'expiration' && tag[1] == '220',
       ),
       isTrue,
     );

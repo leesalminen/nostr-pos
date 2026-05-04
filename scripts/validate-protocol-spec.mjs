@@ -12,6 +12,8 @@ const vectorsDir = path.join(specDir, 'test-vectors');
 const vectorSchemas = new Map([
   ['pos-profile.json', 'pos-profile.schema.json'],
   ['terminal-authorization.json', 'terminal-authorization.schema.json'],
+  ['terminal-revocation.json', 'terminal-revocation.schema.json'],
+  ['pairing.json', 'pairing.schema.json'],
   ['sale-created.json', 'sale-created.schema.json'],
   ['payment-status.json', 'payment-status.schema.json'],
   ['receipt.json', 'receipt.schema.json'],

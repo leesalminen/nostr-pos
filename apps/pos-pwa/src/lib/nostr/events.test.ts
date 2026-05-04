@@ -7,6 +7,7 @@ const sale: Sale = {
   receiptNumber: 'R-1',
   posRef: 'pos',
   terminalId: 'term1',
+  saleBucketTag: 'bucket1',
   amountFiat: '8500',
   fiatCurrency: 'CRC',
   amountSat: 25000,
@@ -36,18 +37,21 @@ describe('local protocol events', () => {
     expect(event.kind).toBe(30383);
     expect(event.tags).toContainEqual(['d', '4F7G-YJDP']);
     expect(event.tags).not.toContainEqual(['pairing', '4F7G-YJDP']);
-    expect(event.tags).toContainEqual(['expiration', '400']);
+    expect(event.tags).toContainEqual(['expiration', '220']);
   });
 
   it('builds sale/status/receipt payloads', () => {
     expect(saleCreatedEvent(sale).kind).toBe(9380);
-    expect(saleCreatedEvent(sale).tags).toContainEqual(['a', 'pos']);
+    expect(saleCreatedEvent(sale).tags).toContainEqual(['x', 'bucket1']);
+    expect(saleCreatedEvent(sale).tags).not.toContainEqual(['a', 'pos']);
     expect(saleCreatedEvent(sale).tags).not.toContainEqual(['sale', 'sale1']);
-    expect(paymentStatusEvent(sale, attempt).tags).toContainEqual(['a', 'pos']);
+    expect(paymentStatusEvent(sale, attempt).tags).toContainEqual(['x', 'bucket1']);
+    expect(paymentStatusEvent(sale, attempt).tags).not.toContainEqual(['a', 'pos']);
     expect(paymentStatusEvent(sale, attempt).tags).not.toContainEqual(['sale', 'sale1']);
     expect(paymentStatusEvent(sale, attempt).tags).not.toContainEqual(['status', 'settled']);
     expect(paymentStatusEvent(sale, attempt).content.status).toBe('settled');
-    expect(receiptEvent(sale, attempt).tags).toContainEqual(['a', 'pos']);
+    expect(receiptEvent(sale, attempt).tags).toContainEqual(['x', 'bucket1']);
+    expect(receiptEvent(sale, attempt).tags).not.toContainEqual(['a', 'pos']);
     expect(receiptEvent(sale, attempt).tags).not.toContainEqual(['sale', 'sale1']);
     expect(receiptEvent(sale, attempt).content.receipt_id).toBe('R-1');
   });

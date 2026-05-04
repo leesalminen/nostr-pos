@@ -31,6 +31,8 @@ describe('payment history merge', () => {
     activatedAt: 1000,
     maxInvoiceSat: 100000,
     syncServers: ['wss://one'],
+    saleBucketSecret: '0'.repeat(64),
+    saleBucketGeneration: 1,
     authorization: { merchant_recovery_pubkey: merchant.publicKey }
   };
 
@@ -72,9 +74,8 @@ describe('payment history merge', () => {
       {
         kind: 9382,
         tags: [
-          ['proto', 'nostr-pos', '0.2'],
-          ['sale', 'sale1'],
-          ['p', terminal.publicKey]
+          ['proto', 'nostr-pos', '0.3'],
+          ['x', 'bucket']
         ],
         content: encryptContent(content, terminal.privateKey, merchant.publicKey),
         created_at: 100
@@ -97,9 +98,8 @@ describe('payment history merge', () => {
       {
         kind: 9383,
         tags: [
-          ['proto', 'nostr-pos', '0.2'],
-          ['sale', 'sale1'],
-          ['p', terminal.publicKey]
+          ['proto', 'nostr-pos', '0.3'],
+          ['x', 'bucket']
         ],
         content: encryptContent({ sale_id: 'sale1', receipt_id: 'R-1', created_at: 100 }, terminal.privateKey, merchant.publicKey),
         created_at: 100
@@ -112,16 +112,16 @@ describe('payment history merge', () => {
     expect(sales.get('sale1')?.status).toBe('receipt_ready');
   });
 
-  it('queries payment history with the indexed p tag', async () => {
+  it('queries payment history with indexed bucket tags', async () => {
     const { mergePaymentHistory } = await import('./payment-history');
     const fetchEvents = vi.fn(async () => []);
 
     await expect(mergePaymentHistory(config, fetchEvents)).resolves.toBe(0);
 
-    expect(fetchEvents).toHaveBeenCalledWith(['wss://one'], {
-      kinds: [9382, 9383],
-      '#p': [terminal.publicKey],
-      limit: 100
-    });
+    expect(fetchEvents).toHaveBeenCalledOnce();
+    const [relays, filter] = fetchEvents.mock.calls[0] as unknown as [string[], Record<string, unknown>];
+    expect(relays).toEqual(['wss://one']);
+    expect(filter).toMatchObject({ kinds: [9382, 9383], limit: 100 });
+    expect(filter['#x']).toEqual(expect.arrayContaining([expect.any(String)]));
   });
 });

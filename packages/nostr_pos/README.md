@@ -155,16 +155,20 @@ final results = await executor.recoverClaims(recoveries);
 - **Events are signed with BIP340 Schnorr signatures** (`bip340` package). Until
   signed, an event has `sig: 'unsigned:<id>'` so it can still be persisted and
   diffed locally.
-- **All events carry `["proto", "nostr-pos", "0.2"]`** so callers and relays can
+- **All events carry `["proto", "nostr-pos", "0.3"]`** so callers and relays can
   filter on protocol version.
+- **Sale-stream events use daily HMAC bucket tags** (`x`) instead of POS `a`
+  tags or terminal `p` tags. The SDK exposes `dailyBucketTag`,
+  `bucketWindow`, and jittered sale-stream builders for v0.3 publishers and
+  subscribers.
 - **`LocalEventStore` is append-only JSONL.** Newer events for the same `d`-tag
   win on read; nothing is mutated in place.
 - **`NostrRelayClient` is intentionally thin.** Per-call WebSocket open/close
   keeps memory predictable and avoids subscription bookkeeping. Long-running
   apps that need pooled connections should wrap it.
 - **Recovery decryption is symmetric AES-GCM** keyed by
-  `sha256("nostr-pos:<terminal_id>")`. The terminal-id comes from a `terminal`
-  tag on the recovery event (or the caller passes it explicitly).
+  `sha256("nostr-pos:<terminal_id>")`. The terminal id is carried in encrypted
+  authorization content or passed explicitly by the caller.
 
 ## Testing
 

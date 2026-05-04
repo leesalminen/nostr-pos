@@ -4,12 +4,16 @@ class TerminalAuthorization {
   TerminalAuthorization({
     required this.posRef,
     required this.terminalPubkey,
+    required this.terminalId,
     required this.terminalName,
     required this.pairingCodeHint,
     required this.ctDescriptor,
     required this.descriptorFingerprint,
     required this.terminalBranch,
     required this.merchantRecoveryPubkey,
+    required this.saleBucketSecret,
+    required this.saleBucketGeneration,
+    required this.effectiveFromEpochDay,
     required this.expiresAt,
     this.network = PosNetwork.mainnet,
     this.maxInvoiceSat = 100000,
@@ -18,12 +22,16 @@ class TerminalAuthorization {
 
   final String posRef;
   final String terminalPubkey;
+  final String terminalId;
   final String terminalName;
   final String pairingCodeHint;
   final String ctDescriptor;
   final String descriptorFingerprint;
   final int terminalBranch;
   final String merchantRecoveryPubkey;
+  final String saleBucketSecret;
+  final int saleBucketGeneration;
+  final int effectiveFromEpochDay;
   final int expiresAt;
   final PosNetwork network;
   final int maxInvoiceSat;
@@ -33,6 +41,7 @@ class TerminalAuthorization {
     'type': 'terminal_authorization',
     'pos_ref': posRef,
     'terminal_pubkey': terminalPubkey,
+    'terminal_id': terminalId,
     'terminal_name': terminalName,
     'pairing_code_hint': pairingCodeHint,
     'network': network.protocolName,
@@ -65,6 +74,9 @@ class TerminalAuthorization {
       {'type': 'esplora', 'url': network.liquidEsploraApiBase},
     ],
     'merchant_recovery_pubkey': merchantRecoveryPubkey,
+    'sale_bucket_secret': saleBucketSecret,
+    'sale_bucket_generation': saleBucketGeneration,
+    'effective_from_epoch_day': effectiveFromEpochDay,
     'expires_at': expiresAt,
   };
 }

@@ -3,11 +3,12 @@
   "$id": "https://example.invalid/nostr-pos/terminal-authorization.schema.json",
   "title": "Terminal Authorization",
   "type": "object",
-  "required": ["type", "pos_ref", "terminal_pubkey", "terminal_name", "pairing_code_hint", "network", "asset", "settlement", "limits", "claim_mode", "swap_providers", "liquid_backends", "merchant_recovery_pubkey", "expires_at"],
+  "required": ["type", "pos_ref", "terminal_pubkey", "terminal_id", "terminal_name", "pairing_code_hint", "network", "asset", "settlement", "limits", "claim_mode", "swap_providers", "liquid_backends", "merchant_recovery_pubkey", "sale_bucket_secret", "sale_bucket_generation", "effective_from_epoch_day", "expires_at"],
   "properties": {
     "type": { "const": "terminal_authorization" },
     "pos_ref": { "type": "string" },
     "terminal_pubkey": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+    "terminal_id": { "type": "string", "pattern": "^[0-9a-fA-F]{32}$" },
     "terminal_name": { "type": "string" },
     "pairing_code_hint": { "type": "string", "pattern": "^[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$" },
     "network": { "enum": ["liquid-mainnet", "liquid-testnet", "liquid-regtest"] },
@@ -40,6 +41,9 @@
     "swap_providers": { "type": "array", "items": { "type": "object" } },
     "liquid_backends": { "type": "array", "items": { "type": "object" } },
     "merchant_recovery_pubkey": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+    "sale_bucket_secret": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+    "sale_bucket_generation": { "type": "integer", "minimum": 1 },
+    "effective_from_epoch_day": { "type": "integer" },
     "expires_at": { "type": "integer" }
   },
   "additionalProperties": false

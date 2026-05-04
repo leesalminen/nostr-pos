@@ -31,6 +31,9 @@ export function defaultTerminalConfig(): TerminalConfig {
     terminalId: keys.publicKey.slice(-8).toUpperCase(),
     terminalPubkey: keys.publicKey,
     terminalPrivkeyEnc: keys.privateKey,
+    saleBucketSecret: '0'.repeat(64),
+    saleBucketGeneration: 1,
+    saleBucketEffectiveFromEpochDay: 0,
     pairingCode: pairingCodeFromPubkey(keys.publicKey),
     authorization: {
       liquid_backends: [{ type: 'esplora', url: 'https://liquid.bullbitcoin.com/api' }]

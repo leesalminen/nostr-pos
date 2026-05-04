@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/nostr-pos/pairing.schema.json",
+  "title": "Pairing Announcement Content",
+  "type": "object",
+  "required": ["pairing_code", "terminal_pubkey", "created_at"],
+  "properties": {
+    "pairing_code": { "type": "string", "pattern": "^[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$" },
+    "terminal_pubkey": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+    "created_at": { "type": "integer", "minimum": 0 }
+  },
+  "additionalProperties": false
+}

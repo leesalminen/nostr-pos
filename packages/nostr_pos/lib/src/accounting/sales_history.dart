@@ -61,9 +61,14 @@ List<SaleSummary> salesHistoryFromEvents(List<NostrPosEvent> events) {
 Future<List<SaleSummary>> salesHistoryFromEventsForMerchant(
   List<NostrPosEvent> events, {
   required String merchantRecoveryPrivkey,
+  Set<String>? authorizedTerminalPubkeys,
 }) async {
   final decoded = <_DecodedAccountingEvent>[];
   for (final event in events) {
+    if (authorizedTerminalPubkeys != null &&
+        !authorizedTerminalPubkeys.contains(event.pubkey)) {
+      continue;
+    }
     final content = await _decodeMerchantAccountingEvent(
       event,
       merchantRecoveryPrivkey: merchantRecoveryPrivkey,
@@ -156,6 +161,10 @@ Future<_DecodedAccountingEvent?> _decodeMerchantAccountingEvent(
 bool _isAccountingEnvelope(NostrPosEvent event) {
   return event.idMatches &&
       event.hasProtocolTag &&
+      event.tags.any((tag) => tag.length >= 2 && tag[0] == 'x') &&
+      !event.tags.any(
+        (tag) => tag.isNotEmpty && (tag[0] == 'a' || tag[0] == 'p'),
+      ) &&
       (event.kind == NostrPosKinds.saleCreated ||
           event.kind == NostrPosKinds.paymentStatus ||
           event.kind == NostrPosKinds.receipt);

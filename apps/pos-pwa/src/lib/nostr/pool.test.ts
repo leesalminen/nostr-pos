@@ -8,7 +8,7 @@ describe('Nostr pool helpers', () => {
     const event = signEvent(
       {
         kind: 1,
-        tags: [['proto', 'nostr-pos', '0.2']],
+        tags: [['proto', 'nostr-pos', '0.3']],
         content: '{}',
         created_at: 100
       },

@@ -7,7 +7,7 @@ void main() {
       pubkey: 'a' * 64,
       kind: NostrPosKinds.saleCreated,
       tags: [
-        ['sale', 'sale1'],
+        ['x', 'bucket'],
       ],
       createdAt: 10,
       content: {
@@ -27,7 +27,7 @@ void main() {
       pubkey: 'a' * 64,
       kind: NostrPosKinds.paymentStatus,
       tags: [
-        ['sale', 'sale1'],
+        ['x', 'bucket'],
       ],
       createdAt: 11,
       content: {
@@ -42,7 +42,7 @@ void main() {
       pubkey: 'a' * 64,
       kind: NostrPosKinds.receipt,
       tags: [
-        ['sale', 'sale1'],
+        ['x', 'bucket'],
       ],
       createdAt: 12,
       content: {'receipt_id': 'R-1', 'sale_id': 'sale1', 'created_at': 12},
@@ -72,7 +72,7 @@ void main() {
       pubkey: terminalPubkey,
       kind: NostrPosKinds.saleCreated,
       tags: [
-        ['sale', 'sale1'],
+        ['x', 'bucket'],
       ],
       createdAt: 10,
       content: {
@@ -92,7 +92,7 @@ void main() {
       pubkey: terminalPubkey,
       kind: NostrPosKinds.paymentStatus,
       tags: [
-        ['sale', 'sale1'],
+        ['x', 'bucket'],
       ],
       createdAt: 11,
       content: {

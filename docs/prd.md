@@ -1,6 +1,6 @@
 # PRD: Open Nostr POS Protocol for Liquid Settlement + Lightning Swaps
 
-> **Status:** v0.2 — decisions locked for v1 implementation. Supersedes v0.1 (initial brief).
+> **Status:** v0.3 — protocol privacy hardening. Supersedes v0.2.
 > **Target:** ship v1 pilot to **Seguras Butcher** in ~14 engineering weeks (solo) / ~8–10 weeks (two engineers).
 > **Primary consumer of the Dart controller SDK:** [`SatoshiPortal/bullbitcoin-mobile`](https://github.com/SatoshiPortal/bullbitcoin-mobile) (Bull Wallet, Flutter).
 
@@ -1078,7 +1078,7 @@ A `.github/workflows/ui-copy-check.yml` enforces this.
 
 ---
 
-## 9. Nostr Protocol Specification (v0.2 draft)
+## 9. Nostr Protocol Specification (v0.3 draft)
 
 ### 9.1 Event Kind Allocation
 
@@ -1087,7 +1087,7 @@ Use experimental/custom kinds initially. v1 targets:
 ```text
 30380  POS Profile                     addressable, public
 30381  Terminal Authorization          addressable, encrypted content to terminal
-30382  Terminal Revocation             addressable, public
+30382  Terminal Revocation             addressable, encrypted content to terminal
 9380   Sale Created                    regular, encrypted in v1
 9381   Swap Recovery Backup            gift-wrapped to recovery keys
 9382   Payment Status                  regular, encrypted in v1
@@ -1099,17 +1099,14 @@ Use experimental/custom kinds initially. v1 targets:
 9388   Receipt Template                addressable, v1.1
 ```
 
-Every event must include:
+Every event must include the hard-cut v0.3 protocol tag:
 
 ```json
-["proto", "nostr-pos", "0.2"]
+["proto", "nostr-pos", "0.3"]
 ```
 
-Events referencing a POS profile must include an `a` tag:
-
-```json
-["a", "30380:<merchant-controller-pubkey>:<pos_id>"]
-```
+Readers reject events that do not carry the v0.3 tag. Sale-stream events no
+longer reference the public POS profile with an `a` tag.
 
 ### 9.2 POS Profile Event
 
@@ -1122,7 +1119,7 @@ Tags:
 ```json
 [
   ["d", "<pos_id>"],
-  ["proto", "nostr-pos", "0.2"],
+  ["proto", "nostr-pos", "0.3"],
   ["name", "Seguras Butcher"],
   ["merchant", "Seguras Butcher S.A."],
   ["method", "liquid"],
@@ -1132,9 +1129,8 @@ Tags:
   ["relay", "wss://no.str.cr"],
   ["relay", "wss://relay.primal.net"],
   ["relay", "wss://nos.lol"],
-  ["recovery_pubkey", "<merchant-recovery-pubkey-hex>"],
   ["claim_mode", "standard"],
-  ["version", "0.2"]
+  ["version", "0.3"]
 ]
 ```
 
@@ -1200,10 +1196,8 @@ Tags:
 
 ```json
 [
-  ["d", "<pos_id>:<terminal_pubkey>"],
-  ["proto", "nostr-pos", "0.2"],
-  ["a", "30380:<merchant-controller-pubkey>:<pos_id>"],
-  ["p", "<terminal_pubkey>"],
+  ["d", "<pos_id>:<terminal_id>"],
+  ["proto", "nostr-pos", "0.3"],
   ["expires", "<unix_timestamp>"]
 ]
 ```
@@ -1215,6 +1209,7 @@ Encrypted content (NIP-44 v2) to terminal:
   "type": "terminal_authorization",
   "pos_ref": "30380:<merchant-controller-pubkey>:<pos_id>",
   "terminal_pubkey": "...",
+  "terminal_id": "<32-char random hex>",
   "terminal_name": "Counter 1",
   "pairing_code_hint": "4F7K-92XP",
   "network": "liquid-mainnet",
@@ -1245,6 +1240,9 @@ Encrypted content (NIP-44 v2) to terminal:
     { "type": "esplora", "url": "https://liquid.bullbitcoin.com/api" }
   ],
   "merchant_recovery_pubkey": "<hex>",
+  "sale_bucket_secret": "<64-char random hex shared by this POS generation>",
+  "sale_bucket_generation": 1,
+  "effective_from_epoch_day": 19800,
   "expires_at": 1777600000
 }
 ```
@@ -1252,6 +1250,12 @@ Encrypted content (NIP-44 v2) to terminal:
 Notes:
 - `limits.max_invoice_sat` default is **100,000 sats** (~$79 USD at scoping). This is the primary mitigation for the §15 standard-swap theft vector. Merchants may raise but should document risk.
 - `pairing_code_hint` lets the terminal sanity-check that the authorization matches the code it displayed.
+- `terminal_id` is an opaque random identifier, not derived from the terminal pubkey.
+- `sale_bucket_secret`, `sale_bucket_generation`, and
+  `effective_from_epoch_day` drive sale-stream `x` tags. Terminals discover
+  authorizations by querying `{authors:[merchantPubkey], kinds:[30381]}` and
+  try-decrypting candidates; after first decrypt they cache `terminal_id` and
+  can re-fetch by `#d:["<pos_id>:<terminal_id>"]`.
 - `claim_mode` defaults to the POS profile value. Reserved for per-terminal override in v1.1.
 - Production pilot status: Dart `auth-terminal` encrypts kind-30381 content with
   NIP-44 v2 to the terminal pubkey when signed with the merchant private key.
@@ -1268,15 +1272,13 @@ Tags:
 
 ```json
 [
-  ["d", "<pos_id>:<terminal_pubkey>"],
-  ["proto", "nostr-pos", "0.2"],
-  ["a", "30380:<merchant-controller-pubkey>:<pos_id>"],
-  ["p", "<terminal_pubkey>"],
+  ["d", "<pos_id>:<terminal_id>"],
+  ["proto", "nostr-pos", "0.3"],
   ["revoked", "true"]
 ]
 ```
 
-Content (public):
+Content is NIP-44 encrypted to the terminal pubkey:
 
 ```json
 {
@@ -1294,23 +1296,37 @@ Terminals must check revocations on startup and subscribe for live updates. On o
 4. Do NOT auto-destroy local data (merchant may want to reactivate).
 ```
 
+Every revocation rotates the POS sale bucket secret. The controller increments
+`sale_bucket_generation`, chooses `effective_from_epoch_day` (default: current
+UTC epoch day + 1), re-issues encrypted 30381 authorizations to remaining
+terminals, waits for at least two relay OKs per re-issue, and subscribes to old
+and new generations during the grace window. Generation selection comes from
+the cached authorization, not from wall-clock proximity to midnight.
+
 ### 9.5 Sale Created Event
 
 Kind: `9380` (regular).
 Signed by: terminal key.
 Purpose: append-only record that a sale/payment request was created.
 
-**v1 change:** content is **always NIP-44 v2 encrypted** to the merchant recovery pubkey, to avoid public leakage of sales cadence. v0.1's "optional encryption" is removed. Public sales metadata is available only via the optional public-receipt variant of kind 9383.
+Content is always NIP-44 v2 encrypted to the merchant recovery pubkey. The
+envelope `created_at` is uniformly jittered by +/- 300 seconds; the encrypted
+content's `created_at` is the true sale timestamp and is used for accounting
+and bucket selection.
 
 Tags:
 
 ```json
 [
-  ["proto", "nostr-pos", "0.2"],
-  ["a", "30380:<merchant-controller-pubkey>:<pos_id>"],
-  ["p", "<terminal_pubkey>"]
+  ["proto", "nostr-pos", "0.3"],
+  ["x", "HMAC_SHA256(sale_bucket_secret, \"<generation>:<epoch_day_utc>\")"]
 ]
 ```
+
+Subscribers query day +/- 1 around the target day for each generation they are
+authorized for. Readers drop sale-stream events whose signer pubkey is not in
+the controller's currently-authorized terminal set before decryption attempts.
+Terminals only accept their own signer pubkey when reloading local history.
 
 Encrypted content:
 
@@ -1333,7 +1349,7 @@ Encrypted content:
 
 Kind: `9381` inner event, gift-wrapped (NIP-59).
 Signed by: terminal key for the inner event; ephemeral wrapper key for the seal.
-Recipients: merchant recovery key + terminal key (two wraps).
+Recipients: merchant recovery key only.
 Purpose: stores encrypted material needed to recover and claim a Lightning-to-Liquid swap.
 
 **The POS must publish this event, receive ≥2 relay OKs, and write to IndexedDB before showing the Lightning invoice.** See §11.4.
@@ -1408,9 +1424,8 @@ Tags:
 
 ```json
 [
-  ["proto", "nostr-pos", "0.2"],
-  ["a", "30380:<merchant-controller-pubkey>:<pos_id>"],
-  ["p", "<terminal_pubkey>"]
+  ["proto", "nostr-pos", "0.3"],
+  ["x", "HMAC_SHA256(sale_bucket_secret, \"<generation>:<epoch_day_utc>\")"]
 ]
 ```
 
@@ -1439,6 +1454,9 @@ Signed by: terminal key or merchant key.
 Purpose: final sale receipt.
 
 Encrypted by default; merchant can enable a minimal public variant for donation / event use cases.
+
+Tags are identical to sale-created/payment-status: only `proto` and `x`. The
+same signer-authorization rule applies before decryption.
 
 Content (encrypted form):
 
@@ -1481,7 +1499,7 @@ Privacy TODO before production pilot:
 
 Kinds `9384` and `9385` reserved for the future covenant-mode claim agent flow. Not implemented in v1.
 
-### 9.10 Pairing code flow (new in v0.2)
+### 9.10 Pairing code flow (v0.3)
 
 Problem: activation must not expose pubkeys/npubs to the cashier. Solution: a short, human-readable pairing code derived from the terminal pubkey.
 
@@ -1502,8 +1520,8 @@ Discovery protocol:
 1. Terminal generates its Nostr keypair, displays pairing code.
 2. Terminal publishes a transient "pairing announcement" event (kind 30383, addressable,
    `d` tag = pairing code) to the first relay in the default set ("pairing discovery relay").
-   - Tags: ["d", "<pairing_code>"], ["p", "<terminal_pubkey>"]
-   - Expires after 5 minutes.
+   - Tags: ["d", "<pairing_code>"], ["p", "<terminal_pubkey>"], ["expiration", "<created_at+120>"]
+   - Expires after 120 seconds. Consumers MUST validate the expiration tag.
 3. Merchant enters pairing code in controller UI.
 4. Controller queries the discovery relay for { kind: 30383, #d: [code] } and resolves
    the full terminal pubkey from the `p` tag.
@@ -1511,11 +1529,14 @@ Discovery protocol:
    Approve?"
 6. On approval, controller publishes a kind-30381 terminal authorization encrypted to
    the terminal pubkey.
-7. Terminal, polling for `#p` = its pubkey, receives the authorization and activates.
+7. Terminal queries the merchant's 30381 events, try-decrypts candidates, caches
+   `terminal_id` and `sale_bucket_secret`, and activates.
 8. Terminal deletes its pairing announcement (publishes a kind-5 deletion).
 ```
 
-Kind `30383` (Pairing Announcement) added to the v0.2 kind allocation.
+The terminal pubkey remains in the 30383 `p` tag in v0.3 so the controller can
+resolve a pairing-code query. A persistent scraper can retain this transient
+binding; removing it is deferred to v0.4.
 
 ---
 
@@ -1985,6 +2006,36 @@ Failed                    (failed)
 ---
 
 ## 15. Security Requirements
+
+### 15.0 Privacy posture under v0.3
+
+v0.3 defeats the trivial public-profile-to-sales pivot. A scraper can no
+longer query all 30380 profiles, read the POS `a` coordinate, and fetch that
+merchant's 9380/9382/9383 timeline by `#a`. Sale-stream events now expose only
+`proto` and an HMAC bucket `x` tag derived from a controller-generated secret.
+
+v0.3 also removes persistent terminal-pubkey publication from 30381
+authorizations, 30382 revocations, sale-stream tags, and recovery gift-wrap
+recipients. The remaining intentional public terminal-pubkey exposure is the
+short-lived 30383 pairing announcement, with a 120-second expiration that
+honest consumers must enforce.
+
+Residual gaps are explicit, not forgotten. Global
+`{kinds:[9380,9382,9383]}` enumeration still returns public Nostr events signed
+by long-lived terminal keys, so a scraper can build per-signer cadence
+histograms. A scraper that retained or transiently observed 30383 pairing
+announcements can still correlate terminal signer pubkeys back to merchant
+identity by timing. Bucket `x` tags also reveal per-bucket cadence even when the
+bucket cannot be bound to a merchant.
+
+Deferred to v0.4:
+
+- Ephemeral per-sale signing keys, with the long-lived terminal pubkey and an
+  accountability signature moved inside encrypted payloads.
+- Pairing-handshake redesign using a one-time pairing key; the operational
+  terminal pubkey is delivered only inside encrypted 30381 content.
+- Bucket-tag histogram hardening such as decoys or gift-wrapping sale-stream
+  events, if the product chooses that cost.
 
 ### 15.1 Threat Model
 
@@ -3467,10 +3518,10 @@ verification evidence stay close to the source of truth.
   visible pending, claimable, expiring-soon, failed, queued, and recent recovery
   record state instead of only exposing raw backup/export counts.
 - Added encrypted relay-history merge on the terminal: cashier startup and
-  payment-screen reconciliation fetch kind-9382/9383 records addressed to the
-  terminal via `#p`, decrypt terminal-authored records via the merchant recovery
-  conversation key or merchant-authored records via the signer key, and merge
-  known sale status/receipt updates back into IndexedDB.
+  payment-screen reconciliation fetch kind-9382/9383 records by v0.3 bucket
+  `#x`, require the terminal's own signer pubkey, decrypt terminal-authored
+  records via the merchant recovery conversation key, and merge known sale
+  status/receipt updates back into IndexedDB.
 - The recent-transactions screen now renders local IndexedDB rows before
   running payment reconciliation, preserving the fast refresh-confidence path
   while still updating statuses afterward.
@@ -3492,9 +3543,9 @@ verification evidence stay close to the source of truth.
 - README now documents the current smoke commands and the live relay-backed
   pilot activation flow from terminal pairing code through controller approval.
 - Relay-queryable terminal and pairing lookups now use standard indexed Nostr
-  tags only: pairing announcements are queried by `#d`, and terminal-addressed
-  payment status/receipt history is queried by `#p` instead of custom
-  multi-character filters such as `#pairing` or `#terminal`.
+  tags only: pairing announcements are queried by `#d`, authorizations by
+  try-decrypting merchant 30381 events, revocations by terminal-id `#d`, and
+  payment status/receipt history by bucket `#x`.
 - Relay publish retries now treat NIP-20 `duplicate` responses as idempotent
   success. If a relay already has the exact event id, the activation or sync
   retry should continue instead of failing the publish step.

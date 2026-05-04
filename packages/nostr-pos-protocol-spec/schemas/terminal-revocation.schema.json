@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/nostr-pos/terminal-revocation.schema.json",
+  "title": "Terminal Revocation",
+  "type": "object",
+  "required": ["reason", "revoked_at"],
+  "properties": {
+    "reason": { "type": "string", "minLength": 1 },
+    "revoked_at": { "type": "integer", "minimum": 0 }
+  },
+  "additionalProperties": false
+}

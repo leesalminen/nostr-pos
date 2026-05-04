@@ -101,6 +101,8 @@ class _DemoProfile {
     required this.relays,
     required this.store,
     required this.baseUrl,
+    required this.saleBucketSecret,
+    required this.saleBucketGeneration,
   });
 
   final String merchantPrivkey;
@@ -115,6 +117,8 @@ class _DemoProfile {
   final List<String> relays;
   final String store;
   final String baseUrl;
+  final String saleBucketSecret;
+  final int saleBucketGeneration;
 
   Map<String, Object?> toJson() => {
     'version': 1,
@@ -128,6 +132,8 @@ class _DemoProfile {
     'relays': relays,
     'store': store,
     'base_url': baseUrl,
+    'sale_bucket_secret': saleBucketSecret,
+    'sale_bucket_generation': saleBucketGeneration,
   };
 
   static _DemoProfile fromJson(Map<String, Object?> json) {
@@ -146,6 +152,8 @@ class _DemoProfile {
       relays: (json['relays']! as List).cast<String>(),
       store: json['store']! as String,
       baseUrl: json['base_url']! as String,
+      saleBucketSecret: (json['sale_bucket_secret'] as String?) ?? '0' * 64,
+      saleBucketGeneration: (json['sale_bucket_generation'] as int?) ?? 1,
     );
   }
 }
@@ -224,6 +232,8 @@ Future<void> _init(List<String> args) async {
     relays: _parseRelays(parsed['relays'] as String),
     store: parsed['store'] as String,
     baseUrl: parsed['base-url'] as String,
+    saleBucketSecret: randomAuxHex(),
+    saleBucketGeneration: 1,
   );
   await file.parent.create(recursive: true);
   await file.writeAsString(
@@ -315,6 +325,9 @@ Future<void> _pairTerminal(List<String> args) async {
     ..addOption('fingerprint', defaultsTo: 'demo-fingerprint')
     ..addOption('branch', defaultsTo: '17')
     ..addOption('terminal-name', defaultsTo: 'Counter 1')
+    ..addOption('terminal-id')
+    ..addOption('sale-bucket-secret')
+    ..addOption('sale-bucket-generation', defaultsTo: '1')
     ..addOption(
       'timeout-seconds',
       defaultsTo: '60',
@@ -355,6 +368,7 @@ Future<void> _pairTerminal(List<String> args) async {
   }
 
   final terminalPubkey = pairing.tags.firstWhere((tag) => tag[0] == 'p')[1];
+  final terminalId = randomAuxHex().substring(0, 32);
   final store = LocalEventStore(profile.store);
   await store.append(pairing);
 
@@ -364,12 +378,18 @@ Future<void> _pairTerminal(List<String> args) async {
       posId: profile.posId,
     ),
     terminalPubkey: terminalPubkey,
+    terminalId: terminalId,
     terminalName: parsed['terminal-name'] as String,
     pairingCodeHint: code,
     ctDescriptor: descriptor,
     descriptorFingerprint: parsed['fingerprint'] as String,
     terminalBranch: int.parse(parsed['branch'] as String),
     merchantRecoveryPubkey: profile.recoveryPubkey,
+    saleBucketSecret: profile.saleBucketSecret,
+    saleBucketGeneration: profile.saleBucketGeneration,
+    effectiveFromEpochDay: epochDayFromUnix(
+      DateTime.now().millisecondsSinceEpoch ~/ 1000,
+    ),
     network: profile.network,
     expiresAt:
         DateTime.now().add(const Duration(days: 365)).millisecondsSinceEpoch ~/
@@ -398,6 +418,7 @@ Future<void> _pairTerminal(List<String> args) async {
   final ok = results.where((r) => r.ok).length;
   stdout
     ..writeln('Authorized terminal ${terminalPubkey.substring(0, 12)}…')
+    ..writeln('Terminal id:          $terminalId')
     ..writeln('Authorization event:  ${signed.id}')
     ..writeln('Published auth to $ok/${results.length} relays.');
   for (final result in results.where((r) => !r.ok)) {
@@ -462,9 +483,10 @@ void _addSalesReadOptions(ArgParser parser) {
     )
     ..addOption('author', help: 'Only include events signed by this pubkey.')
     ..addOption(
-      'pos-ref',
-      help: 'Only include events tagged with this POS ref.',
+      'bucket',
+      help: 'Only include events tagged with this sale bucket.',
     )
+    ..addOption('days', defaultsTo: '1')
     ..addOption('limit', defaultsTo: '500');
 }
 
@@ -483,7 +505,7 @@ Future<List<SaleSummary>> _salesRows(ArgResults parsed) async {
             NostrPosKinds.receipt,
           ],
           if (parsed['author'] != null) 'authors': [parsed['author'] as String],
-          if (parsed['pos-ref'] != null) '#a': [parsed['pos-ref'] as String],
+          if (parsed['bucket'] != null) '#x': [parsed['bucket'] as String],
           'limit': int.parse(parsed['limit'] as String),
         },
       ),
@@ -775,18 +797,28 @@ Future<void> _authTerminal(List<String> args) async {
   }
   await store.append(pairing);
   final terminalPubkey = pairing.tags.firstWhere((tag) => tag[0] == 'p')[1];
+  final terminalId =
+      (parsed['terminal-id'] as String?) ?? randomAuxHex().substring(0, 32);
+  final bucketSecret =
+      (parsed['sale-bucket-secret'] as String?) ?? randomAuxHex();
   final authorization = TerminalAuthorization(
     posRef: posRef(
       merchantPubkey: merchantPubkey,
       posId: parsed['pos-id'] as String,
     ),
     terminalPubkey: terminalPubkey,
+    terminalId: terminalId,
     terminalName: parsed['terminal-name'] as String,
     pairingCodeHint: parsed['pairing-code'] as String,
     ctDescriptor: descriptor,
     descriptorFingerprint: parsed['fingerprint'] as String,
     terminalBranch: int.parse(parsed['branch'] as String),
     merchantRecoveryPubkey: parsed['merchant-recovery-pubkey'] as String,
+    saleBucketSecret: bucketSecret,
+    saleBucketGeneration: int.parse(parsed['sale-bucket-generation'] as String),
+    effectiveFromEpochDay: epochDayFromUnix(
+      DateTime.now().millisecondsSinceEpoch ~/ 1000,
+    ),
     network: PosNetwork.fromName(parsed['network'] as String),
     expiresAt:
         DateTime.now().add(const Duration(days: 365)).millisecondsSinceEpoch ~/
@@ -815,6 +847,7 @@ Future<void> _authTerminal(List<String> args) async {
 Future<void> _revokeTerminal(List<String> args) async {
   final parser = ArgParser()
     ..addOption('terminal-pubkey', mandatory: true)
+    ..addOption('terminal-id', mandatory: true)
     ..addOption('pos-id', defaultsTo: 'seguras-butcher')
     ..addOption('merchant-pubkey', defaultsTo: 'a' * 64)
     ..addOption('merchant-privkey')
@@ -824,10 +857,17 @@ Future<void> _revokeTerminal(List<String> args) async {
   final merchantPubkey = merchantPrivkey == null
       ? parsed['merchant-pubkey'] as String
       : publicKeyFromPrivateKey(merchantPrivkey);
-  final event = buildTerminalRevocationEvent(
+  if (merchantPrivkey == null) {
+    stderr.writeln('merchant-privkey is required to encrypt v0.3 revocations.');
+    exitCode = 64;
+    return;
+  }
+  final event = await buildTerminalRevocationEvent(
     merchantPubkey: merchantPubkey,
+    merchantPrivkey: merchantPrivkey,
     posId: parsed['pos-id'] as String,
     terminalPubkey: parsed['terminal-pubkey'] as String,
+    terminalId: parsed['terminal-id'] as String,
   );
   final signed = _maybeSign(event, merchantPrivkey);
   await LocalEventStore(parsed['store'] as String).append(signed);
@@ -845,7 +885,9 @@ Future<void> _recordSale(List<String> args) async {
     ..addOption('sats', defaultsTo: '25000')
     ..addOption('method', defaultsTo: 'lightning_swap')
     ..addOption('status', defaultsTo: 'settled')
-    ..addOption('txid', defaultsTo: 'demo-txid');
+    ..addOption('txid', defaultsTo: 'demo-txid')
+    ..addOption('sale-bucket-secret', defaultsTo: '0'.padLeft(64, '0'))
+    ..addOption('sale-bucket-generation', defaultsTo: '1');
   final parsed = parser.parse(args);
   final terminalPrivkey = parsed['terminal-privkey'] as String?;
   final terminalPubkey = terminalPrivkey == null
@@ -853,13 +895,17 @@ Future<void> _recordSale(List<String> args) async {
       : publicKeyFromPrivateKey(terminalPrivkey);
   final store = LocalEventStore(parsed['store'] as String);
   final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+  final bucket = dailyBucketTag(
+    secret: hexToBytes(parsed['sale-bucket-secret'] as String),
+    generation: int.parse(parsed['sale-bucket-generation'] as String),
+    epochDayUtc: epochDayFromUnix(now),
+  );
   final saleId = parsed['sale-id'] as String;
-  final sale = buildUnsignedEvent(
-    pubkey: terminalPubkey,
+  final sale = buildSaleStreamEvent(
+    terminalPubkey: terminalPubkey,
     kind: NostrPosKinds.saleCreated,
-    tags: [
-      ['p', terminalPubkey],
-    ],
+    bucket: bucket,
+    contentCreatedAt: now,
     content: {
       'sale_id': saleId,
       'created_at': now,
@@ -873,12 +919,11 @@ Future<void> _recordSale(List<String> args) async {
       'status': 'created',
     },
   );
-  final status = buildUnsignedEvent(
-    pubkey: terminalPubkey,
+  final status = buildSaleStreamEvent(
+    terminalPubkey: terminalPubkey,
     kind: NostrPosKinds.paymentStatus,
-    tags: [
-      ['p', terminalPubkey],
-    ],
+    bucket: bucket,
+    contentCreatedAt: now,
     content: {
       'sale_id': saleId,
       'status': parsed['status'],
@@ -887,12 +932,11 @@ Future<void> _recordSale(List<String> args) async {
       'payment': {'settlement_txid': parsed['txid']},
     },
   );
-  final receipt = buildUnsignedEvent(
-    pubkey: terminalPubkey,
+  final receipt = buildSaleStreamEvent(
+    terminalPubkey: terminalPubkey,
     kind: NostrPosKinds.receipt,
-    tags: [
-      ['p', terminalPubkey],
-    ],
+    bucket: bucket,
+    contentCreatedAt: now,
     content: {'receipt_id': 'R-$saleId', 'sale_id': saleId, 'created_at': now},
   );
   final events = [

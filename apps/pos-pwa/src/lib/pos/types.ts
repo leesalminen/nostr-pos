@@ -27,6 +27,7 @@ export type Sale = {
   receiptNumber: string;
   posRef: string;
   terminalId: string;
+  saleBucketTag?: string;
   amountFiat: string;
   fiatCurrency: string;
   amountSat: number;
@@ -143,6 +144,9 @@ export type TerminalConfig = {
   terminalId: string;
   terminalPubkey: string;
   terminalPrivkeyEnc?: string;
+  saleBucketSecret?: string;
+  saleBucketGeneration?: number;
+  saleBucketEffectiveFromEpochDay?: number;
   pairingCode: string;
   activatedAt?: number;
   revokedAt?: number;
