@@ -29,13 +29,14 @@
       tabLock = createTerminalTabLock(config.terminalPubkey, (state) => {
         tabReadOnly = state.readonly;
       });
-      const [{ syncTerminalRevocation }, { reconcileOpenPayments }, { reconcileClaimBroadcasts, resumePreparedClaims }, { syncTerminalRecoveryBackups }, { mergePaymentHistory }] =
+      const [{ syncTerminalRevocation }, { reconcileOpenPayments }, { reconcileClaimBroadcasts, resumePreparedClaims }, { syncTerminalRecoveryBackups }, { mergePaymentHistory }, { syncQueuedRecords }] =
         await Promise.all([
           import('../lib/activation/revocation-sync'),
           import('../lib/pos/reconciler'),
           import('../lib/pos/claim-engine'),
           import('../lib/pos/recovery-sync'),
-          import('../lib/pos/payment-history')
+          import('../lib/pos/payment-history'),
+          import('../lib/pos/sync')
         ]);
       const revoked = await syncTerminalRevocation(config);
       if (revoked) {
@@ -49,6 +50,7 @@
       await reconcileClaimBroadcasts(config);
       await mergePaymentHistory(config);
       await refreshTransactions();
+      await syncQueuedRecords(config);
     } finally {
       booting = false;
     }

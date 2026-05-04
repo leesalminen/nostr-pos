@@ -17,9 +17,11 @@
   let dataUrl = $state('');
 
   $effect(() => {
-    QRCode.toDataURL(value, { margin: 1, width: 300, color: { dark: '#211f1a', light: '#fffaf0' } }).then(
-      (next) => (dataUrl = next)
-    );
+    QRCode.toDataURL(value, {
+      margin: 4,
+      width: 300,
+      color: { dark: '#000000', light: '#ffffff' }
+    }).then((next) => (dataUrl = next));
   });
 </script>
 
