@@ -24,6 +24,52 @@ void main() {
     );
   });
 
+  test('builds testnet POS profile and terminal authorization payloads', () {
+    final profileEvent = buildPosProfileEvent(
+      merchantPubkey: 'a' * 64,
+      posId: 'seguras',
+      profile: PosProfile(
+        name: 'Counter 1',
+        merchantName: 'Seguras Butcher',
+        currency: 'CRC',
+        network: PosNetwork.testnet,
+      ),
+    );
+
+    expect(
+      profileEvent.tags,
+      anyElement(equals(['network', 'liquid-testnet'])),
+    );
+    final profile = jsonDecode(profileEvent.content) as Map<String, Object?>;
+    expect(
+      (profile['liquid_backends'] as List).first,
+      containsPair('url', 'https://liquid.bullbitcoin.com/testnet/api'),
+    );
+    expect(
+      (profile['swap_providers'] as List).first,
+      containsPair('id', 'boltz-testnet'),
+    );
+
+    final authorization = TerminalAuthorization(
+      posRef: posRef(merchantPubkey: 'a' * 64, posId: 'seguras'),
+      terminalPubkey: 'b' * 64,
+      terminalName: 'Counter 1',
+      pairingCodeHint: 'ABCD-EFGH',
+      ctDescriptor: 'ct(slip77(00),elwpkh(xpub-demo/0/*))',
+      descriptorFingerprint: 'demo-fingerprint',
+      terminalBranch: 17,
+      merchantRecoveryPubkey: 'c' * 64,
+      expiresAt: 1790000000,
+      network: PosNetwork.testnet,
+    );
+
+    expect(authorization.toJson(), containsPair('network', 'liquid-testnet'));
+    expect(
+      (authorization.toJson()['swap_providers'] as List).first,
+      containsPair('api_base', 'https://api.testnet.boltz.exchange'),
+    );
+  });
+
   test('builds pairing announcement from terminal key', () {
     final event = buildPairingAnnouncement(
       terminalPubkey:

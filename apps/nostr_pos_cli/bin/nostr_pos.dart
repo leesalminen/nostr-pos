@@ -97,6 +97,7 @@ class _DemoProfile {
     required this.name,
     required this.merchantName,
     required this.currency,
+    required this.network,
     required this.relays,
     required this.store,
     required this.baseUrl,
@@ -110,6 +111,7 @@ class _DemoProfile {
   final String name;
   final String merchantName;
   final String currency;
+  final PosNetwork network;
   final List<String> relays;
   final String store;
   final String baseUrl;
@@ -122,6 +124,7 @@ class _DemoProfile {
     'name': name,
     'merchant_name': merchantName,
     'currency': currency,
+    'network': network.name,
     'relays': relays,
     'store': store,
     'base_url': baseUrl,
@@ -139,6 +142,7 @@ class _DemoProfile {
       name: json['name']! as String,
       merchantName: json['merchant_name']! as String,
       currency: json['currency']! as String,
+      network: PosNetwork.fromName((json['network'] as String?) ?? 'mainnet'),
       relays: (json['relays']! as List).cast<String>(),
       store: json['store']! as String,
       baseUrl: json['base_url']! as String,
@@ -175,6 +179,11 @@ Future<void> _init(List<String> args) async {
     ..addOption('name', defaultsTo: 'Counter 1')
     ..addOption('merchant', defaultsTo: 'Demo Merchant')
     ..addOption('currency', defaultsTo: 'USD')
+    ..addOption(
+      'network',
+      defaultsTo: 'mainnet',
+      allowed: ['mainnet', 'testnet'],
+    )
     ..addOption('relays', defaultsTo: defaultRelays.join(','))
     ..addOption('base-url', defaultsTo: 'https://pay.bullbitcoin.com/#/pos')
     ..addOption('merchant-privkey', help: 'Reuse an existing 32-byte hex key.')
@@ -211,6 +220,7 @@ Future<void> _init(List<String> args) async {
     name: parsed['name'] as String,
     merchantName: parsed['merchant'] as String,
     currency: parsed['currency'] as String,
+    network: PosNetwork.fromName(parsed['network'] as String),
     relays: _parseRelays(parsed['relays'] as String),
     store: parsed['store'] as String,
     baseUrl: parsed['base-url'] as String,
@@ -225,12 +235,15 @@ Future<void> _init(List<String> args) async {
     ..writeln('  merchant pubkey:  ${profile.merchantPubkey}')
     ..writeln('  recovery pubkey:  ${profile.recoveryPubkey}')
     ..writeln('  pos id:           ${profile.posId}')
+    ..writeln('  network:          ${profile.network.name}')
     ..writeln('  store:            ${profile.store}')
     ..writeln('  relays:           ${profile.relays.join(", ")}')
     ..writeln('')
     ..writeln('Next:')
     ..writeln('  dart run bin/nostr_pos.dart serve-pos')
-    ..writeln('  dart run bin/nostr_pos.dart pair-terminal --pairing-code XXXX-XXXX');
+    ..writeln(
+      '  dart run bin/nostr_pos.dart pair-terminal --pairing-code XXXX-XXXX',
+    );
 }
 
 Future<void> _servePos(List<String> args) async {
@@ -249,6 +262,7 @@ Future<void> _servePos(List<String> args) async {
     merchantName: profile.merchantName,
     currency: profile.currency,
     description: 'Retail counter',
+    network: profile.network,
     relays: profile.relays,
   );
   final event = signNostrPosEvent(
@@ -356,6 +370,7 @@ Future<void> _pairTerminal(List<String> args) async {
     descriptorFingerprint: parsed['fingerprint'] as String,
     terminalBranch: int.parse(parsed['branch'] as String),
     merchantRecoveryPubkey: profile.recoveryPubkey,
+    network: profile.network,
     expiresAt:
         DateTime.now().add(const Duration(days: 365)).millisecondsSinceEpoch ~/
         1000,
@@ -610,6 +625,11 @@ Future<void> _createPos(List<String> args) async {
     ..addOption('name', defaultsTo: 'Counter 1')
     ..addOption('merchant', defaultsTo: 'Seguras Butcher')
     ..addOption('currency', defaultsTo: 'CRC')
+    ..addOption(
+      'network',
+      defaultsTo: 'mainnet',
+      allowed: ['mainnet', 'testnet'],
+    )
     ..addOption('pos-id', defaultsTo: 'seguras-butcher')
     ..addOption('merchant-pubkey', defaultsTo: 'a' * 64)
     ..addOption('merchant-privkey')
@@ -624,6 +644,7 @@ Future<void> _createPos(List<String> args) async {
     merchantName: parsed['merchant'] as String,
     currency: parsed['currency'] as String,
     description: 'Retail counter',
+    network: PosNetwork.fromName(parsed['network'] as String),
   );
   final event = buildPosProfileEvent(
     merchantPubkey: merchantPubkey,
@@ -705,6 +726,11 @@ Future<void> _authTerminal(List<String> args) async {
     ..addOption('merchant-pubkey', defaultsTo: 'a' * 64)
     ..addOption('merchant-privkey')
     ..addOption('merchant-recovery-pubkey', defaultsTo: 'b' * 64)
+    ..addOption(
+      'network',
+      defaultsTo: 'mainnet',
+      allowed: ['mainnet', 'testnet'],
+    )
     ..addOption('terminal-name', defaultsTo: 'Counter 1')
     ..addOption(
       'descriptor',
@@ -761,6 +787,7 @@ Future<void> _authTerminal(List<String> args) async {
     descriptorFingerprint: parsed['fingerprint'] as String,
     terminalBranch: int.parse(parsed['branch'] as String),
     merchantRecoveryPubkey: parsed['merchant-recovery-pubkey'] as String,
+    network: PosNetwork.fromName(parsed['network'] as String),
     expiresAt:
         DateTime.now().add(const Duration(days: 365)).millisecondsSinceEpoch ~/
         1000,

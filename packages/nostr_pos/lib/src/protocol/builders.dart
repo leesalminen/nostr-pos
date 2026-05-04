@@ -19,7 +19,7 @@ NostrPosEvent buildPosProfileEvent({
       ['method', 'liquid'],
       ['method', 'lightning_via_swap'],
       ['method', 'bolt_card'],
-      ['network', 'liquid-mainnet'],
+      ['network', profile.network.protocolName],
       ...profile.relays.map((relay) => ['relay', relay]),
       ['claim_mode', 'standard'],
       ['version', '0.2'],
