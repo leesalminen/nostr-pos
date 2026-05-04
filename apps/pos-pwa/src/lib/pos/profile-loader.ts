@@ -76,6 +76,13 @@ export function parsePosProfileReference(value: string): PosProfilePointer {
 }
 
 export function profileFromEvent(pointer: PosProfilePointer, event: Event): LoadedPosProfile {
+  console.log('[nostr-pos] profile candidate', {
+    eventId: event.id,
+    merchantPubkey: event.pubkey,
+    createdAt: event.created_at,
+    pointer,
+    tags: event.tags
+  });
   if (event.kind !== KINDS.posProfile) throw new Error('Payment profile could not be loaded.');
   if (event.pubkey !== pointer.merchantPubkey) throw new Error('Payment profile could not be loaded.');
   if (!event.tags.some((tag) => tag[0] === 'd' && tag[1] === pointer.posId)) {
@@ -95,7 +102,7 @@ export function profileFromEvent(pointer: PosProfilePointer, event: Event): Load
     .filter((backend) => backend.type === 'esplora' && typeof backend.url === 'string')
     .map((backend) => ({ type: 'esplora' as const, url: backend.url as string }));
 
-  return {
+  const loaded = {
     pointer,
     eventId: event.id,
     name: typeof content.name === 'string' ? content.name : (tagValue(event, 'name') ?? 'Counter'),
@@ -104,6 +111,15 @@ export function profileFromEvent(pointer: PosProfilePointer, event: Event): Load
     relays: uniq([...pointer.relays, ...strings(content.relays), ...relayTags(event)]),
     liquidBackends
   };
+  console.log('[nostr-pos] profile loaded', {
+    eventId: loaded.eventId,
+    name: loaded.name,
+    merchantName: loaded.merchantName,
+    currency: loaded.currency,
+    relays: loaded.relays,
+    liquidBackends: loaded.liquidBackends
+  });
+  return loaded;
 }
 
 export async function resolvePosProfile(reference: string, fetchEvents = querySignedEvents): Promise<LoadedPosProfile> {
@@ -129,7 +145,7 @@ export function configWithPosProfile(config: TerminalConfig, profile: LoadedPosP
     ...(config.authorization ?? {}),
     ...(profile.liquidBackends.length > 0 ? { liquid_backends: profile.liquidBackends } : {})
   };
-  return {
+  const updated = {
     ...config,
     merchantName: profile.merchantName,
     posName: config.activatedAt ? config.posName : profile.name,
@@ -144,4 +160,12 @@ export function configWithPosProfile(config: TerminalConfig, profile: LoadedPosP
       relays
     }
   };
+  console.log('[nostr-pos] profile applied to terminal', {
+    merchantName: updated.merchantName,
+    posName: updated.posName,
+    currency: updated.currency,
+    posProfile: updated.posProfile,
+    syncServers: updated.syncServers
+  });
+  return updated;
 }

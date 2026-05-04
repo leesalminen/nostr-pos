@@ -41,6 +41,23 @@ export function configWithTerminalAuthorization(
   now = Date.now()
 ): TerminalConfig {
   const authorization = parseTerminalAuthorization(raw);
+  console.log('[nostr-pos] applying terminal authorization', {
+    currentTerminalId: config.terminalId,
+    currentMerchantName: config.merchantName,
+    currentPosName: config.posName,
+    currentCurrency: config.currency,
+    authorization: {
+      type: authorization.type,
+      terminal_id: authorization.terminal_id,
+      merchant_name: authorization.merchant_name,
+      currency: authorization.currency,
+      terminal_name: authorization.terminal_name,
+      pairing_code_hint: authorization.pairing_code_hint,
+      terminal_pubkey_matches: authorization.terminal_pubkey === config.terminalPubkey,
+      max_invoice_sat: authorization.limits?.max_invoice_sat,
+      has_ct_descriptor: Boolean(authorization.settlement?.ct_descriptor ?? authorization.ct_descriptor)
+    }
+  });
   if (authorization.type !== 'terminal_authorization') {
     throw new Error('Approval is not for a payment terminal.');
   }
@@ -54,7 +71,7 @@ export function configWithTerminalAuthorization(
     throw new Error('Approval has expired.');
   }
 
-  return {
+  const updated = {
     ...config,
     terminalId: authorization.terminal_id ?? config.terminalId,
     merchantName: authorization.merchant_name ?? config.merchantName,
@@ -67,4 +84,13 @@ export function configWithTerminalAuthorization(
     authorization,
     activatedAt: now
   };
+  console.log('[nostr-pos] terminal authorization applied', {
+    terminalId: updated.terminalId,
+    merchantName: updated.merchantName,
+    posName: updated.posName,
+    currency: updated.currency,
+    maxInvoiceSat: updated.maxInvoiceSat,
+    activatedAt: updated.activatedAt
+  });
+  return updated;
 }
