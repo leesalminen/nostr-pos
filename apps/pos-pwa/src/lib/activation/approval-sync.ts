@@ -14,6 +14,25 @@ function plaintextApprovalAllowed(): boolean {
   return !import.meta.env.PROD;
 }
 
+type ApprovalFilter = {
+  kinds: number[];
+  authors?: string[];
+  '#d'?: string[];
+  limit: number;
+};
+
+function approvalCoordinate(config: TerminalConfig): string | undefined {
+  if (!config.posProfile?.posId || !config.terminalId) return undefined;
+  return `${config.posProfile.posId}:${config.terminalId}`;
+}
+
+function approvalHasBranding(config: TerminalConfig): boolean {
+  return (
+    typeof config.authorization?.merchant_name === 'string' &&
+    typeof config.authorization?.currency === 'string'
+  );
+}
+
 export function configFromApprovalEvent(
   config: TerminalConfig,
   event: Event,
@@ -45,18 +64,31 @@ export async function findTerminalApproval(
   fetchEvents = querySignedEvents,
   options: ApprovalSyncOptions = {}
 ): Promise<TerminalConfig | undefined> {
-  const filter = {
+  const baseFilter = {
     kinds: [KINDS.terminalAuthorization],
     limit: 50
-  } as { kinds: number[]; authors?: string[]; limit: number };
-  if (config.posProfile?.merchantPubkey) filter.authors = [config.posProfile.merchantPubkey];
-  const events = await fetchEvents(config.syncServers, filter);
-  const newestFirst = [...events].sort((a, b) => b.created_at - a.created_at);
+  } as ApprovalFilter;
+  if (config.posProfile?.merchantPubkey) baseFilter.authors = [config.posProfile.merchantPubkey];
+
+  const filters: ApprovalFilter[] = [];
+  const coordinate = approvalCoordinate(config);
+  if (coordinate) filters.push({ ...baseFilter, '#d': [coordinate], limit: 20 });
+  filters.push(baseFilter);
+
+  const byId = new Map<string, Event>();
+  for (const filter of filters) {
+    for (const event of await fetchEvents(config.syncServers, filter)) {
+      byId.set(event.id, event);
+    }
+  }
+
+  const newestFirst = [...byId.values()].sort((a, b) => b.created_at - a.created_at);
+  const valid: TerminalConfig[] = [];
   for (const event of newestFirst) {
     const approved = configFromApprovalEvent(config, event, Date.now(), options);
-    if (approved) return approved;
+    if (approved) valid.push(approved);
   }
-  return undefined;
+  return valid.find(approvalHasBranding) ?? valid[0];
 }
 
 export async function syncTerminalApproval(config: TerminalConfig): Promise<TerminalConfig | undefined> {

@@ -99,4 +99,63 @@ describe('approval relay sync', () => {
     const approved = await findTerminalApproval(config, async () => [stale, newest], { allowPlaintext: true });
     expect(approved?.posName).toBe('Front Counter');
   });
+
+  it('queries exact authorization coordinate but prefers branded fresh approvals', async () => {
+    const approvedConfig: TerminalConfig = {
+      ...config,
+      terminalId: 'old-terminal',
+      activatedAt: 1000,
+      posProfile: {
+        merchantPubkey: merchantKeys.publicKey,
+        posId: 'pos1',
+        eventId: 'profile1',
+        loadedAt: 1000,
+        relays: ['wss://one']
+      }
+    };
+    const staleExact = signEvent(
+      {
+        kind: 30381,
+        tags: [['d', 'pos1:old-terminal']],
+        content: JSON.stringify({
+          ...approval,
+          terminal_id: 'old-terminal',
+          merchant_name: undefined,
+          currency: undefined,
+          terminal_name: 'Old Counter'
+        }),
+        created_at: 3000
+      },
+      merchantKeys.privateKey
+    );
+    const freshBranded = signEvent(
+      {
+        kind: 30381,
+        tags: [['d', 'pos1:new-terminal']],
+        content: JSON.stringify({
+          ...approval,
+          terminal_id: 'new-terminal',
+          terminal_name: 'Fresh Counter'
+        }),
+        created_at: 2000
+      },
+      merchantKeys.privateKey
+    );
+    const filters: unknown[] = [];
+
+    const approved = await findTerminalApproval(
+      approvedConfig,
+      async (_relays, filter) => {
+        filters.push(filter);
+        return filter['#d'] ? [staleExact] : [staleExact, freshBranded];
+      },
+      { allowPlaintext: true }
+    );
+
+    expect(filters).toContainEqual(expect.objectContaining({ '#d': ['pos1:old-terminal'] }));
+    expect(approved?.terminalId).toBe('new-terminal');
+    expect(approved?.posName).toBe('Fresh Counter');
+    expect(approved?.merchantName).toBe('Corner Shop');
+    expect(approved?.currency).toBe('CAD');
+  });
 });
