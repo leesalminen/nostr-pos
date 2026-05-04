@@ -2,6 +2,7 @@
   "type": "terminal_authorization",
   "pos_ref": "nostr:30380:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:seguras-butcher",
   "terminal_pubkey": "23cf0f49b6f5db3c6ef008a0df8918df95e4436bda46e5b9d67b8b7c9d5f5bb1",
+  "terminal_id": "0123456789abcdef0123456789abcdef",
   "terminal_name": "Counter 1",
   "pairing_code_hint": "4F7G-YJDP",
   "network": "liquid-mainnet",
@@ -36,5 +37,8 @@
     }
   ],
   "merchant_recovery_pubkey": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "sale_bucket_secret": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "sale_bucket_generation": 1,
+  "effective_from_epoch_day": 19800,
   "expires_at": 1790000000
 }

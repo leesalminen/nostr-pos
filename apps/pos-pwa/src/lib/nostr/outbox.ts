@@ -5,6 +5,7 @@ import { publishSignedEvent, relayOkCount, signEvent, type PublishResult } from 
 import type { OutboxItem, TerminalConfig } from '../pos/types';
 import { encryptContent } from './encryption';
 import { hexToBytes } from '../security/keys';
+import { jitteredUnix } from './bucket';
 
 export type OutboxPublishReport = {
   id: string;
@@ -27,7 +28,7 @@ export function outboxItemToTemplate(item: OutboxItem, privateKeyHex?: string, r
     kind: item.payload.kind,
     tags: item.payload.tags,
     content,
-    created_at: Math.floor(item.createdAt / 1000)
+    created_at: isSaleStreamItem(item) ? jitteredUnix(item.createdAt) : Math.floor(item.createdAt / 1000)
   };
 }
 
@@ -53,18 +54,8 @@ function combinePublishResults(reports: PublishResult[][], relays: string[]): Pu
   });
 }
 
-function isTerminalAddressedRecord(item: OutboxItem): boolean {
+function isSaleStreamItem(item: OutboxItem): boolean {
   return ['sale_created', 'payment_status', 'receipt'].includes(item.type);
-}
-
-function terminalAddressedTemplate(template: EventTemplate, terminalPubkey: string): EventTemplate {
-  return {
-    ...template,
-    tags: [
-      ...template.tags.filter((tag) => tag[0] !== 'terminal' && !(tag[0] === 'p' && tag[1] === terminalPubkey)),
-      ['p', terminalPubkey]
-    ]
-  };
 }
 
 async function publishItemEvents(
@@ -79,19 +70,14 @@ async function publishItemEvents(
   }
   if (item.type === 'payment_backup' && recoveryRecipient) {
     const template = outboxItemToTemplate(item);
-    const events = recoveryGiftWrapEvents(template, config.terminalPrivkeyEnc, [recoveryRecipient, config.terminalPubkey]);
+    const events = recoveryGiftWrapEvents(template, config.terminalPrivkeyEnc, [recoveryRecipient]);
     const reports = [];
     for (const event of events) reports.push(await publish(config.syncServers, event));
     return combinePublishResults(reports, config.syncServers);
   }
 
   const event = signEvent(
-    isTerminalAddressedRecord(item)
-      ? terminalAddressedTemplate(
-          outboxItemToTemplate(item, config.terminalPrivkeyEnc, recoveryRecipient),
-          config.terminalPubkey
-        )
-      : outboxItemToTemplate(item, config.terminalPrivkeyEnc, recoveryRecipient),
+    outboxItemToTemplate(item, config.terminalPrivkeyEnc, recoveryRecipient),
     config.terminalPrivkeyEnc
   );
   return publish(config.syncServers, event);

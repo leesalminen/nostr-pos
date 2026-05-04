@@ -23,6 +23,7 @@ function profileEvent(createdAt: number, name: string) {
     {
       kind: 30380,
       tags: [
+        ['proto', 'nostr-pos', '0.3'],
         ['d', 'seguras'],
         ['relay', 'wss://profile']
       ],

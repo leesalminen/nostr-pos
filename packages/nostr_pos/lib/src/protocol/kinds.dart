@@ -10,7 +10,7 @@ class NostrPosKinds {
   static const receipt = 9383;
 }
 
-const nostrPosProtocolTag = ['proto', 'nostr-pos', '0.2'];
+const nostrPosProtocolTag = ['proto', 'nostr-pos', '0.3'];
 
 List<List<String>> defaultRelayTags() => [
   ['relay', 'wss://no.str.cr'],

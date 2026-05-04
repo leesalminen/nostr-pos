@@ -6,12 +6,107 @@ Lightning swaps, and Bolt Card payments.
 This repository is organized as a small monorepo:
 
 - `packages/nostr-pos-protocol-spec`: schemas, fixtures, and human protocol docs.
-- `packages/nostr_pos`: Dart controller SDK foundations.
-- `apps/nostr_pos_cli`: CLI controller built on the Dart SDK.
+- `packages/nostr_pos`: Dart controller SDK ([README](packages/nostr_pos/README.md)).
+- `apps/nostr_pos_cli`: CLI controller built on the Dart SDK ([README](apps/nostr_pos_cli/README.md)).
 - `apps/pos-pwa`: static Svelte 5 + Vite cashier PWA.
 - `infra`: local relay/Liquid/swap development scaffolding.
 
-## Current Smoke Commands
+## Live demo: web cashier + Dart controller, side by side
+
+Three controller commands take you from "nothing" to "terminal authorized and
+ringing up sales".
+
+```bash
+# Terminal A: start the cashier PWA
+npm install
+npm run preview -w apps/pos-pwa -- --host 0.0.0.0 --port 4173
+
+# Terminal B: controller
+cd apps/nostr_pos_cli
+dart pub get
+
+# 1. Generate merchant + recovery keys; persist defaults.
+dart run bin/nostr_pos.dart init --base-url 'http://localhost:4173/#/pos'
+
+# 2. Publish the POS profile and print the URL the cashier opens.
+dart run bin/nostr_pos.dart serve-pos
+
+# 3. After opening the URL on the cashier, copy the displayed pairing code
+#    (e.g. 4F7G-YJDP) and authorize the terminal:
+dart run bin/nostr_pos.dart pair-terminal --pairing-code 4F7G-YJDP
+```
+
+`init` writes `.nostr-pos/profile.json` (gitignored) with the merchant key,
+recovery key, POS id, relays, and store path. `serve-pos` and `pair-terminal`
+both read those defaults — no flag soup. The cashier picks up the
+authorization from relays automatically and unlocks the keypad. Total: two
+human steps and three commands.
+
+For the full mainnet runbook (Liquid, Lightning, recovery), see
+[`docs/mainnet-e2e-test.md`](docs/mainnet-e2e-test.md).
+
+## End-to-end workflow
+
+```mermaid
+flowchart TD
+    Start([Merchant has nothing]) --> Init["controller: init<br/>generate merchant + recovery keys<br/>write .nostr-pos/profile.json"]
+    Init --> Serve["controller: serve-pos<br/>build + sign POS profile (kind 30380)<br/>publish to relays<br/>print naddr URL"]
+    Serve --> OpenPwa["cashier: open URL<br/>browser loads PWA"]
+    OpenPwa --> HasProfile{"profile available<br/>via naddr?"}
+    HasProfile -- "no" --> ManualActivate["cashier: open /activate<br/>generate terminal key<br/>show pairing code"]
+    HasProfile -- "yes" --> AutoActivate["cashier: derive terminal key<br/>publish pairing announcement (kind 30383)<br/>show pairing code"]
+    ManualActivate --> Announce["cashier publishes pairing<br/>announcement (kind 30383)"]
+    AutoActivate --> Announce
+    Announce --> Pair["controller: pair-terminal --pairing-code XXXX-XXXX<br/>poll relays for kind 30383"]
+    Pair --> Found{"announcement<br/>discovered?"}
+    Found -- "no, timeout" --> RetryPair["controller exits 66<br/>operator retries"]
+    RetryPair --> Pair
+    Found -- "yes" --> Authorize["controller builds terminal authorization<br/>(kind 30381)<br/>NIP-44 encrypts CT descriptor to terminal pubkey<br/>signs with merchant key"]
+    Authorize --> Publish["controller publishes auth<br/>2-of-N relay quorum"]
+    Publish --> CashierUnlock["cashier polls for kind 30381<br/>verifies merchant signature<br/>decrypts CT descriptor"]
+    CashierUnlock --> Live(["Terminal live<br/>keypad unlocked"])
+
+    Live --> NewSale["cashier rings sale<br/>kind 9380 sale-created (encrypted)"]
+    NewSale --> ChooseMethod{"payment<br/>method?"}
+
+    ChooseMethod -- "Liquid" --> LiquidAddr["cashier derives next address<br/>from terminal CT branch"]
+    LiquidAddr --> CustomerPaysL["customer pays Liquid invoice"]
+    CustomerPaysL --> LiquidWatch["cashier polls Esplora<br/>unblinds candidate output"]
+    LiquidWatch --> LiquidConfirm{"valid mempool<br/>or confirmed?"}
+    LiquidConfirm -- "no" --> Wait["wait / retry"]
+    Wait --> LiquidWatch
+    LiquidConfirm -- "yes" --> Settled
+
+    ChooseMethod -- "Lightning (Boltz reverse swap)" --> LightInvoice["cashier creates Boltz BTC→L-BTC swap<br/>generates preimage + claim keypair"]
+    LightInvoice --> Backup["cashier publishes encrypted<br/>swap recovery backup<br/>kind 9381, gift-wrapped to recovery key"]
+    Backup --> Quorum{"backup reached<br/>≥2 relays?"}
+    Quorum -- "no" --> Abort["abort sale<br/>show explicit error"]
+    Quorum -- "yes" --> ShowQR["cashier shows<br/>verified Bolt11 QR"]
+    ShowQR --> CustomerPaysLn["customer pays Lightning"]
+    CustomerPaysLn --> BoltzLockup["Boltz locks L-BTC<br/>cashier sees lockup tx"]
+    BoltzLockup --> Claim["cashier builds + broadcasts<br/>Liquid claim transaction"]
+    Claim --> Settled
+
+    ChooseMethod -- "Bolt Card" --> BoltCard["cashier presents NFC tap<br/>same Boltz lockup-claim path"]
+    BoltCard --> Settled([" "])
+
+    Settled["payment-status (kind 9382)<br/>+ receipt (kind 9383)<br/>encrypted, replicated to relays"] --> NextSale{"another<br/>sale?"}
+    NextSale -- "yes" --> NewSale
+    NextSale -- "no, terminal lost / compromised" --> Recovery
+
+    Recovery["controller: recover-swaps<br/>--merchant-recovery-privkey ...<br/>fetch + decrypt kind 9381 backups"] --> RecoveryAction{"backup<br/>state?"}
+    RecoveryAction -- "claim_tx_hex prepared" --> RebroadcastClaim["controller rebroadcasts<br/>via Liquid Esplora"]
+    RecoveryAction -- "needs claim" --> BuildClaim["controller polls Boltz status<br/>builds + broadcasts claim"]
+    RecoveryAction -- "expired" --> AuditExpired["audit only<br/>swap timed out before payment"]
+    RebroadcastClaim --> RecoveryDone(["funds recovered to<br/>merchant Liquid address"])
+    BuildClaim --> RecoveryDone
+    AuditExpired --> RecoveryDone
+
+    NextSale -- "no, revoke a terminal" --> Revoke["controller: revoke-terminal --terminal-pubkey ...<br/>publish kind 30382"]
+    Revoke --> CashierLock(["cashier reads revocation<br/>locks keypad"])
+```
+
+## Smoke commands
 
 ```bash
 npm run protocol:check
@@ -29,7 +124,7 @@ Relay smoke:
 npm run relay:smoke
 ```
 
-Controller publish smoke:
+Controller publish smoke (no profile, deterministic merchant key):
 
 ```bash
 cd apps/nostr_pos_cli
@@ -41,50 +136,7 @@ dart run bin/nostr_pos.dart create-pos \
 dart run bin/nostr_pos.dart publish-events --store "$tmp/events.jsonl" --limit 1
 ```
 
-## Pilot Activation Flow
-
-For the full mainnet pilot runbook, including browser setup, CLI controller
-commands, Liquid payment testing, Lightning/Boltz testing, and recovery checks,
-see [`docs/mainnet-e2e-test.md`](docs/mainnet-e2e-test.md).
-
-1. Start the PWA and open the activation screen.
-2. The terminal displays a pairing code and publishes an approval request to the configured backup servers.
-3. The controller can discover that request:
-
-```bash
-cd apps/nostr_pos_cli
-dart run bin/nostr_pos.dart fetch-pairing --pairing-code 4F7G-YJDP
-```
-
-Use `--relays` here when the PWA was opened with a POS profile that overrides
-the default relay set; pairing announcements are discovered by the indexed `d`
-tag on kind `30383`.
-
-If a relay returns `duplicate` during publish, it already has that event. The
-controller treats that as accepted so activation retries are safe.
-
-4. The controller authorizes the terminal and signs the approval:
-
-```bash
-dart run bin/nostr_pos.dart auth-terminal \
-  --pairing-code 4F7G-YJDP \
-  --relays wss://no.str.cr,wss://relay.primal.net,wss://nos.lol \
-  --merchant-privkey <merchant-private-key-hex>
-```
-
-5. Publish the approval so the PWA picks it up from relays:
-
-```bash
-dart run bin/nostr_pos.dart publish-events --kind 30381 --limit 1
-```
-
-`publish-events` sends the newest matching event first, so `--kind 30381
---limit 1` publishes the authorization that was just created even when the
-local store contains older terminal approvals. The PWA polls for this
-authorization and transitions into the keypad automatically — no manual
-paste step.
-
-## Recovery Operations
+## Recovery operations
 
 List encrypted swap recovery records from a local event store, or merge relay
 records addressed to the merchant recovery key:
@@ -109,7 +161,7 @@ dart run bin/nostr_pos.dart recover-swaps \
   --liquid-api https://liquid.bullbitcoin.com/api
 ```
 
-## Design Tradeoffs
+## Design tradeoffs
 
 This project has an unusual shape: no backend, no merchant servers, no central
 database, a browser-resident cashier, and funds that settle on Liquid and

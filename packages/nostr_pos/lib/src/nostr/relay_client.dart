@@ -208,7 +208,8 @@ NostrPosEvent? _latestValidPairing(
                 event.idMatches &&
                 event.kind == NostrPosKinds.pairingAnnouncement &&
                 _hasTag(event, 'p', event.pubkey) &&
-                _hasTag(event, 'd', pairingCode),
+                _hasTag(event, 'd', pairingCode) &&
+                _isUnexpired(event),
           )
           .toList()
         ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -221,6 +222,17 @@ bool _hasTag(NostrPosEvent event, String name, String value) {
   );
 }
 
+bool _isUnexpired(NostrPosEvent event) {
+  final expiration = event.tags
+      .where((tag) => tag.length >= 2 && tag[0] == 'expiration')
+      .map((tag) => int.tryParse(tag[1]))
+      .whereType<int>()
+      .firstOrNull;
+  if (expiration == null) return false;
+  final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+  return expiration > now;
+}
+
 Future<List<NostrPosEvent>> fetchSwapRecoveryBackups({
   required List<String> relays,
   String? recoveryPubkey,
@@ -228,26 +240,7 @@ Future<List<NostrPosEvent>> fetchSwapRecoveryBackups({
   NostrRelayClient? client,
 }) async {
   final relayClient = client ?? NostrRelayClient();
-  final legacyFilter = <String, Object?>{
-    'kinds': [NostrPosKinds.swapRecoveryBackup],
-    'limit': 100,
-  };
-  if (recoveryPubkey != null && recoveryPubkey.isNotEmpty) {
-    legacyFilter['#p'] = [recoveryPubkey];
-  }
-
-  final recoveries =
-      (await queryEventsFromRelays(
-            relays: relays,
-            filter: legacyFilter,
-            client: relayClient,
-          ))
-          .where(
-            (event) =>
-                event.kind == NostrPosKinds.swapRecoveryBackup &&
-                event.hasProtocolTag,
-          )
-          .toList();
+  final recoveries = <NostrPosEvent>[];
 
   if (recoveryPrivkey != null && recoveryPrivkey.isNotEmpty) {
     final recipientPubkey = publicKeyFromPrivateKey(recoveryPrivkey);

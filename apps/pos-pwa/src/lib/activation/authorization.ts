@@ -3,8 +3,12 @@ import type { TerminalAuthorization, TerminalConfig } from '../pos/types';
 type TerminalAuthorizationPayload = TerminalAuthorization & {
   type?: string;
   terminal_pubkey?: string;
+  terminal_id?: string;
   terminal_name?: string;
   pairing_code_hint?: string;
+  sale_bucket_secret?: string;
+  sale_bucket_generation?: number;
+  effective_from_epoch_day?: number;
   expires_at?: number;
   limits?: {
     max_invoice_sat?: number;
@@ -50,8 +54,12 @@ export function configWithTerminalAuthorization(
 
   return {
     ...config,
+    terminalId: authorization.terminal_id ?? config.terminalId,
     posName: authorization.terminal_name ?? config.posName,
     maxInvoiceSat: authorization.limits?.max_invoice_sat ?? config.maxInvoiceSat,
+    saleBucketSecret: authorization.sale_bucket_secret ?? config.saleBucketSecret,
+    saleBucketGeneration: authorization.sale_bucket_generation ?? config.saleBucketGeneration,
+    saleBucketEffectiveFromEpochDay: authorization.effective_from_epoch_day ?? config.saleBucketEffectiveFromEpochDay,
     authorization,
     activatedAt: now
   };

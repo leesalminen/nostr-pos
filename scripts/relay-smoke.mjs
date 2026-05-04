@@ -20,11 +20,10 @@ const event = finalizeEvent(
     kind: 30383,
     created_at: now,
     tags: [
-      ['proto', 'nostr-pos', '0.2'],
+      ['proto', 'nostr-pos', '0.3'],
       ['d', pairingCode],
-      ['pairing', pairingCode],
       ['p', pubkey],
-      ['expiration', String(now + 600)]
+      ['expiration', String(now + 120)]
     ],
     content: JSON.stringify({
       probe: 'relay-smoke',

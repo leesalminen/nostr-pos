@@ -18,10 +18,10 @@ export type LocalProtocolEvent = {
   content: Record<string, unknown>;
 };
 
-function saleTags(sale: Sale, extra: string[][] = []): string[][] {
+export function saleTags(sale: Pick<Sale, 'saleBucketTag'>, extra: string[][] = []): string[][] {
   return [
-    ['proto', 'nostr-pos', '0.2'],
-    ...(sale.posRef ? [['a', sale.posRef]] : []),
+    ['proto', 'nostr-pos', '0.3'],
+    ['x', sale.saleBucketTag ?? 'local-missing-bucket'],
     ...extra
   ];
 }
@@ -34,10 +34,10 @@ export function pairingAnnouncementEvent(input: {
   return {
     kind: KINDS.pairingAnnouncement,
     tags: [
-      ['proto', 'nostr-pos', '0.2'],
+      ['proto', 'nostr-pos', '0.3'],
       ['d', input.pairingCode],
       ['p', input.terminalPubkey],
-      ['expiration', String(Math.floor(input.createdAt / 1000) + 300)]
+      ['expiration', String(Math.floor(input.createdAt / 1000) + 120)]
     ],
     content: {
       pairing_code: input.pairingCode,
@@ -128,7 +128,7 @@ export function swapRecoveryEvent(input: {
   claimRbfCount?: number;
 }): LocalProtocolEvent {
   const tags = [
-    ['proto', 'nostr-pos', '0.2'],
+    ['proto', 'nostr-pos', '0.3'],
     ['sale', input.saleId],
     ['swap', input.swapId]
   ];

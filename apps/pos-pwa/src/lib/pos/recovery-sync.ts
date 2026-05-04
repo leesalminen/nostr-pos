@@ -130,15 +130,7 @@ export async function syncTerminalRecoveryBackups(
   config: TerminalConfig,
   fetchEvents = querySignedEvents
 ): Promise<number> {
-  if (!config.terminalPrivkeyEnc) return 0;
-  const events = await fetchEvents(config.syncServers, {
-    kinds: [KINDS.giftWrap],
-    '#p': [config.terminalPubkey],
-    limit: 100
-  });
-  let changed = 0;
-  for (const event of events.sort((a, b) => a.created_at - b.created_at)) {
-    if (await applyTerminalRecoveryBackup(config, event)) changed += 1;
-  }
-  return changed;
+  void config;
+  void fetchEvents;
+  return 0;
 }

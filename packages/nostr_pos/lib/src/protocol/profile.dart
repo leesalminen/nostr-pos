@@ -1,3 +1,5 @@
+import 'network.dart';
+
 class PosProfile {
   PosProfile({
     required this.name,
@@ -5,6 +7,7 @@ class PosProfile {
     required this.currency,
     this.description = '',
     this.publicReceipts = false,
+    this.network = PosNetwork.mainnet,
     List<String>? relays,
   }) : relays =
            relays ??
@@ -15,6 +18,7 @@ class PosProfile {
   final String currency;
   final String description;
   final bool publicReceipts;
+  final PosNetwork network;
   final List<String> relays;
 
   Map<String, Object?> toJson() => {
@@ -40,14 +44,14 @@ class PosProfile {
     ],
     'relays': relays,
     'liquid_backends': [
-      {'type': 'esplora', 'url': 'https://liquid.bullbitcoin.com/api'},
+      {'type': 'esplora', 'url': network.liquidEsploraApiBase},
     ],
     'swap_providers': [
       {
-        'id': 'boltz-mainnet',
+        'id': network.boltzProviderId,
         'type': 'boltz',
-        'api_base': 'https://api.boltz.exchange',
-        'ws_url': 'wss://api.boltz.exchange/v2/ws',
+        'api_base': network.boltzApiBase,
+        'ws_url': network.boltzWebSocketUrl,
       },
     ],
     'fiat_provider': {

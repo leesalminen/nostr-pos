@@ -81,6 +81,9 @@ export function profileFromEvent(pointer: PosProfilePointer, event: Event): Load
   if (!event.tags.some((tag) => tag[0] === 'd' && tag[1] === pointer.posId)) {
     throw new Error('Payment profile could not be loaded.');
   }
+  if (!event.tags.some((tag) => tag[0] === 'proto' && tag[1] === 'nostr-pos' && tag[2] === '0.3')) {
+    throw new Error('Payment profile protocol is not supported.');
+  }
 
   const content = asObject(JSON.parse(event.content));
   if (!content) throw new Error('Payment profile is not valid.');

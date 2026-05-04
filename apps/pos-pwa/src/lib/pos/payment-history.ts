@@ -4,6 +4,7 @@ import { decryptContent } from '../nostr/encryption';
 import { KINDS } from '../nostr/events';
 import { isValidSignedEvent, querySignedEvents } from '../nostr/pool';
 import { merchantRecoveryPubkey } from '../nostr/outbox';
+import { bucketWindow, epochDayFromUnix, saleBucketConfig } from '../nostr/bucket';
 import { ulid } from '../util/ulid';
 import type { PaymentAttempt, PaymentStatus, SaleStatus, TerminalConfig } from './types';
 
@@ -62,7 +63,7 @@ export async function applyPaymentHistoryEvent(
 ): Promise<boolean> {
   if (!isValidSignedEvent(event)) return false;
   if (event.kind !== KINDS.paymentStatus && event.kind !== KINDS.receipt) return false;
-  if (!event.tags.some((tag) => tag[0] === 'p' && tag[1] === config.terminalPubkey)) return false;
+  if (event.pubkey !== config.terminalPubkey) return false;
   const content = eventContent(config, event);
   const saleId = typeof content?.sale_id === 'string' ? content.sale_id : undefined;
   if (!saleId) return false;
@@ -105,11 +106,20 @@ export async function applyPaymentHistoryEvent(
 
 export async function mergePaymentHistory(
   config: TerminalConfig,
-  fetchEvents = querySignedEvents
+  fetchEvents = querySignedEvents,
+  lookbackDays = 1
 ): Promise<number> {
+  const bucket = saleBucketConfig(config) ?? { secretHex: '0'.repeat(64), generation: 1 };
+  const today = epochDayFromUnix(Math.floor(Date.now() / 1000));
+  const buckets = new Set<string>();
+  for (let offset = 0; offset <= lookbackDays; offset += 1) {
+    for (const tag of await bucketWindow({ ...bucket, epochDayUtc: today - offset })) {
+      buckets.add(tag);
+    }
+  }
   const events = await fetchEvents(config.syncServers, {
     kinds: [KINDS.paymentStatus, KINDS.receipt],
-    '#p': [config.terminalPubkey],
+    '#x': [...buckets],
     limit: 100
   });
   let changed = 0;

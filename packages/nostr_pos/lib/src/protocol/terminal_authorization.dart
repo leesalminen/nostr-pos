@@ -1,27 +1,39 @@
+import 'network.dart';
+
 class TerminalAuthorization {
   TerminalAuthorization({
     required this.posRef,
     required this.terminalPubkey,
+    required this.terminalId,
     required this.terminalName,
     required this.pairingCodeHint,
     required this.ctDescriptor,
     required this.descriptorFingerprint,
     required this.terminalBranch,
     required this.merchantRecoveryPubkey,
+    required this.saleBucketSecret,
+    required this.saleBucketGeneration,
+    required this.effectiveFromEpochDay,
     required this.expiresAt,
+    this.network = PosNetwork.mainnet,
     this.maxInvoiceSat = 100000,
     this.dailyVolumeSat = 20000000,
   });
 
   final String posRef;
   final String terminalPubkey;
+  final String terminalId;
   final String terminalName;
   final String pairingCodeHint;
   final String ctDescriptor;
   final String descriptorFingerprint;
   final int terminalBranch;
   final String merchantRecoveryPubkey;
+  final String saleBucketSecret;
+  final int saleBucketGeneration;
+  final int effectiveFromEpochDay;
   final int expiresAt;
+  final PosNetwork network;
   final int maxInvoiceSat;
   final int dailyVolumeSat;
 
@@ -29,9 +41,10 @@ class TerminalAuthorization {
     'type': 'terminal_authorization',
     'pos_ref': posRef,
     'terminal_pubkey': terminalPubkey,
+    'terminal_id': terminalId,
     'terminal_name': terminalName,
     'pairing_code_hint': pairingCodeHint,
-    'network': 'liquid-mainnet',
+    'network': network.protocolName,
     'asset': 'L-BTC',
     'settlement': {
       'type': 'liquid_ct_descriptor',
@@ -50,17 +63,20 @@ class TerminalAuthorization {
     'claim_mode': 'standard',
     'swap_providers': [
       {
-        'id': 'boltz-mainnet',
+        'id': network.boltzProviderId,
         'type': 'boltz',
-        'api_base': 'https://api.boltz.exchange',
-        'ws_url': 'wss://api.boltz.exchange/v2/ws',
+        'api_base': network.boltzApiBase,
+        'ws_url': network.boltzWebSocketUrl,
         'supports_covenants': true,
       },
     ],
     'liquid_backends': [
-      {'type': 'esplora', 'url': 'https://liquid.bullbitcoin.com/api'},
+      {'type': 'esplora', 'url': network.liquidEsploraApiBase},
     ],
     'merchant_recovery_pubkey': merchantRecoveryPubkey,
+    'sale_bucket_secret': saleBucketSecret,
+    'sale_bucket_generation': saleBucketGeneration,
+    'effective_from_epoch_day': effectiveFromEpochDay,
     'expires_at': expiresAt,
   };
 }

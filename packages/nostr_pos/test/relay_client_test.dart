@@ -87,7 +87,7 @@ void main() {
     final event = buildPairingAnnouncement(
       terminalPubkey:
           '23cf0f49b6f5db3c6ef008a0df8918df95e4436bda46e5b9d67b8b7c9d5f5bb1',
-      createdAt: 1000,
+      createdAt: DateTime.now().millisecondsSinceEpoch ~/ 1000,
     );
     unawaited(
       server.forEach((request) async {
@@ -115,7 +115,7 @@ void main() {
     await server.close(force: true);
   });
 
-  test('fetches swap recovery backups from a relay websocket', () async {
+  test('does not fetch plaintext swap recovery backups', () async {
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     final event = buildUnsignedEvent(
       pubkey: 'c' * 64,
@@ -151,7 +151,7 @@ void main() {
       recoveryPubkey: 'b' * 64,
     );
 
-    expect(found.single.id, event.id);
+    expect(found, isEmpty);
     await server.close(force: true);
   });
 

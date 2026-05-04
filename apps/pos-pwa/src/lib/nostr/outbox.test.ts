@@ -37,12 +37,14 @@ describe('signed outbox publisher', () => {
       okFrom: []
     };
 
-    expect(outboxItemToTemplate(item)).toEqual({
+    const template = outboxItemToTemplate(item);
+    expect(template).toMatchObject({
       kind: 9380,
       tags: [['sale', 'sale1']],
-      content: '{"sale_id":"sale1"}',
-      created_at: 1
+      content: '{"sale_id":"sale1"}'
     });
+    expect(template.created_at).toBeGreaterThanOrEqual(0);
+    expect(template.created_at).toBeLessThanOrEqual(301);
   });
 
   it('detects merchant recovery keys from authorization payloads', () => {
@@ -147,7 +149,8 @@ describe('signed outbox publisher', () => {
     for (const item of privateItems) {
       const publish = vi.fn(async (_relays: string[], event: Event) => {
         expect(event.content).not.toContain('sale1');
-        expect(event.tags).toContainEqual(['p', terminal.publicKey]);
+        expect(event.tags).not.toContainEqual(['p', terminal.publicKey]);
+        expect(event.tags).not.toContainEqual(['a', expect.any(String)]);
         expect(event.tags.some((tag) => tag[0] === 'terminal')).toBe(false);
         expect(decryptContent(event.content, merchant.privateKey, terminal.publicKey)).toEqual({ sale_id: 'sale1' });
         return [{ relay: 'wss://one', ok: true }];
@@ -157,7 +160,7 @@ describe('signed outbox publisher', () => {
     }
   });
 
-  it('gift-wraps recovery backups to merchant and terminal recipients', async () => {
+  it('gift-wraps recovery backups to requested recipients', async () => {
     const terminal = createTerminalKeypair();
     const merchant = createTerminalKeypair();
     const item: OutboxItem = {
@@ -185,7 +188,7 @@ describe('signed outbox publisher', () => {
     });
   });
 
-  it('requires each relay to accept every recovery wrap before counting OK', async () => {
+  it('requires each relay to accept the recovery wrap before counting OK', async () => {
     saved.length = 0;
     const terminal = createTerminalKeypair();
     const merchant = createTerminalKeypair();
@@ -225,12 +228,12 @@ describe('signed outbox publisher', () => {
 
     const report = await publishOutboxItem(config, item, publish);
 
-    expect(publish).toHaveBeenCalledTimes(2);
-    expect(report.okCount).toBe(1);
+    expect(publish).toHaveBeenCalledTimes(1);
+    expect(report.okCount).toBe(2);
     expect(report.results).toEqual([
       { relay: 'wss://one', ok: true, message: undefined },
-      { relay: 'wss://two', ok: false, message: 'offline' }
+      { relay: 'wss://two', ok: true, message: undefined }
     ]);
-    expect(saved.at(-1)?.okFrom).toEqual(['wss://one']);
+    expect(saved.at(-1)?.okFrom).toEqual(['wss://one', 'wss://two']);
   });
 });

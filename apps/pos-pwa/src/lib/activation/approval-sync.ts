@@ -45,11 +45,12 @@ export async function findTerminalApproval(
   fetchEvents = querySignedEvents,
   options: ApprovalSyncOptions = {}
 ): Promise<TerminalConfig | undefined> {
-  const events = await fetchEvents(config.syncServers, {
+  const filter = {
     kinds: [KINDS.terminalAuthorization],
-    '#p': [config.terminalPubkey],
-    limit: 10
-  });
+    limit: 50
+  } as { kinds: number[]; authors?: string[]; limit: number };
+  if (config.posProfile?.merchantPubkey) filter.authors = [config.posProfile.merchantPubkey];
+  const events = await fetchEvents(config.syncServers, filter);
   const newestFirst = [...events].sort((a, b) => b.created_at - a.created_at);
   for (const event of newestFirst) {
     const approved = configFromApprovalEvent(config, event, Date.now(), options);

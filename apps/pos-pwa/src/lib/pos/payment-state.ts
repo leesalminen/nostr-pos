@@ -11,6 +11,7 @@ import type { ReverseSwapResponse, SwapProvider } from '../swaps/provider';
 import { ulid } from '../util/ulid';
 import { paymentStatusEvent, saleCreatedEvent, swapRecoveryEvent } from '../nostr/events';
 import { merchantRecoveryPubkey, publishOutboxItem, type OutboxPublishReport } from '../nostr/outbox';
+import { saleBucketTagForConfig } from '../nostr/bucket';
 import { settleAttempt } from './settlement';
 import type { OutboxItem, SwapRecoveryRecord } from './types';
 export { paymentPayload } from './payment-payload';
@@ -71,6 +72,8 @@ export async function createSale(
   }
 
   const now = Date.now();
+  const saleBucketTag = await saleBucketTagForConfig(config, now);
+  if (!saleBucketTag) throw new Error('Owner approval is missing the sale stream secret.');
   const saleId = ulid(now);
   const attemptId = ulid(now + 1);
   const addressIndex = await reserveAddressIndex();
@@ -99,6 +102,7 @@ export async function createSale(
     receiptNumber: `R-${String(now).slice(-8)}`,
     posRef: posRefForConfig(config),
     terminalId: config.terminalId,
+    saleBucketTag,
     amountFiat: fiatAmount,
     fiatCurrency: config.currency,
     amountSat,
