@@ -4,6 +4,8 @@ type TerminalAuthorizationPayload = TerminalAuthorization & {
   type?: string;
   terminal_pubkey?: string;
   terminal_id?: string;
+  merchant_name?: string;
+  currency?: string;
   terminal_name?: string;
   pairing_code_hint?: string;
   sale_bucket_secret?: string;
@@ -55,6 +57,8 @@ export function configWithTerminalAuthorization(
   return {
     ...config,
     terminalId: authorization.terminal_id ?? config.terminalId,
+    merchantName: authorization.merchant_name ?? config.merchantName,
+    currency: authorization.currency ?? config.currency,
     posName: authorization.terminal_name ?? config.posName,
     maxInvoiceSat: authorization.limits?.max_invoice_sat ?? config.maxInvoiceSat,
     saleBucketSecret: authorization.sale_bucket_secret ?? config.saleBucketSecret,

@@ -23,6 +23,8 @@ const config: TerminalConfig = {
 const approval = {
   type: 'terminal_authorization',
   terminal_pubkey: terminalKeys.publicKey,
+  merchant_name: 'Corner Shop',
+  currency: 'CAD',
   terminal_name: 'Front Counter',
   pairing_code_hint: '4F7G-YJDP',
   expires_at: 2000000000,

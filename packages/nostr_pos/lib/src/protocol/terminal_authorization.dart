@@ -16,6 +16,8 @@ class TerminalAuthorization {
     required this.effectiveFromEpochDay,
     required this.expiresAt,
     this.network = PosNetwork.mainnet,
+    this.merchantName,
+    this.currency,
     this.maxInvoiceSat = 100000,
     this.dailyVolumeSat = 20000000,
   });
@@ -34,6 +36,8 @@ class TerminalAuthorization {
   final int effectiveFromEpochDay;
   final int expiresAt;
   final PosNetwork network;
+  final String? merchantName;
+  final String? currency;
   final int maxInvoiceSat;
   final int dailyVolumeSat;
 
@@ -42,6 +46,8 @@ class TerminalAuthorization {
     'pos_ref': posRef,
     'terminal_pubkey': terminalPubkey,
     'terminal_id': terminalId,
+    if (merchantName != null) 'merchant_name': merchantName,
+    if (currency != null) 'currency': currency,
     'terminal_name': terminalName,
     'pairing_code_hint': pairingCodeHint,
     'network': network.protocolName,

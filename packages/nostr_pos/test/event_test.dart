@@ -65,9 +65,16 @@ void main() {
       effectiveFromEpochDay: 19800,
       expiresAt: 1790000000,
       network: PosNetwork.testnet,
+      merchantName: 'Seguras Butcher',
+      currency: 'CRC',
     );
 
     expect(authorization.toJson(), containsPair('network', 'liquid-testnet'));
+    expect(
+      authorization.toJson(),
+      containsPair('merchant_name', 'Seguras Butcher'),
+    );
+    expect(authorization.toJson(), containsPair('currency', 'CRC'));
     expect(
       (authorization.toJson()['swap_providers'] as List).first,
       containsPair('api_base', 'https://api.testnet.boltz.exchange'),

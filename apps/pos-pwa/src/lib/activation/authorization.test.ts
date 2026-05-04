@@ -16,6 +16,8 @@ const baseConfig: TerminalConfig = {
 const approval = {
   type: 'terminal_authorization',
   terminal_pubkey: baseConfig.terminalPubkey,
+  merchant_name: 'Corner Shop',
+  currency: 'CAD',
   terminal_name: 'Front Counter',
   pairing_code_hint: baseConfig.pairingCode,
   expires_at: 200,
@@ -32,6 +34,8 @@ describe('terminal authorization import', () => {
   it('activates matching approval and applies terminal limits', () => {
     const updated = configWithTerminalAuthorization(baseConfig, JSON.stringify(approval), 1000);
     expect(updated.activatedAt).toBe(1000);
+    expect(updated.merchantName).toBe('Corner Shop');
+    expect(updated.currency).toBe('CAD');
     expect(updated.posName).toBe('Front Counter');
     expect(updated.maxInvoiceSat).toBe(50000);
     expect(updated.authorization?.liquid_backends?.[0]?.url).toBe('https://liquid.example/api');
