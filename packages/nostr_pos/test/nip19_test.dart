@@ -38,5 +38,26 @@ void main() {
 
     expect(url, startsWith('https://nostr-pos.vercel.app/#/pos/naddr1'));
     expect(naddrDecode(url.split('/').last).identifier, 'seguras');
+    final parsed = PosProfileUrl.parse(url);
+    expect(parsed.posId, 'seguras');
+    expect(parsed.merchantPubkey, 'a' * 64);
+    expect(parsed.relays, ['wss://one']);
+    expect(parsed.baseUrl, 'https://nostr-pos.vercel.app/#/pos');
+  });
+
+  test('round-trips POS profile URLs without fragment routes', () {
+    final url = posProfileUrl(
+      baseUrl: 'https://cashier.example/pos',
+      identifier: 'main-counter',
+      pubkey: 'b' * 64,
+      relays: ['wss://one', 'wss://two'],
+    );
+
+    final parsed = PosProfileUrl.parse(url);
+
+    expect(parsed.posId, 'main-counter');
+    expect(parsed.merchantPubkey, 'b' * 64);
+    expect(parsed.relays, ['wss://one', 'wss://two']);
+    expect(parsed.baseUrl, 'https://cashier.example/pos');
   });
 }

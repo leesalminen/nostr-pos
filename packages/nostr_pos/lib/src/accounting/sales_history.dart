@@ -3,6 +3,9 @@ import 'dart:convert';
 import '../protocol/event.dart';
 import '../protocol/kinds.dart';
 import '../protocol/nip44.dart';
+import '../protocol/payment_methods.dart';
+
+enum SaleStatus { waiting, settled, expired, refunded, created, unknown }
 
 class SaleSummary {
   SaleSummary({
@@ -29,6 +32,22 @@ class SaleSummary {
   final String? receiptId;
   final String? note;
 
+  String get statusRaw => status;
+  String? get methodRaw => method;
+
+  SaleStatus get statusKind {
+    return switch (status) {
+      'waiting' => SaleStatus.waiting,
+      'settled' => SaleStatus.settled,
+      'expired' => SaleStatus.expired,
+      'refunded' => SaleStatus.refunded,
+      'created' => SaleStatus.created,
+      _ => SaleStatus.unknown,
+    };
+  }
+
+  PosPaymentMethod? get methodKind => PosPaymentMethod.parse(method);
+
   Map<String, Object?> toJson() => {
     'sale_id': saleId,
     'created_at': createdAt,
@@ -44,10 +63,15 @@ class SaleSummary {
 }
 
 class _DecodedAccountingEvent {
-  _DecodedAccountingEvent({required this.kind, required this.content});
+  _DecodedAccountingEvent({
+    required this.kind,
+    required this.content,
+    required this.createdAt,
+  });
 
   final int kind;
   final Map<String, Object?> content;
+  final int createdAt;
 }
 
 List<SaleSummary> salesHistoryFromEvents(List<NostrPosEvent> events) {
@@ -66,6 +90,7 @@ Future<List<SaleSummary>> salesHistoryFromEventsForMerchant(
   final decoded = <_DecodedAccountingEvent>[];
   for (final event in events) {
     if (authorizedTerminalPubkeys != null &&
+        event.kind != NostrPosKinds.swapRecoveryBackup &&
         !authorizedTerminalPubkeys.contains(event.pubkey)) {
       continue;
     }
@@ -84,6 +109,7 @@ List<SaleSummary> _salesHistoryFromDecoded(
   final created = <String, Map<String, Object?>>{};
   final latestStatus = <String, Map<String, Object?>>{};
   final receipts = <String, Map<String, Object?>>{};
+  final recovered = <String, Map<String, Object?>>{};
 
   for (final event in events) {
     final content = event.content;
@@ -101,6 +127,40 @@ List<SaleSummary> _salesHistoryFromDecoded(
         }
       case NostrPosKinds.receipt:
         receipts[saleId] = content;
+      case NostrPosKinds.swapRecoveryBackup:
+        final claim = content['claim'] is Map
+            ? (content['claim'] as Map).cast<String, Object?>()
+            : const <String, Object?>{};
+        final claimTxid = claim['claim_txid'] as String?;
+        if (claimTxid == null || claimTxid.isEmpty) continue;
+        final current = recovered[saleId];
+        final updatedAt =
+            (claim['claim_broadcast_at'] as int?) ??
+            (claim['claim_confirmed_at'] as int?) ??
+            event.createdAt;
+        if (current == null ||
+            updatedAt >= (current['updated_at'] as int? ?? 0)) {
+          recovered[saleId] = {
+            'sale_id': saleId,
+            'status': 'settled',
+            'method': 'lightning_swap',
+            'updated_at': updatedAt,
+            'payment': {
+              'boltz_swap_id': content['swap_id'],
+              'settlement_txid': claimTxid,
+              'recovered': true,
+            },
+          };
+        }
+    }
+  }
+
+  for (final entry in recovered.entries) {
+    final current = latestStatus[entry.key];
+    if (current == null ||
+        (entry.value['updated_at'] as int? ?? 0) >=
+            (current['updated_at'] as int? ?? 0)) {
+      latestStatus[entry.key] = entry.value;
     }
   }
 
@@ -128,20 +188,34 @@ List<SaleSummary> _salesHistoryFromDecoded(
 }
 
 _DecodedAccountingEvent? _decodePlainAccountingEvent(NostrPosEvent event) {
+  if (event.kind == NostrPosKinds.swapRecoveryBackup) {
+    return _decodeRecoveryEvent(event);
+  }
   if (!_isAccountingEnvelope(event)) return null;
   final content = _decodeJsonObject(event.content);
   if (content == null) return null;
-  return _DecodedAccountingEvent(kind: event.kind, content: content);
+  return _DecodedAccountingEvent(
+    kind: event.kind,
+    content: content,
+    createdAt: event.createdAt,
+  );
 }
 
 Future<_DecodedAccountingEvent?> _decodeMerchantAccountingEvent(
   NostrPosEvent event, {
   required String merchantRecoveryPrivkey,
 }) async {
+  if (event.kind == NostrPosKinds.swapRecoveryBackup) {
+    return _decodeRecoveryEvent(event);
+  }
   if (!_isAccountingEnvelope(event)) return null;
   final plain = _decodeJsonObject(event.content);
   if (plain != null) {
-    return _DecodedAccountingEvent(kind: event.kind, content: plain);
+    return _DecodedAccountingEvent(
+      kind: event.kind,
+      content: plain,
+      createdAt: event.createdAt,
+    );
   }
 
   try {
@@ -152,10 +226,28 @@ Future<_DecodedAccountingEvent?> _decodeMerchantAccountingEvent(
     );
     final content = _decodeJsonObject(decrypted);
     if (content == null) return null;
-    return _DecodedAccountingEvent(kind: event.kind, content: content);
+    return _DecodedAccountingEvent(
+      kind: event.kind,
+      content: content,
+      createdAt: event.createdAt,
+    );
   } catch (_) {
     return null;
   }
+}
+
+_DecodedAccountingEvent? _decodeRecoveryEvent(NostrPosEvent event) {
+  if (!event.idMatches || !event.hasProtocolTag) return null;
+  final content = _decodeJsonObject(event.content);
+  if (content == null) return null;
+  if (content['sale_id'] is! String || content['swap_id'] is! String) {
+    return null;
+  }
+  return _DecodedAccountingEvent(
+    kind: event.kind,
+    content: content,
+    createdAt: event.createdAt,
+  );
 }
 
 bool _isAccountingEnvelope(NostrPosEvent event) {

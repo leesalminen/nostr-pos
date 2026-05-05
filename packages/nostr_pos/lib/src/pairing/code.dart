@@ -1,6 +1,24 @@
 import 'dart:typed_data';
 
 const _alphabet = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+final _pairingCodePattern = RegExp(
+  '[${RegExp.escape(_alphabet)}]{4}-[${RegExp.escape(_alphabet)}]{4}',
+);
+final _pairingCodeExactPattern = RegExp(
+  '^[${RegExp.escape(_alphabet)}]{4}-[${RegExp.escape(_alphabet)}]{4}\$',
+);
+
+class PairingPayload {
+  const PairingPayload({required this.pairingCode});
+
+  final String pairingCode;
+
+  static PairingPayload parse(String value) {
+    final code = extractPairingCode(value);
+    if (code == null) throw const FormatException('Missing pairing code.');
+    return PairingPayload(pairingCode: code);
+  }
+}
 
 String pairingCodeFromPubkey(String terminalPubkeyHex) {
   final normalized = terminalPubkeyHex.toLowerCase();
@@ -30,4 +48,13 @@ String pairingCodeFromPubkey(String terminalPubkeyHex) {
 
   final raw = chars.join();
   return '${raw.substring(0, 4)}-${raw.substring(4)}';
+}
+
+String? extractPairingCode(String text) {
+  final normalized = text.toUpperCase();
+  return _pairingCodePattern.firstMatch(normalized)?.group(0);
+}
+
+bool isPairingCode(String candidate) {
+  return _pairingCodeExactPattern.hasMatch(candidate.trim().toUpperCase());
 }

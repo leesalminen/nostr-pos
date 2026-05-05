@@ -65,19 +65,19 @@ void main() {
       );
 
       expect(event.createdAt, contentTime);
-    expect(
-      event.tags,
-      anyElement(
-        equals([
-          'x',
-          dailyBucketTag(
-            secret: hexToBytes('04' * 32),
-            generation: 1,
-            epochDayUtc: epochDayFromUnix(contentTime),
-          ),
-        ]),
-      ),
-    );
+      expect(
+        event.tags,
+        anyElement(
+          equals([
+            'x',
+            dailyBucketTag(
+              secret: hexToBytes('04' * 32),
+              generation: 1,
+              epochDayUtc: epochDayFromUnix(contentTime),
+            ),
+          ]),
+        ),
+      );
     },
   );
 
@@ -90,5 +90,55 @@ void main() {
       );
       expect(value, inInclusiveRange(0, 310));
     }
+  });
+
+  test('sale bucket query helper matches the consumer query window', () {
+    final from = DateTime.fromMillisecondsSinceEpoch(
+      epochDayFromUnix(1711929590) * Duration.secondsPerDay * 1000,
+    );
+    final to = from.add(const Duration(days: 2));
+    final tags = saleBucketTagsForQuery(
+      terminals: [
+        TerminalBucketKey(
+          secret: '05' * 32,
+          generation: 1,
+          effectiveFromEpochDay: epochDayFromUnix(
+            from.millisecondsSinceEpoch ~/ 1000,
+          ),
+        ),
+      ],
+      from: from,
+      to: to,
+    );
+    final effectiveFromDay = epochDayFromUnix(
+      from.millisecondsSinceEpoch ~/ 1000,
+    );
+    final toDay = epochDayFromUnix(to.millisecondsSinceEpoch ~/ 1000) + 1;
+    final expected = {
+      for (var day = effectiveFromDay; day <= toDay; day++)
+        dailyBucketTag(
+          secret: hexToBytes('05' * 32),
+          generation: 1,
+          epochDayUtc: day,
+        ),
+    };
+
+    expect(tags.toSet(), expected);
+  });
+
+  test('sale event filter uses the bucket privacy filter', () {
+    final filter = saleEventsFilterForBuckets(
+      bucketTags: ['bucket1'],
+      since: 1710000000,
+    );
+
+    expect(filter['#x'], ['bucket1']);
+    expect(filter['limit'], 500);
+    expect(filter['since'], 1710000000);
+    expect(filter['kinds'], [
+      NostrPosKinds.saleCreated,
+      NostrPosKinds.paymentStatus,
+      NostrPosKinds.receipt,
+    ]);
   });
 }

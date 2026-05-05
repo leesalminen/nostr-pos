@@ -28,5 +28,5 @@ jobs:
       - uses: dart-lang/setup-dart@v1
         with:
           sdk: stable
-      - run: cd packages/nostr_pos && dart pub get && dart analyze && dart test
+      - run: cd packages/nostr_pos && dart pub get && dart analyze && dart test && dart compile js -o /dev/null tool/web_compile_smoke.dart
       - run: cd apps/nostr_pos_cli && dart pub get && dart analyze && dart test

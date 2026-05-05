@@ -19,6 +19,51 @@ class NaddrPointer {
   final List<String> relays;
 }
 
+class PosProfileUrl {
+  const PosProfileUrl({
+    required this.posId,
+    required this.merchantPubkey,
+    required this.relays,
+    required this.baseUrl,
+  });
+
+  final String posId;
+  final String merchantPubkey;
+  final List<String> relays;
+  final String baseUrl;
+
+  static PosProfileUrl parse(String url) {
+    final uri = Uri.parse(url);
+    final route = uri.fragment.isNotEmpty ? uri.fragment : uri.path;
+    final segments = route
+        .split('/')
+        .where((segment) => segment.isNotEmpty)
+        .toList();
+    final encoded = segments.isEmpty ? uri.toString() : segments.last;
+    final pointer = naddrDecode(encoded);
+    if (pointer.kind != NostrPosKinds.posProfile) {
+      throw ArgumentError('URL does not point to a POS profile');
+    }
+    final baseSegments = segments.take(segments.length - 1).join('/');
+    final baseUrl = uri.hasScheme ? _profileBaseUrl(uri, baseSegments) : '';
+    return PosProfileUrl(
+      posId: pointer.identifier,
+      merchantPubkey: pointer.pubkey,
+      relays: pointer.relays,
+      baseUrl: baseUrl,
+    );
+  }
+}
+
+String _profileBaseUrl(Uri uri, String baseSegments) {
+  final origin = '${uri.scheme}://${uri.authority}';
+  if (uri.fragment.isNotEmpty) {
+    final path = uri.path.isEmpty ? '' : uri.path;
+    return '$origin$path#/$baseSegments';
+  }
+  return baseSegments.isEmpty ? origin : '$origin/$baseSegments';
+}
+
 String naddrEncode({
   required String identifier,
   required String pubkey,

@@ -226,30 +226,6 @@ class LiquidTransactionClient {
   }
 }
 
-class ControllerRecoveryResult {
-  ControllerRecoveryResult({
-    required this.swapId,
-    required this.status,
-    this.providerStatus,
-    this.claimTxid,
-    this.reason,
-  });
-
-  final String swapId;
-  final String status;
-  final String? providerStatus;
-  final String? claimTxid;
-  final String? reason;
-
-  Map<String, Object?> toJson() => {
-    'swap_id': swapId,
-    'status': status,
-    'provider_status': providerStatus,
-    'claim_txid': claimTxid,
-    'reason': reason,
-  };
-}
-
 class ControllerRecoveryExecutor {
   ControllerRecoveryExecutor({
     required SwapStatusClient swapStatusClient,

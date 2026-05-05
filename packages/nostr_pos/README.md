@@ -34,13 +34,15 @@ Required Dart SDK is `>=3.10.0 <4.0.0`.
 | Recovery | `src/recovery/swap_recovery.dart`, `claim_recovery.dart` | Parse swap-recovery backups, decrypt per-terminal AES-GCM blobs, drive a `ControllerRecoveryExecutor` that polls Boltz status and broadcasts claim transactions on Liquid. |
 | FX | `src/fx/bull_bitcoin.dart` | Anonymous Bull Bitcoin index-price client used for fiat→sats quotes. |
 
-A single `import 'package:nostr_pos/nostr_pos.dart';` re-exports every public
-symbol (see `lib/nostr_pos.dart`).
+Core protocol symbols are exported from
+`import 'package:nostr_pos/nostr_pos.dart';`. VM-only helpers such as relay
+websockets, claim recovery clients, and `LocalEventStore` are exported from
+`import 'package:nostr_pos/nostr_pos_io.dart';`.
 
 ## Quickstart
 
 ```dart
-import 'package:nostr_pos/nostr_pos.dart';
+import 'package:nostr_pos/nostr_pos_io.dart';
 
 Future<void> main() async {
   // 1. Generate a merchant key (or load one from your secret store).

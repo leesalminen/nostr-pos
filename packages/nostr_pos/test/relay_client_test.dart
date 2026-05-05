@@ -6,7 +6,7 @@ import 'package:ndk/data_layer/repositories/signers/bip340_event_signer.dart';
 import 'package:ndk/domain_layer/entities/nip_01_event.dart';
 import 'package:ndk/domain_layer/usecases/accounts/accounts.dart';
 import 'package:ndk/domain_layer/usecases/gift_wrap/gift_wrap.dart';
-import 'package:nostr_pos/nostr_pos.dart';
+import 'package:nostr_pos/nostr_pos_io.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -227,6 +227,68 @@ void main() {
 
     expect(found.single.id, recovery.id);
     expect(jsonDecode(found.single.content), containsPair('swap_id', 'swap1'));
+    await server.close(force: true);
+  });
+
+  test('publishes NIP-59 swap recovery backup updates', () async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    const recoveryPrivkey =
+        '0000000000000000000000000000000000000000000000000000000000000003';
+    final recoveryPubkey = publicKeyFromPrivateKey(recoveryPrivkey);
+    final recovery = buildUnsignedEvent(
+      pubkey: recoveryPubkey,
+      kind: NostrPosKinds.swapRecoveryBackup,
+      tags: [
+        ['sale', 'sale1'],
+        ['swap', 'swap1'],
+      ],
+      content: {
+        'sale_id': 'sale1',
+        'payment_attempt_id': 'attempt1',
+        'swap_id': 'swap1',
+        'expires_at': DateTime.now().millisecondsSinceEpoch ~/ 1000 + 3600,
+        'encrypted_local_blob': 'ciphertext',
+        'claim': {'claim_txid': 'claimtxid'},
+      },
+      createdAt: 1000,
+    );
+    final published = Completer<NostrPosEvent>();
+    unawaited(
+      server.forEach((request) async {
+        final socket = await WebSocketTransformer.upgrade(request);
+        await for (final message in socket) {
+          final decoded = jsonDecode(message as String) as List<Object?>;
+          if (decoded.first != 'EVENT') continue;
+          final event = NostrPosEvent.fromJson(
+            (decoded[1] as Map).cast<String, Object?>(),
+          );
+          if (!published.isCompleted) published.complete(event);
+          socket.add(jsonEncode(['OK', event.id, true, '']));
+        }
+      }),
+    );
+
+    final relayUrl = 'ws://${server.address.host}:${server.port}';
+    final results = await publishSwapRecoveryBackup(
+      relays: [relayUrl],
+      recoveryEvent: recovery,
+      recoveryPrivkey: recoveryPrivkey,
+      recoveryPubkey: recoveryPubkey,
+    );
+    final wrapped = await published.future;
+    final unwrapped = await unwrapRecoveryGiftWraps(
+      wrappedEvents: [wrapped],
+      recoveryPrivkey: recoveryPrivkey,
+    );
+
+    expect(results.single.ok, isTrue);
+    expect(wrapped.kind, NostrPosKinds.giftWrap);
+    expect(wrapped.tags, contains(equals(['p', recoveryPubkey])));
+    expect(unwrapped.single.id, recovery.id);
+    expect(
+      jsonDecode(unwrapped.single.content),
+      containsPair('swap_id', 'swap1'),
+    );
     await server.close(force: true);
   });
 }

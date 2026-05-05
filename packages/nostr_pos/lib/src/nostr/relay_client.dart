@@ -269,6 +269,46 @@ Future<List<NostrPosEvent>> fetchSwapRecoveryBackups({
     ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 }
 
+Future<NostrPosEvent> wrapRecoveryBackup({
+  required NostrPosEvent recoveryEvent,
+  required String recoveryPrivkey,
+  String? recoveryPubkey,
+}) async {
+  if (recoveryEvent.kind != NostrPosKinds.swapRecoveryBackup ||
+      !recoveryEvent.hasProtocolTag ||
+      !recoveryEvent.idMatches) {
+    throw ArgumentError('recoveryEvent must be a valid swap recovery event');
+  }
+  final recipientPubkey =
+      recoveryPubkey ?? publicKeyFromPrivateKey(recoveryPrivkey);
+  final signer = Bip340EventSigner(
+    privateKey: recoveryPrivkey,
+    publicKey: publicKeyFromPrivateKey(recoveryPrivkey),
+  );
+  final giftWrap = GiftWrap(accounts: Accounts());
+  final wrapped = await giftWrap.toGiftWrap(
+    rumor: _toNip01Event(recoveryEvent),
+    recipientPubkey: recipientPubkey,
+    customSigner: signer,
+  );
+  return _fromNip01Event(wrapped);
+}
+
+Future<List<RelayPublishResult>> publishSwapRecoveryBackup({
+  required List<String> relays,
+  required NostrPosEvent recoveryEvent,
+  required String recoveryPrivkey,
+  String? recoveryPubkey,
+  NostrRelayClient? client,
+}) async {
+  final wrapped = await wrapRecoveryBackup(
+    recoveryEvent: recoveryEvent,
+    recoveryPrivkey: recoveryPrivkey,
+    recoveryPubkey: recoveryPubkey,
+  );
+  return publishEventToRelays(relays: relays, event: wrapped, client: client);
+}
+
 Future<List<NostrPosEvent>> unwrapRecoveryGiftWraps({
   required List<NostrPosEvent> wrappedEvents,
   required String recoveryPrivkey,

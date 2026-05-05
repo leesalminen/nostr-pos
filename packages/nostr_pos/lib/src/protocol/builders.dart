@@ -21,9 +21,7 @@ NostrPosEvent buildPosProfileEvent({
       ['d', posId],
       ['name', profile.name],
       ['merchant', profile.merchantName],
-      ['method', 'liquid'],
-      ['method', 'lightning_via_swap'],
-      ['method', 'bolt_card'],
+      ...profile.paymentMethods.toMethodTags(),
       ['network', profile.network.protocolName],
       ...profile.relays.map((relay) => ['relay', relay]),
       ['claim_mode', 'standard'],
@@ -33,9 +31,26 @@ NostrPosEvent buildPosProfileEvent({
   );
 }
 
+NostrPosEvent buildSignedPosProfileEvent({
+  required String merchantPubkey,
+  required String posId,
+  required PosProfile profile,
+  required String merchantPrivkey,
+}) {
+  return signNostrPosEvent(
+    buildPosProfileEvent(
+      merchantPubkey: merchantPubkey,
+      posId: posId,
+      profile: profile,
+    ),
+    merchantPrivkey,
+  );
+}
+
 NostrPosEvent buildPairingAnnouncement({
   required String terminalPubkey,
   int? createdAt,
+  Duration ttl = const Duration(seconds: 120),
 }) {
   final ts = createdAt ?? DateTime.now().millisecondsSinceEpoch ~/ 1000;
   final code = pairingCodeFromPubkey(terminalPubkey);
@@ -46,13 +61,36 @@ NostrPosEvent buildPairingAnnouncement({
     tags: [
       ['d', code],
       ['p', terminalPubkey],
-      ['expiration', (ts + 120).toString()],
+      ['expiration', (ts + ttl.inSeconds).toString()],
     ],
     content: {
       'pairing_code': code,
       'terminal_pubkey': terminalPubkey,
       'created_at': ts,
     },
+  );
+}
+
+Future<NostrPosEvent> buildSignedTerminalAuthorizationEvent({
+  required TerminalAuthorization authorization,
+  required String merchantPubkey,
+  required String posId,
+  required String merchantPrivkey,
+  required String terminalPubkey,
+}) async {
+  final unsigned = buildTerminalAuthorizationEvent(
+    merchantPubkey: merchantPubkey,
+    posId: posId,
+    authorization: authorization,
+  );
+  final encrypted = await nip44EncryptToPubkey(
+    plaintext: unsigned.content,
+    privateKeyHex: merchantPrivkey,
+    publicKeyHex: terminalPubkey,
+  );
+  return signNostrPosEvent(
+    replaceEventContent(unsigned, encrypted),
+    merchantPrivkey,
   );
 }
 
@@ -69,6 +107,29 @@ NostrPosEvent buildTerminalAuthorizationEvent({
       ['expires', authorization.expiresAt.toString()],
     ],
     content: authorization.toJson(),
+  );
+}
+
+Future<NostrPosEvent> buildSignedTerminalRevocationEvent({
+  required String merchantPubkey,
+  required String merchantPrivkey,
+  required String posId,
+  required String terminalPubkey,
+  required String terminalId,
+  String reason = 'merchant_revoked',
+  int? revokedAt,
+}) async {
+  return signNostrPosEvent(
+    await buildTerminalRevocationEvent(
+      merchantPubkey: merchantPubkey,
+      merchantPrivkey: merchantPrivkey,
+      posId: posId,
+      terminalPubkey: terminalPubkey,
+      terminalId: terminalId,
+      reason: reason,
+      revokedAt: revokedAt,
+    ),
+    merchantPrivkey,
   );
 }
 
