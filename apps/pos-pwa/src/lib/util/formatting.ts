@@ -1,11 +1,12 @@
 import type { PaymentMethod, SaleStatus } from '../pos/types';
 
-export function formatFiat(amount: string | number, currency: string): string {
+export function formatFiat(amount: string | number, currency: string, showCents = false): string {
   const value = typeof amount === 'string' ? Number(amount) : amount;
   return new Intl.NumberFormat(undefined, {
     style: 'currency',
     currency,
-    maximumFractionDigits: currency === 'CRC' ? 0 : 2
+    minimumFractionDigits: showCents ? 2 : 0,
+    maximumFractionDigits: showCents ? 2 : currency === 'CRC' ? 0 : 2
   }).format(value);
 }
 

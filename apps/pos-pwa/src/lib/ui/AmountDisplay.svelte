@@ -2,7 +2,8 @@
   import { formatFiat } from '../util/formatting';
 
   let { amount, currency }: { amount: string; currency: string } = $props();
-  const display = $derived(formatFiat(Number(amount || '0'), currency));
+  const showCents = $derived(amount.includes('.'));
+  const display = $derived(formatFiat(Number(amount || '0'), currency, showCents));
 </script>
 
 <div class="text-right">

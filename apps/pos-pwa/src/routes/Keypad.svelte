@@ -9,6 +9,7 @@
   import { terminal, loadTerminal } from '../lib/stores/terminal';
   import { refreshTransactions } from '../lib/stores/ledger';
   import { createTerminalTabLock, type TerminalTabLock } from '../lib/security/tab-lock';
+  import { applyAmountInput } from '../lib/pos/amount-input';
 
   let amount = $state('');
   let note = $state('');
@@ -61,8 +62,7 @@
   });
 
   function applyInput(value: string) {
-    if (value === 'back') amount = amount.slice(0, -1);
-    else amount = (amount + value).replace(/^0+(?=\d)/, '').slice(0, 9);
+    amount = applyAmountInput(amount, value);
   }
 
   async function charge() {
