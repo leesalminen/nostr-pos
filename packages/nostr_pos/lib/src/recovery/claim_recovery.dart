@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
@@ -34,15 +36,38 @@ abstract class SwapStatusClient {
 }
 
 class BoltzSwapStatusClient implements SwapStatusClient {
-  BoltzSwapStatusClient({required String apiBase, http.Client? client})
-    : _apiBase = apiBase.replaceAll(RegExp(r'/+$'), ''),
-      _client = client ?? http.Client();
+  BoltzSwapStatusClient({
+    required String apiBase,
+    String? webSocketUrl,
+    Duration webSocketTimeout = Duration.zero,
+    http.Client? client,
+  }) : _apiBase = apiBase.replaceAll(RegExp(r'/+$'), ''),
+       _webSocketUrl = webSocketUrl,
+       _webSocketTimeout = webSocketTimeout,
+       _client = client ?? http.Client();
 
   final String _apiBase;
+  final String? _webSocketUrl;
+  final Duration _webSocketTimeout;
   final http.Client _client;
 
   @override
   Future<SwapStatusDetails> getSwapStatusDetails(String swapId) async {
+    final details = await _getRestSwapStatusDetails(swapId);
+    if (_shouldFetchReverseSwapTransaction(details)) {
+      final transactionDetails = await _getReverseSwapTransactionDetails(
+        swapId,
+        fallbackStatus: details.status,
+      );
+      if (transactionDetails != null) return transactionDetails;
+    }
+    if (_shouldWaitForWebSocket(details)) {
+      return _waitForWebSocketUpdate(swapId, fallback: details);
+    }
+    return details;
+  }
+
+  Future<SwapStatusDetails> _getRestSwapStatusDetails(String swapId) async {
     final response = await _client.get(
       Uri.parse('$_apiBase/v2/swap/${Uri.encodeComponent(swapId)}'),
     );
@@ -50,15 +75,124 @@ class BoltzSwapStatusClient implements SwapStatusClient {
       return SwapStatusDetails(status: 'created');
     }
     final json = jsonDecode(response.body) as Map<String, Object?>;
-    final transaction = json['transaction'] is Map
-        ? (json['transaction'] as Map).cast<String, Object?>()
-        : null;
+    return _detailsFromBoltzJson(json);
+  }
+
+  bool _shouldFetchReverseSwapTransaction(SwapStatusDetails details) =>
+      details.status == 'invoice.paid' &&
+      details.txid == null &&
+      details.transactionHex == null;
+
+  Future<SwapStatusDetails?> _getReverseSwapTransactionDetails(
+    String swapId, {
+    required String fallbackStatus,
+  }) async {
+    final response = await _client.get(
+      Uri.parse(
+        '$_apiBase/v2/swap/reverse/${Uri.encodeComponent(swapId)}/transaction',
+      ),
+    );
+    if (response.statusCode < 200 || response.statusCode >= 300) return null;
+    final json = jsonDecode(response.body) as Map<String, Object?>;
+    final txid = json['id'] as String?;
+    final transactionHex = json['hex'] as String?;
+    if (txid == null && transactionHex == null) return null;
     return SwapStatusDetails(
-      status: _normalizeBoltzStatus(json['status']),
-      txid: transaction?['id'] as String?,
-      transactionHex: transaction?['hex'] as String?,
+      status: fallbackStatus,
+      txid: txid,
+      transactionHex: transactionHex,
     );
   }
+
+  bool _shouldWaitForWebSocket(SwapStatusDetails details) =>
+      _webSocketUrl != null &&
+      _webSocketTimeout > Duration.zero &&
+      details.status == 'invoice.paid' &&
+      details.txid == null &&
+      details.transactionHex == null;
+
+  Future<SwapStatusDetails> _waitForWebSocketUpdate(
+    String swapId, {
+    required SwapStatusDetails fallback,
+  }) async {
+    WebSocket? socket;
+    try {
+      socket = await WebSocket.connect(
+        _normalizeBoltzWebSocketUrl(_webSocketUrl!),
+      );
+      socket.add(
+        jsonEncode({
+          'op': 'subscribe',
+          'channel': 'swap.update',
+          'args': [swapId],
+        }),
+      );
+
+      await for (final message in socket.timeout(_webSocketTimeout)) {
+        final details = _detailsFromBoltzWebSocketMessage(message, swapId);
+        if (details == null) continue;
+        if (details.txid != null ||
+            details.transactionHex != null ||
+            details.status == 'transaction.claimed') {
+          return details;
+        }
+        if (details.status != 'invoice.paid') return details;
+      }
+    } on TimeoutException {
+      return fallback;
+    } catch (_) {
+      return fallback;
+    } finally {
+      await socket?.close();
+    }
+    return fallback;
+  }
+}
+
+String _normalizeBoltzWebSocketUrl(String url) {
+  var uri = Uri.parse(url);
+  final scheme = switch (uri.scheme) {
+    'http' => 'ws',
+    'https' => 'wss',
+    _ => uri.scheme,
+  };
+  uri = uri.replace(scheme: scheme);
+  if (uri.path.endsWith('/v2/ws')) return uri.toString();
+  final base = uri.replace(path: uri.path.replaceAll(RegExp(r'/+$'), ''));
+  return base.replace(path: '${base.path}/v2/ws').toString();
+}
+
+SwapStatusDetails _detailsFromBoltzJson(Map<String, Object?> json) {
+  final transaction = json['transaction'] is Map
+      ? (json['transaction'] as Map).cast<String, Object?>()
+      : null;
+  return SwapStatusDetails(
+    status: _normalizeBoltzStatus(json['status']),
+    txid: transaction?['id'] as String?,
+    transactionHex: transaction?['hex'] as String?,
+  );
+}
+
+SwapStatusDetails? _detailsFromBoltzWebSocketMessage(
+  Object? message,
+  String swapId,
+) {
+  if (message is! String) return null;
+  final decoded = jsonDecode(message);
+  if (decoded is! Map) return null;
+  final json = decoded.cast<String, Object?>();
+  if (json['event'] != 'update' || json['channel'] != 'swap.update') {
+    return null;
+  }
+  final args = json['args'];
+  if (args is! List) return null;
+  for (final arg in args) {
+    if (arg is! Map) continue;
+    final update = arg.cast<String, Object?>();
+    if (update['id'] != swapId) continue;
+    return _detailsFromBoltzJson(update);
+  }
+  return null;
 }
 
 class LiquidTransactionClient {
@@ -134,6 +268,8 @@ class ControllerRecoveryExecutor {
     String? terminalId,
     double? feeSatPerVbyte,
     DateTime? now,
+    Duration lockupPollTimeout = Duration.zero,
+    Duration lockupPollInterval = const Duration(seconds: 5),
   }) async {
     final results = <ControllerRecoveryResult>[];
     for (final recovery in recoveries) {
@@ -143,6 +279,8 @@ class ControllerRecoveryExecutor {
           terminalId: terminalId,
           feeSatPerVbyte: feeSatPerVbyte,
           now: now,
+          lockupPollTimeout: lockupPollTimeout,
+          lockupPollInterval: lockupPollInterval,
         ),
       );
     }
@@ -154,6 +292,8 @@ class ControllerRecoveryExecutor {
     String? terminalId,
     double? feeSatPerVbyte,
     DateTime? now,
+    Duration lockupPollTimeout = Duration.zero,
+    Duration lockupPollInterval = const Duration(seconds: 5),
   }) async {
     if (_expiredAt(recovery, now ?? DateTime.now())) {
       return ControllerRecoveryResult(
@@ -195,7 +335,23 @@ class ControllerRecoveryExecutor {
           claimTxid: claimTxid,
         );
       }
-      if (status != null && !_claimableStatus(status.status)) {
+      status = await _pollForLockupMaterial(
+        recovery,
+        status,
+        timeout: lockupPollTimeout,
+        interval: lockupPollInterval,
+      );
+      if (status?.status == 'transaction.claimed') {
+        return ControllerRecoveryResult(
+          swapId: recovery.swapId,
+          status: 'already_claimed',
+          providerStatus: status!.status,
+        );
+      }
+      final hasLockupMaterial = _hasLockupMaterial(recovery, status);
+      if (status != null &&
+          !_claimableStatus(status.status) &&
+          !hasLockupMaterial) {
         return ControllerRecoveryResult(
           swapId: recovery.swapId,
           status: 'waiting',
@@ -255,6 +411,28 @@ class ControllerRecoveryExecutor {
       );
     }
   }
+
+  Future<SwapStatusDetails?> _pollForLockupMaterial(
+    SwapRecoverySummary recovery,
+    SwapStatusDetails? status, {
+    required Duration timeout,
+    required Duration interval,
+  }) async {
+    if (timeout <= Duration.zero || !_shouldPollForLockup(status)) {
+      return status;
+    }
+    final deadline = DateTime.now().add(timeout);
+    var latest = status;
+    while (DateTime.now().isBefore(deadline) &&
+        !_claimableStatus(latest?.status ?? '') &&
+        !_hasLockupMaterial(recovery, latest)) {
+      if (interval > Duration.zero) await Future<void>.delayed(interval);
+      latest = await _swapStatusClient.getSwapStatusDetails(recovery.swapId);
+      if (latest.status == 'transaction.claimed') return latest;
+      if (!_shouldPollForLockup(latest)) return latest;
+    }
+    return latest;
+  }
 }
 
 String _normalizeBoltzStatus(Object? status) {
@@ -277,6 +455,17 @@ String _normalizeBoltzStatus(Object? status) {
 
 bool _claimableStatus(String status) =>
     status == 'transaction.mempool' || status == 'transaction.confirmed';
+
+bool _hasLockupMaterial(
+  SwapRecoverySummary recovery,
+  SwapStatusDetails? status,
+) =>
+    recovery.lockupTxHex != null ||
+    status?.transactionHex != null ||
+    status?.txid != null;
+
+bool _shouldPollForLockup(SwapStatusDetails? status) =>
+    status?.status == 'invoice.paid' || status?.status == 'invoice.settled';
 
 bool _expiredAt(SwapRecoverySummary recovery, DateTime now) =>
     recovery.expiresAt <= now.millisecondsSinceEpoch ~/ 1000;
