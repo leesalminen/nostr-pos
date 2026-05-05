@@ -88,15 +88,15 @@
   const displayAmount = $derived(amount || '0');
 </script>
 
-<main class="min-h-[100dvh] bg-[#f5f0e8] text-[#211f1a] dark:bg-[#161512] dark:text-[#fff6e8]">
+<main class="h-[100dvh] overflow-hidden bg-[#f5f0e8] text-[#211f1a] dark:bg-[#161512] dark:text-[#fff6e8]">
   {#if booting}
-    <div class="grid min-h-[100dvh] place-items-center">
+    <div class="grid h-[100dvh] place-items-center">
       <BullSpinner size={72} />
     </div>
   {:else}
-  <div class="mx-auto flex min-h-[100dvh] max-w-4xl flex-col">
-    <section class="flex min-h-[100dvh] flex-1 flex-col px-5 py-4 sm:px-8 sm:py-6">
-      <header class="mb-4 flex items-center justify-between gap-4 sm:mb-6">
+  <div class="mx-auto flex h-[100dvh] max-w-4xl flex-col overflow-hidden">
+    <section class="flex min-h-0 flex-1 flex-col overflow-hidden px-5 py-3 sm:px-8 sm:py-5">
+      <header class="mb-3 flex shrink-0 items-center justify-between gap-4 sm:mb-5">
         <div>
           <h1 class="font-display text-3xl uppercase tracking-display leading-none">{$terminal?.merchantName ?? 'Seguras Butcher'}</h1>
           <p class="mt-0.5 text-xs font-medium uppercase tracking-[0.12em] text-[#776b5a] dark:text-[#b9aa91]">{$terminal?.posName ?? 'Counter 1'}</p>
@@ -111,7 +111,7 @@
         </div>
       </header>
 
-      <div class="mx-auto flex w-full max-w-xl flex-1 flex-col justify-center gap-4 sm:gap-6">
+      <div class="mx-auto flex min-h-0 w-full max-w-xl flex-1 flex-col justify-center gap-3 overflow-hidden sm:gap-5">
         {#if tabReadOnly}
           <div class="rounded-md bg-[#ffe0d9] px-5 py-4 text-center text-[#8c2d28]">
             <p class="font-display text-3xl uppercase tracking-display leading-none">Terminal open in another tab</p>
@@ -126,7 +126,7 @@
         <AmountDisplay amount={displayAmount} currency={$terminal?.currency ?? 'CRC'} />
         <Keypad onInput={applyInput} />
         <textarea
-          class="min-h-12 rounded-lg border border-[#d7c8b4] bg-[#fffaf0] px-4 py-3 text-base outline-none focus:ring-2 focus:ring-[#B7000B] dark:border-[#3a342a] dark:bg-[#211f1a]"
+          class="min-h-12 shrink-0 rounded-lg border border-[#d7c8b4] bg-[#fffaf0] px-4 py-3 text-base outline-none focus:ring-2 focus:ring-[#B7000B] dark:border-[#3a342a] dark:bg-[#211f1a]"
           bind:value={note}
           placeholder="Add note"
           rows="1"
@@ -138,7 +138,7 @@
         <BullFooter />
       </div>
 
-      <div class="sticky bottom-0 mx-auto mt-3 flex w-full max-w-xl flex-col bg-gradient-to-t from-[#f5f0e8] from-60% to-transparent pb-[max(0.25rem,env(safe-area-inset-bottom))] pt-3 dark:from-[#161512]">
+      <div class="mx-auto mt-2 flex w-full max-w-xl shrink-0 flex-col bg-gradient-to-t from-[#f5f0e8] from-60% to-transparent pb-[max(0.25rem,env(safe-area-inset-bottom))] pt-2 dark:from-[#161512]">
         {#if !lockedMessage}
           <Button disabled={!canCharge || preparing} onclick={charge}>
             {preparing ? 'Preparing' : 'Charge'}

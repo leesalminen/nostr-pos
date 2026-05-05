@@ -24,6 +24,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg'],
       workbox: {
+        clientsClaim: true,
+        skipWaiting: true,
         maximumFileSizeToCacheInBytes: 12 * 1024 * 1024
       },
       manifest: {
